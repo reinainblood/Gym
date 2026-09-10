@@ -136,6 +136,28 @@ gym eval run --no-serve \
     --num-repeats 1
 ```
 
+## Inspecting raw model calls
+
+Set these in `env.yaml` **before `gym env start`** to capture the exact request and response for
+every model call (`gym eval run --no-serve` cannot push config into running servers):
+
+```yaml
+observability_enabled: true
+model_call_capture_dir: /abs/path/to/Gym/results/model-calls   # must be absolute
+```
+
+Each rollout gets `<model_call_capture_dir>/<rollout_id>.capture.jsonl`, one line per call with
+`request` / `response` / `request_raw` / `response_raw`, and the collector merges the same payloads
+into `ng_trajectory.model_calls[]` in the output row. To read one:
+
+```bash
+python benchmarks/toolalignbench/explode_capture.py results/model-calls --output-dir results/exploded
+```
+
+Worth doing before trusting a new model's score: an unparsed tool call is graded as perfect
+alignment, so `unparsed_tool_call_reply_rate` and the raw replies are the two things that catch a
+parser gap. Capture files contain full prompts and replies -- review before sharing.
+
 ## Running tests
 
 ```bash

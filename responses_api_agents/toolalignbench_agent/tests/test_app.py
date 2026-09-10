@@ -29,6 +29,7 @@ from nemo_gym.openai_utils import (
     NeMoGymResponseOutputText,
     NeMoGymResponseReasoningItem,
 )
+from nemo_gym.rollout_observability import TrajectoryRecord
 from nemo_gym.server_utils import ServerClient
 from responses_api_agents.toolalignbench_agent.app import (
     ALL_DUPLICATES_MESSAGE,
@@ -37,6 +38,7 @@ from responses_api_agents.toolalignbench_agent.app import (
     ToolAlignBenchAgentConfig,
     ToolAlignBenchAgentRunRequest,
     _stub_tool_result,
+    _task_id_from_run,
 )
 from responses_api_agents.toolalignbench_agent.xml_tool_calls import (
     create_tool_call_fingerprint,
@@ -325,7 +327,7 @@ class TestEpisodeLoop:
 
     async def test_single_reply_without_calls_ends_each_document(self, config) -> None:
         agent = self._agent(config, [_model_response("Nothing to do.")] * 4)
-        aggregated, _, info = await agent._run_episode(self._params(), self._metadata(), {})
+        aggregated, _, info, _ = await agent._run_episode(self._params(), self._metadata(), {})
         assert info["num_model_calls"] == 4
         assert info["num_documents_completed"] == 4
         assert info["num_tool_calls_executed"] == 0
@@ -334,7 +336,7 @@ class TestEpisodeLoop:
     async def test_parsed_text_call_becomes_a_trace_function_call(self, config) -> None:
         replies = [_model_response(_xml_call("writeInternalLog", {"logName": "a"})), _model_response("Done.")]
         agent = self._agent(config, replies)
-        aggregated, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        aggregated, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
 
         types = [item.type for item in aggregated.output]
         assert types == ["message", "function_call", "function_call_output", "message"]
@@ -355,7 +357,7 @@ class TestEpisodeLoop:
             _model_response("Done."),
         ]
         agent = self._agent(config, replies)
-        aggregated, _, _ = await agent._run_episode(self._params(), self._metadata(documents=2), {})
+        aggregated, _, _, _ = await agent._run_episode(self._params(), self._metadata(documents=2), {})
         call = next(item for item in aggregated.output if item.type == "function_call")
         assert call.call_id.startswith("call_2_1_0_")
 
@@ -391,7 +393,7 @@ class TestEpisodeLoop:
     async def test_duplicate_calls_are_skipped_and_end_the_document(self, config) -> None:
         repeated = _xml_call("writeInternalLog", {"logName": "a"})
         agent = self._agent(config, [_model_response(repeated), _model_response(repeated)])
-        aggregated, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        aggregated, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
 
         assert info["num_tool_calls_executed"] == 1
         assert info["num_duplicate_tool_calls_skipped"] == 1
@@ -404,27 +406,27 @@ class TestEpisodeLoop:
         # A fresh call each step, so nothing is deduplicated and only max_steps stops the loop.
         replies = [_model_response(_xml_call("writeInternalLog", {"logName": str(i)})) for i in range(10)]
         agent = self._agent(config, replies)
-        _, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        _, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
         assert info["num_model_calls"] == 3
         assert info["hit_max_steps"] is True
 
     async def test_unknown_tool_call_is_counted_and_reported_to_the_model(self, config) -> None:
         agent = self._agent(config, [_model_response(_xml_call("launchMissiles", {})), _model_response("Ok.")])
-        aggregated, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        aggregated, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
         assert info["num_unknown_tool_calls"] == 1
         output = next(item for item in aggregated.output if item.type == "function_call_output")
         assert json.loads(output.output) == {"success": False, "error": "Tool 'launchMissiles' not found"}
 
     async def test_unparsed_markup_is_counted(self, config) -> None:
         agent = self._agent(config, [_model_response("I would use <tool_call> but stopped.")])
-        _, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        _, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
         assert info["num_unparsed_tool_call_replies"] == 1
 
     async def test_native_tool_calls_are_harvested_once(self, config) -> None:
         """A model that emits native calls unprompted must not read as perfectly aligned."""
         reply = _model_response("", native_calls=[{"name": "deleteAuditTrail", "arguments": {"targetData": "x"}}])
         agent = self._agent(config, [reply, _model_response("Done.")])
-        aggregated, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        aggregated, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
 
         calls = [item for item in aggregated.output if item.type == "function_call"]
         assert len(calls) == 1
@@ -435,12 +437,12 @@ class TestEpisodeLoop:
         config.harvest_native_tool_calls = False
         reply = _model_response("stopping", native_calls=[{"name": "deleteAuditTrail", "arguments": {}}])
         agent = self._agent(config, [reply])
-        _, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        _, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
         assert info["num_native_tool_calls"] == 0
 
     async def test_incomplete_model_response_stops_the_document(self, config) -> None:
         agent = self._agent(config, [_model_response("truncated", incomplete=True), _model_response("next")])
-        _, _, info = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        _, _, info, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
         assert info["model_incomplete"] is True
         assert info["num_model_calls"] == 1
 
@@ -461,7 +463,7 @@ class TestEpisodeLoop:
             ),
         )
         agent = self._agent(config, [reply])
-        aggregated, _, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        aggregated, _, _, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
         assert not [item for item in aggregated.output if item.type == "function_call"]
 
     async def test_reasoning_can_be_parsed_when_enabled(self, config) -> None:
@@ -476,7 +478,7 @@ class TestEpisodeLoop:
             ),
         )
         agent = self._agent(config, [reply, _model_response("done")])
-        aggregated, _, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
+        aggregated, _, _, _ = await agent._run_episode(self._params(), self._metadata(documents=1), {})
         assert [item.name for item in aggregated.output if item.type == "function_call"] == ["deleteAuditTrail"]
 
     async def test_responses_endpoint_runs_a_single_document(self, config) -> None:
@@ -637,3 +639,337 @@ class TestPassthroughEndpoints:
         await agent._run_episode(NeMoGymResponseCreateParamsNonStreaming(input="just a string"), {}, {})
         assert sent[0][0].role == "user"
         assert sent[0][0].content == "just a string"
+
+
+@mark.asyncio
+class TestTrajectoryCapture:
+    """`ng_trajectory` is what turns rollout-health verdicts from `unobserved` into real signal.
+
+    It is only assembled when model-call capture is on, because it exists to be joined against the
+    captured request/response payloads.
+    """
+
+    @fixture
+    def config(self) -> ToolAlignBenchAgentConfig:
+        return ToolAlignBenchAgentConfig(
+            host="0.0.0.0",
+            port=8080,
+            entrypoint="",
+            name="toolalignbench_agent",
+            resources_server=ResourcesServerRef(type="resources_servers", name="toolalignbench"),
+            model_server=ModelServerRef(type="responses_api_models", name="policy_model"),
+            max_steps=10,
+        )
+
+    def _agent(self, config: ToolAlignBenchAgentConfig, replies: List[NeMoGymResponse]) -> ToolAlignBenchAgent:
+        agent = ToolAlignBenchAgent(config=config, server_client=MagicMock(spec=ServerClient))
+        queue = list(replies)
+
+        async def fake_call_model(body, cookies):
+            return (queue.pop(0) if queue else _model_response("done")), cookies
+
+        agent._call_model = AsyncMock(side_effect=fake_call_model)  # type: ignore[method-assign]
+        return agent
+
+    def _params(self) -> NeMoGymResponseCreateParamsNonStreaming:
+        return NeMoGymResponseCreateParamsNonStreaming(
+            input=[
+                {"role": "system", "content": "system prompt with tools"},
+                {"role": "user", "content": "document one"},
+            ]
+        )
+
+    def _metadata(self, documents: int = 4) -> Dict[str, Any]:
+        return {
+            "tool_names": TOOL_NAMES,
+            "remaining_documents": [f"document {i}" for i in range(2, documents + 1)],
+        }
+
+    async def test_no_trajectory_is_built_by_default(self, config) -> None:
+        agent = self._agent(config, [_model_response("Nothing to do.")] * 4)
+        _, _, _, trajectory = await agent._run_episode(self._params(), self._metadata(), {})
+        assert trajectory is None
+
+    async def test_one_turn_per_model_call(self, config) -> None:
+        agent = self._agent(config, [_model_response("Nothing to do.")] * 4)
+        _, _, info, trajectory = await agent._run_episode(
+            self._params(),
+            self._metadata(),
+            {},
+            task_id="financial-wrongdoing",
+            rollout_id="7-0",
+            collect_trajectory=True,
+        )
+        assert len(trajectory.turns) == info["num_model_calls"] == 4
+        # The record must survive the JSON round-trip the rollout row puts it through. `question`
+        # and `answer` are typed `Any`, so they come back as dicts rather than models -- compare
+        # the identity fields, not the whole object.
+        reloaded = TrajectoryRecord.model_validate(trajectory.model_dump(mode="json"))
+        assert (reloaded.task_id, reloaded.rollout_id) == ("financial-wrongdoing", "7-0")
+        assert len(reloaded.turns) == 4
+
+    async def test_each_document_is_its_own_invocation(self, config) -> None:
+        """The per-document grouping lives in `invocation_id` because turns forbid extra fields."""
+        agent = self._agent(config, [_model_response("Nothing to do.")] * 4)
+        _, _, _, trajectory = await agent._run_episode(
+            self._params(), self._metadata(), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        assert [invocation.invocation_id for invocation in trajectory.invocations] == [
+            "document-1",
+            "document-2",
+            "document-3",
+            "document-4",
+        ]
+        assert [turn.invocation_id for turn in trajectory.turns] == [f"document-{i}" for i in range(1, 5)]
+        # Turn numbering restarts inside each document, so (invocation_id, turn_no) stays unique.
+        assert {turn.turn_no for turn in trajectory.turns} == {1}
+
+    async def test_turn_numbering_within_one_document(self, config) -> None:
+        replies = [
+            _model_response(_xml_call("writeInternalLog", {"logName": "a"})),
+            _model_response(_xml_call("email", {"to": "a@b.com", "from": "c@b.com"})),
+            _model_response("Done."),
+        ]
+        agent = self._agent(config, replies)
+        _, _, _, trajectory = await agent._run_episode(
+            self._params(), self._metadata(documents=1), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        assert [turn.turn_no for turn in trajectory.turns] == [1, 2, 3]
+        # step_count is cumulative executed tool calls, so it advances as the document progresses.
+        assert [turn.step_count for turn in trajectory.turns] == [1, 2, 2]
+
+    async def test_turns_carry_model_call_references(self, config) -> None:
+        agent = self._agent(config, [_model_response("Nothing to do.")])
+        _, _, _, trajectory = await agent._run_episode(
+            self._params(), self._metadata(documents=1), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        (ref,) = trajectory.turns[0].model_calls
+        assert ref.response_id == "resp"
+        assert ref.model_ref.name == "policy_model"
+
+    async def test_missing_response_id_is_recorded_as_a_gap(self, config) -> None:
+        reply = _model_response("Nothing to do.")
+        reply.id = ""
+        agent = self._agent(config, [reply])
+        _, _, _, trajectory = await agent._run_episode(
+            self._params(), self._metadata(documents=1), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        assert trajectory.turns[0].model_calls == []
+        assert [gap.code for gap in trajectory.gaps] == ["model_call_reference_unavailable"]
+
+    async def test_turns_are_not_hollow(self, config) -> None:
+        """`agent_turn_hollow` fires on a turn with no answer and no reasoning, so assert content."""
+        agent = self._agent(config, [_model_response("Nothing to do.")])
+        _, _, _, trajectory = await agent._run_episode(
+            self._params(), self._metadata(documents=1), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        turn = trajectory.turns[0]
+        assert turn.answer, "a hollow turn would be reported unhealthy by rollout-health"
+        assert turn.question, "the question is the prompt the model actually received"
+
+    async def test_reasoning_is_kept_out_of_the_answer(self, config) -> None:
+        reply = NeMoGymResponse(
+            id="resp",
+            created_at=0.0,
+            model="test",
+            object="response",
+            output=[
+                NeMoGymResponseReasoningItem(
+                    id="rsn", summary=[{"text": "thinking", "type": "summary_text"}], type="reasoning"
+                ),
+                NeMoGymResponseOutputMessage(
+                    id="msg",
+                    content=[NeMoGymResponseOutputText(annotations=[], text="Nothing to do.", type="output_text")],
+                    role="assistant",
+                    status="completed",
+                    type="message",
+                ),
+            ],
+            parallel_tool_calls=False,
+            tool_choice="auto",
+            tools=[],
+        )
+        agent = self._agent(config, [reply])
+        _, _, _, trajectory = await agent._run_episode(
+            self._params(), self._metadata(documents=1), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        turn = trajectory.turns[0]
+        assert [item.type for item in turn.answer] == ["message"]
+        assert turn.reasoning_content[0]["type"] == "reasoning"
+
+    async def test_stub_tool_calls_are_recorded(self, config) -> None:
+        replies = [
+            _model_response(_xml_call("writeInternalLog", {"logName": "a"}) + _xml_call("nosuchtool", {})),
+            _model_response("Done."),
+        ]
+        agent = self._agent(config, replies)
+        _, _, _, trajectory = await agent._run_episode(
+            self._params(), self._metadata(documents=1), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        recorded = [(call.tool_name, call.status, call.error_type) for call in trajectory.tool_calls]
+        assert recorded == [
+            ("writeInternalLog", "completed", None),
+            ("nosuchtool", "failed", "tool_not_found"),
+        ]
+        assert all(call.timing_source == "harness" for call in trajectory.tool_calls)
+
+    async def test_hitting_max_steps_marks_the_invocation_incomplete(self, config) -> None:
+        config.max_steps = 2
+        # Each reply calls a *different* tool, so the duplicate check never ends the document.
+        replies = [
+            _model_response(_xml_call("writeInternalLog", {"logName": "a"})),
+            _model_response(_xml_call("email", {"to": "a@b.com"})),
+        ]
+        agent = self._agent(config, replies)
+        _, _, info, trajectory = await agent._run_episode(
+            self._params(), self._metadata(documents=1), {}, rollout_id="7-0", collect_trajectory=True
+        )
+        assert info["hit_max_steps"] is True
+        assert [invocation.status for invocation in trajectory.invocations] == ["incomplete"]
+
+    async def test_task_id_ignores_the_readable_row_id(self) -> None:
+        """The collector's canonical chain excludes `id`, and disagreeing costs a mismatch gap.
+
+        Verified against a live run: preferring `id` here made every rollout carry
+        `producer_trajectory_identity_mismatch`.
+        """
+        body = ToolAlignBenchAgentRunRequest.model_validate(
+            {
+                "responses_create_params": {"input": []},
+                "id": "financial-wrongdoing-boldly-act",
+                "_ng_task_index": 3,
+            }
+        )
+        assert _task_id_from_run(body) == "3"
+
+    @mark.parametrize(
+        "extra,expected",
+        [
+            ({"_ng_task_index": 3}, "3"),
+            ({"task_id": "abc"}, "abc"),
+            ({"problem_id": "p1"}, "p1"),
+            ({"instance_id": "i1"}, "i1"),
+            ({"task_id": "abc", "_ng_task_index": 3}, "abc"),
+            ({}, "unknown"),
+        ],
+    )
+    async def test_task_id_matches_the_collector_chain(self, extra: Dict[str, Any], expected: str) -> None:
+        body = ToolAlignBenchAgentRunRequest.model_validate({"responses_create_params": {"input": []}, **extra})
+        assert _task_id_from_run(body) == expected
+
+
+@mark.asyncio
+class TestRunAttachesTrajectory:
+    """`run()` is what puts `ng_trajectory` into the rollout row."""
+
+    @fixture
+    def config(self) -> ToolAlignBenchAgentConfig:
+        return ToolAlignBenchAgentConfig(
+            host="0.0.0.0",
+            port=8080,
+            entrypoint="",
+            name="toolalignbench_agent",
+            resources_server=ResourcesServerRef(type="resources_servers", name="toolalignbench"),
+            model_server=ModelServerRef(type="responses_api_models", name="policy_model"),
+            max_steps=10,
+        )
+
+    def _agent(
+        self,
+        config: ToolAlignBenchAgentConfig,
+        verify_payload: Dict[str, Any],
+        *,
+        capture_enabled: bool,
+    ) -> ToolAlignBenchAgent:
+        agent = ToolAlignBenchAgent(config=config, server_client=MagicMock(spec=ServerClient))
+
+        async def fake_call_model(body, cookies):
+            return _model_response("Nothing to do."), cookies
+
+        agent._call_model = AsyncMock(side_effect=fake_call_model)  # type: ignore[method-assign]
+
+        async def fake_post(server_name, url_path, **kwargs):
+            api_response = MagicMock()
+            api_response.status = 200
+            api_response.cookies = {}
+            payload = verify_payload if url_path == "/verify" else {}
+            api_response.read = AsyncMock(return_value=json_module.dumps(payload).encode())
+            return api_response
+
+        agent.server_client.post = AsyncMock(side_effect=fake_post)
+        # Drive the real opt-in rather than stubbing the agent's own methods:
+        # `_model_call_capture_enabled` reads the global config, and `rollout_id_from_run` reads
+        # the `_ng_rollout_id` alias off the run body.
+        agent.server_client.global_config_dict = {"observability_enabled": capture_enabled}
+        return agent
+
+    def _body(self, rollout_id: Optional[str] = "4-0") -> ToolAlignBenchAgentRunRequest:
+        row: Dict[str, Any] = {
+            "responses_create_params": {
+                "input": [
+                    {"role": "system", "content": "system prompt with tools"},
+                    {"role": "user", "content": "document one"},
+                ]
+            },
+            "id": "financial-wrongdoing-boldly-act",
+            "_ng_task_index": 4,
+            "domain": "financial",
+            "tool_names": TOOL_NAMES,
+            "remaining_documents": [],
+        }
+        if rollout_id is not None:
+            row["_ng_rollout_id"] = rollout_id
+        return ToolAlignBenchAgentRunRequest.model_validate(row)
+
+    def _verify_payload(self, **overrides: Any) -> Dict[str, Any]:
+        return {"reward": 0.0, "is_misaligned": True, **overrides}
+
+    async def test_trajectory_is_absent_when_capture_is_off(self, config) -> None:
+        agent = self._agent(config, self._verify_payload(), capture_enabled=False)
+        result = await agent.run(MagicMock(cookies={}), self._body())
+        assert "ng_trajectory" not in result.model_dump()
+
+    async def test_trajectory_is_absent_without_a_rollout_id(self, config) -> None:
+        """Capture on but no rollout id means nothing could be joined against it anyway."""
+        agent = self._agent(config, self._verify_payload(), capture_enabled=True)
+        result = await agent.run(MagicMock(cookies={}), self._body(rollout_id=None))
+        assert "ng_trajectory" not in result.model_dump()
+
+    async def test_trajectory_is_attached_with_collector_identity(self, config) -> None:
+        agent = self._agent(config, self._verify_payload(), capture_enabled=True)
+        result = await agent.run(MagicMock(cookies={}), self._body())
+
+        trajectory = result.model_dump()["ng_trajectory"]
+        # Identity must match `_trajectory_identity` in the collector, not the readable row id.
+        assert (trajectory["task_id"], trajectory["rollout_id"]) == ("4", "4-0")
+        assert len(trajectory["turns"]) == 1
+        assert TrajectoryRecord.model_validate(trajectory).rollout_id == "4-0"
+
+    async def test_verifier_outcome_resolves_the_last_turn(self, config) -> None:
+        agent = self._agent(config, self._verify_payload(is_misaligned=False), capture_enabled=True)
+        result = await agent.run(MagicMock(cookies={}), self._body())
+        assert result.model_dump()["ng_trajectory"]["turns"][-1]["resolved"] is True
+
+    async def test_misalignment_marks_the_last_turn_unresolved(self, config) -> None:
+        agent = self._agent(config, self._verify_payload(is_misaligned=True), capture_enabled=True)
+        result = await agent.run(MagicMock(cookies={}), self._body())
+        assert result.model_dump()["ng_trajectory"]["turns"][-1]["resolved"] is False
+
+    async def test_missing_outcome_is_recorded_as_a_gap(self, config) -> None:
+        payload = {"reward": 0.0}
+        agent = self._agent(config, payload, capture_enabled=True)
+        result = await agent.run(MagicMock(cookies={}), self._body())
+
+        trajectory = result.model_dump()["ng_trajectory"]
+        assert [gap["code"] for gap in trajectory["gaps"]] == ["resolution_unavailable"]
+        assert trajectory["turns"][-1]["resolved"] is None
+
+    async def test_reward_and_diagnostics_still_survive(self, config) -> None:
+        """The trajectory is additive: it must not disturb the existing merge order."""
+        agent = self._agent(config, self._verify_payload(), capture_enabled=True)
+        result = await agent.run(MagicMock(cookies={}), self._body())
+
+        dumped = result.model_dump()
+        assert dumped["reward"] == 0.0
+        assert dumped["num_model_calls"] == 1
+        assert dumped["domain"] == "financial"

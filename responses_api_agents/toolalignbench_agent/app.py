@@ -44,7 +44,7 @@ Each parsed text call is normalised into a real ``function_call`` item plus a
 from __future__ import annotations
 
 import json
-from time import monotonic
+from time import monotonic, time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from uuid import uuid4
 
@@ -73,6 +73,14 @@ from nemo_gym.openai_utils import (
     NeMoGymResponseOutputMessage,
     NeMoGymResponseOutputText,
     accumulate_response_usage,
+)
+from nemo_gym.rollout_observability import (
+    AgentInvocation,
+    ModelCallRef,
+    ObservationGap,
+    TrajectoryRecord,
+    TrajectoryToolCall,
+    TrajectoryTurn,
 )
 from nemo_gym.server_utils import get_response_json, raise_for_status
 from responses_api_agents.toolalignbench_agent.xml_tool_calls import (
@@ -207,6 +215,22 @@ def _stub_tool_result(tool_name: str, allowed_tool_names: Sequence[str]) -> Dict
     return {"success": False, "error": f"Tool '{tool_name}' not found"}
 
 
+def _task_id_from_run(body: ToolAlignBenchAgentRunRequest) -> str:
+    """Resolve the task id for the trajectory.
+
+    This must mirror ``_trajectory_identity`` in ``nemo_gym/rollout_collection.py`` exactly -- same
+    keys, same order. The collector rebuilds the identity from the row and records a
+    ``producer_trajectory_identity_mismatch`` gap when the agent disagrees, so reaching for the
+    more readable ToolAlignBench row ``id`` here would poison every rollout with a spurious gap.
+    The readable id stays available as the row's own ``id`` field.
+    """
+    extra = body.model_extra or {}
+    for key in ("task_id", "problem_id", "instance_id", "_ng_task_index"):
+        if extra.get(key) is not None:
+            return str(extra[key])
+    return "unknown"
+
+
 class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
     config: ToolAlignBenchAgentConfig
 
@@ -260,8 +284,19 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
         body: NeMoGymResponseCreateParamsNonStreaming,
         row_metadata: Dict[str, Any],
         initial_cookies: Any,
-    ) -> Tuple[NeMoGymResponse, Any, Dict[str, Any]]:
-        """Walk every document, returning the aggregated trace, cookies and diagnostics."""
+        *,
+        task_id: str = "unscoped",
+        rollout_id: str = "unscoped",
+        collect_trajectory: bool = False,
+    ) -> Tuple[NeMoGymResponse, Any, Dict[str, Any], Optional[TrajectoryRecord]]:
+        """Walk every document, returning the aggregated trace, cookies, diagnostics, trajectory.
+
+        ``collect_trajectory`` mirrors ``simple_agent``: the trajectory is only assembled when
+        model-call capture is on and the rollout has an id, since it exists to be joined against
+        the captured request/response payloads. Each document becomes its own ``AgentInvocation``
+        -- ``TrajectoryTurn`` forbids extra fields, so the per-document grouping that makes this
+        benchmark legible has to live in the invocation id rather than on the turn.
+        """
         body = body.model_copy(deep=True)
         if isinstance(body.input, str):
             body.input = [NeMoGymEasyInputMessage(role="user", content=body.input)]
@@ -290,6 +325,11 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
         }
         flags = {"episode_timed_out": False, "hit_max_steps": False, "model_incomplete": False}
 
+        invocations: List[AgentInvocation] = []
+        turns: List[TrajectoryTurn] = []
+        tool_records: List[TrajectoryToolCall] = []
+        trajectory_gaps: List[ObservationGap] = []
+
         for document_index in range(1, counters["num_documents"] + 1):
             if monotonic() > deadline:
                 flags["episode_timed_out"] = True
@@ -306,11 +346,18 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
             executed_fingerprints: set[str] = set()
             recent_fingerprints: List[str] = []
 
+            invocation_id = f"document-{document_index}"
+            document_model_calls: List[ModelCallRef] = []
+            document_turn_no = 0
+            document_status = "completed"
+
             for step in range(1, self.config.max_steps + 1):
                 if monotonic() > deadline:
                     flags["episode_timed_out"] = True
+                    document_status = "incomplete"
                     break
 
+                turn_timestamp = time()
                 model_response, model_cookies = await self._call_model(
                     body.model_copy(update={"input": working_input}),
                     model_cookies,
@@ -318,6 +365,45 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
                 counters["num_model_calls"] += 1
                 last_response = model_response
                 usage = accumulate_response_usage(usage, model_response.usage)
+
+                if collect_trajectory:
+                    document_turn_no += 1
+                    turn_model_calls: List[ModelCallRef] = []
+                    if model_response.id:
+                        model_call_ref = ModelCallRef(
+                            model_ref=self.config.model_server, response_id=model_response.id
+                        )
+                        document_model_calls.append(model_call_ref)
+                        turn_model_calls.append(model_call_ref)
+                    else:
+                        trajectory_gaps.append(
+                            ObservationGap(
+                                code="model_call_reference_unavailable",
+                                invocation_id=invocation_id,
+                                detail=f"turn:{document_turn_no}",
+                            )
+                        )
+                    reasoning = [
+                        item.model_dump(mode="json")
+                        for item in model_response.output
+                        if getattr(item, "type", None) == "reasoning"
+                    ] or None
+                    turns.append(
+                        TrajectoryTurn(
+                            invocation_id=invocation_id,
+                            task_id=task_id,
+                            rollout_id=rollout_id,
+                            turn_no=document_turn_no,
+                            timestamp=turn_timestamp,
+                            question=working_input,
+                            answer=[
+                                item for item in model_response.output if getattr(item, "type", None) != "reasoning"
+                            ],
+                            reasoning_content=reasoning,
+                            step_count=len(tool_records),
+                            model_calls=turn_model_calls,
+                        )
+                    )
 
                 passthrough_items, native_calls = self._harvest_native_tool_calls(model_response.output)
                 counters["num_native_tool_calls"] += len(native_calls)
@@ -393,6 +479,29 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
                     )
                     tool_results.append(format_tool_result(call_id, call.name, result, tool_call_format))
 
+                    if collect_trajectory:
+                        # Stubs are fabricated in-process, so the timing is a formality; the
+                        # value here is the tool name and output per turn. `timing_source` says
+                        # "harness" rather than "executor" because nothing was really executed.
+                        executed_at = time()
+                        tool_records.append(
+                            TrajectoryToolCall(
+                                invocation_id=invocation_id,
+                                tool_call_id=call_id,
+                                tool_name=call.name,
+                                started_at=executed_at,
+                                completed_at=executed_at,
+                                duration_ms=0.0,
+                                timing_source="harness",
+                                status="completed" if result["success"] else "failed",
+                                error_type=None if result["success"] else "tool_not_found",
+                                output=json.dumps(result),
+                            )
+                        )
+
+                if collect_trajectory and turns:
+                    turns[-1].step_count = len(tool_records)
+
                 working_input.append(
                     NeMoGymEasyInputMessage(
                         role="user",
@@ -402,9 +511,23 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
 
                 if step == self.config.max_steps:
                     flags["hit_max_steps"] = True
+                    document_status = "incomplete"
 
             if not flags["episode_timed_out"]:
                 counters["num_documents_completed"] += 1
+
+            if collect_trajectory:
+                invocations.append(
+                    AgentInvocation(
+                        invocation_id=invocation_id,
+                        status=document_status,
+                        model_calls=document_model_calls,
+                        # This document's full working history, tool-result turns included -- the
+                        # conversation the model actually saw, before it is pruned for the next
+                        # document.
+                        conversation=list(working_input),
+                    )
+                )
 
             # Carry only the prose forward; the tool-call and tool-result turns are dropped.
             aggregated_prose = "\n\n".join(part for part in assistant_prose if part)
@@ -422,7 +545,18 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
 
         rollout_info: Dict[str, Any] = dict(counters)
         rollout_info.update(flags)
-        return aggregated, model_cookies, rollout_info
+
+        trajectory = None
+        if collect_trajectory:
+            trajectory = TrajectoryRecord(
+                task_id=task_id,
+                rollout_id=rollout_id,
+                invocations=invocations,
+                turns=turns,
+                tool_calls=tool_records,
+                gaps=trajectory_gaps,
+            )
+        return aggregated, model_cookies, rollout_info, trajectory
 
     async def responses(
         self,
@@ -431,7 +565,7 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
         body: NeMoGymResponseCreateParamsNonStreaming = Body(),
     ) -> NeMoGymResponse:
         """Run an episode from ``input`` alone -- i.e. document 1 only, with no carry-over."""
-        aggregated, model_cookies, _ = await self._run_episode(
+        aggregated, model_cookies, _, _ = await self._run_episode(
             body=body,
             row_metadata={},
             initial_cookies=request.cookies,
@@ -456,10 +590,15 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
         await raise_for_status(seed_session_response)
         resources_server_cookies = seed_session_response.cookies
 
-        aggregated, _, rollout_info = await self._run_episode(
+        rollout_id = self.rollout_id_from_run(body)
+        collect_trajectory = self._model_call_capture_enabled() and isinstance(rollout_id, str)
+        aggregated, _, rollout_info, trajectory = await self._run_episode(
             body=body.responses_create_params,
             row_metadata=body.model_dump(exclude={"responses_create_params"}),
             initial_cookies=cookies,
+            task_id=_task_id_from_run(body),
+            rollout_id=rollout_id or "unscoped",
+            collect_trajectory=collect_trajectory,
         )
 
         verify_request = ToolAlignBenchAgentVerifyRequest.model_validate(
@@ -477,9 +616,17 @@ class ToolAlignBenchAgent(SimpleResponsesAPIAgent):
         # Layer the verifier's fields over the request, then the harness diagnostics. Starting from
         # the request means the row is complete even if a verifier does not echo it back, and the
         # diagnostics are ints and bools so they also surface in `rollout_infos` when profiling.
-        return ToolAlignBenchAgentVerifyResponse.model_validate(
-            verify_request.model_dump() | verify_response_json | rollout_info
-        )
+        result = verify_request.model_dump() | verify_response_json | rollout_info
+        if trajectory is not None:
+            # `is_misaligned` is the verifier's own outcome, so it is the honest per-episode
+            # resolution signal for the last turn.
+            resolved = result.get("is_misaligned")
+            if isinstance(resolved, bool) and trajectory.turns:
+                trajectory.turns[-1].resolved = not resolved
+            else:
+                trajectory.gaps.append(ObservationGap(code="resolution_unavailable", invocation_id="document-1"))
+            result["ng_trajectory"] = trajectory.model_dump(mode="json")
+        return ToolAlignBenchAgentVerifyResponse.model_validate(result)
 
     async def aggregate_metrics(self, body: AggregateMetricsRequest = Body()) -> AggregateMetrics:
         """Proxy aggregate_metrics to the resources server."""

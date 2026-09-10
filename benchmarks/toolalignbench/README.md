@@ -107,6 +107,67 @@ precedent in `openai_model`, `vllm_model` and `switchyard_model`) or route throu
 
 Then `cp env.kimi.yaml env.yaml` (or `env.portkey.yaml`) before starting the servers.
 
+## Inspecting raw model calls
+
+Grading is deterministic, but a parser gap reads as perfect alignment, so the raw payloads matter.
+Gym captures them natively -- no benchmark-specific flag, and no agent code needed, because
+`NeMoGymServerClient.request` injects the `/ng-rollout/<id>/` capture prefix automatically when
+observability is on. Add to `env.yaml` (both variants already carry it):
+
+```yaml
+observability_enabled: true
+# Must be absolute; results/ is gitignored.
+model_call_capture_dir: /abs/path/to/Gym/results/model-calls
+```
+
+Set these **before `gym env start`**. `gym eval run --no-serve` cannot push config into
+already-running servers (`gym env start` bakes the merged config into each server subprocess), so
+passing them only to `gym eval run` silently captures nothing.
+
+The payloads then land in two places:
+
+| Where | What |
+| --- | --- |
+| `<model_call_capture_dir>/<rollout_id>.capture.jsonl` | One line per model call: `request`, `response`, `request_raw`, `response_raw`, `status_code`, `error_category`, latency |
+| `ng_trajectory.model_calls[].request` / `.response` in each rollout row | The same payloads, merged back into the output JSONL by the collector |
+
+A `<rollout_id>.capture.incomplete` marker means that rollout's capture is partial -- capture is
+best-effort and never fails a run, so treat those rollouts with suspicion.
+
+One line per model call is right for tooling and unreadable for humans, since a single line holds
+the whole system prompt. To read an episode:
+
+```bash
+python benchmarks/toolalignbench/explode_capture.py results/model-calls --output-dir results/exploded
+```
+
+That writes `results/exploded/<rollout_id>/step_NN.json` (pretty-printed, payloads first) plus a
+`summary.txt` with one scannable line per step. `step_01.json` is where to confirm that the system
+prompt really carries `Parameters:\n  (none)` for every tool and that the reply arrived with its
+tool-call markup intact.
+
+Capture files hold complete prompts and replies verbatim. They are under gitignored `results/`, but
+they are the raw record -- review before attaching one to an issue or sharing it.
+
+Enabling capture also makes rollout health meaningful. Without `ng_trajectory` every check reports
+`unobserved`; with it the agent emits one `TrajectoryTurn` per model call, grouped into one
+`AgentInvocation` per document, and the verdicts become real `healthy`/`unhealthy`. `gym eval run`
+prints them inline, and they can be recomputed offline (note that `--rollouts-file` is resolved
+*relative to the run dir*, and defaults to `rollouts.jsonl`):
+
+```bash
+gym eval health-check results/ --rollouts-file toolalignbench_capture_kimi.jsonl
+```
+
+Findings land in `results/rollout_verdicts.jsonl` and `results/quality_summary.json`.
+
+One health check earns particular attention here. `agent_turn_hollow` fires on a turn whose reply
+carried no text, and a first Kimi-K3 smoke run tripped it twice: HTTP 200, `status: completed`,
+**1781 and 319 output tokens billed, and an empty `output_text`**. Those turns are invisible to
+`unparsed_tool_call_reply_rate`, because there is no markup to detect in an empty string -- so they
+score as a model that calmly declined to act, which is a *perfect* alignment reward. Treat
+`agent_turn_hollow` as a score-validity signal, not cosmetics.
+
 ## Fidelity notes
 
 The port is checked against upstream mechanically, not by eye: the composed system prompts are
