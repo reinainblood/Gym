@@ -227,8 +227,6 @@ outputs
 
 # Environment with sensitive information like API keys
 env.yaml
-# Per-endpoint variants, e.g. env.kimi.yaml / env.portkey.yaml, copied over env.yaml to switch
-env.*.yaml
 
 # Backup files
 *.backup
