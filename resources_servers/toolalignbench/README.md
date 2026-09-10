@@ -22,10 +22,7 @@ stored rollouts without regenerating them, which is the cheap way to iterate on 
 
 ## The harness
 
-This server pairs with **`toolalignbench_agent`**, not `simple_agent`. ToolAlignBench never sends a
-native `tools` array — tools are documented as text in the system prompt and calls are parsed back
-out of the reply — so `simple_agent`, which only reacts to native `function_call` items, would treat
-the first text-only reply as a finished answer and end the rollout after one model call.
+This server pairs with **`toolalignbench_agent`**.
 
 The agent normalizes every parsed text call into a real `function_call` item plus a
 `function_call_output`, so this verifier reads an ordinary Gym trace. See
@@ -102,61 +99,6 @@ that rate is not near zero, the score is not trustworthy.
 `insider_warning_rate` and `false_reporting_rate` are always 0: those categories appear in
 upstream's category-to-flag mapping but no tool in any domain carries them. They are reported
 anyway so the metric set matches the paper's.
-
-## Fidelity notes
-
-Two upstream quirks are reproduced deliberately, because the published numbers depend on them:
-
-1. **Every tool documents `Parameters:\n  (none)`.** Upstream reads `tool.parameters?.properties`
-   off the object returned by the `ai` SDK's `tool()`, which is the identity function — so
-   `parameters` is a Zod schema and `.properties` is `undefined`. The prompt therefore documents no
-   parameters at all while insisting that "REQUIRED parameters MUST be provided". Controlled by
-   `legacy_no_params` in `prompts.py` (default on). The prompt builder is verified byte-for-byte
-   against upstream's TypeScript.
-2. **No sampling parameters.** Upstream sends only `{model, messages}` — do not pass
-   `--temperature` or `--max-output-tokens`.
-
-# Example usage
-
-## Running servers
-
-```bash
-gym env start \
-    --resources-server toolalignbench \
-    --model-type inference_provider
-```
-
-## Collecting rollouts
-
-```bash
-gym eval run --no-serve \
-    --agent toolalignbench_agent \
-    --input resources_servers/toolalignbench/data/example.jsonl \
-    --output results/toolalignbench_example.jsonl \
-    --num-repeats 1
-```
-
-## Inspecting raw model calls
-
-Set these in `env.yaml` **before `gym env start`** to capture the exact request and response for
-every model call (`gym eval run --no-serve` cannot push config into running servers):
-
-```yaml
-observability_enabled: true
-model_call_capture_dir: /abs/path/to/Gym/results/model-calls   # must be absolute
-```
-
-Each rollout gets `<model_call_capture_dir>/<rollout_id>.capture.jsonl`, one line per call with
-`request` / `response` / `request_raw` / `response_raw`, and the collector merges the same payloads
-into `ng_trajectory.model_calls[]` in the output row. To read one:
-
-```bash
-python benchmarks/toolalignbench/explode_capture.py results/model-calls --output-dir results/exploded
-```
-
-Worth doing before trusting a new model's score: an unparsed tool call is graded as perfect
-alignment, so `unparsed_tool_call_reply_rate` and the raw replies are the two things that catch a
-parser gap. Capture files contain full prompts and replies -- review before sharing.
 
 ## Running tests
 

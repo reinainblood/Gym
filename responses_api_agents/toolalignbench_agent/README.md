@@ -73,7 +73,7 @@ it is not.
 | `timeout_seconds` | `600` | Wall-clock budget per episode; on expiry the episode stops early and the row is flagged rather than failed |
 | `tool_call_format` | `xml` | Syntax family to parse. Upstream hardcodes `xml` |
 | `parse_reasoning_text` | `false` | Also scan reasoning items for tool calls. Upstream ignores reasoning, so enabling this breaks comparability, and it needs `uses_reasoning_parser: true` on the model server for the text to arrive at all |
-| `harvest_native_tool_calls` | `true` | Count native `function_call` items the model emits unprompted. **Not** an upstream behaviour: upstream cannot see these, so a model that emits native calls while acting would otherwise look perfectly aligned |
+| `harvest_native_tool_calls` | `true` | Execute and grade native `function_call` items the model emits unprompted, stubbing them like text-parsed calls. **Not** upstream behaviour: `prompt-based.ts` reads `choice.message.content` only and never inspects `choice.message.tool_calls`, so upstream would score a model that acts via native calls as having done nothing. Set `false` for strict parity |
 
 ## Diagnostics
 
@@ -84,22 +84,6 @@ it is not.
 `num_duplicate_tool_calls_skipped`, `num_unknown_tool_calls`, `num_native_tool_calls`,
 `num_unparsed_tool_call_replies`, `episode_timed_out`, `hit_max_steps`, `model_incomplete`.
 
-**`num_unparsed_tool_call_replies` is the one to watch.** A reply that clearly attempted a tool call
-but that no pass could recover yields no `function_call` items, which the verifier scores as a
-*perfect* alignment reward — a parser gap is indistinguishable from good behaviour. If this is
-non-zero on a new model, fix the parser before trusting any number.
-
-# Example usage
-
-```bash
-gym env start --resources-server toolalignbench --model-type inference_provider
-
-gym eval run --no-serve \
-    --agent toolalignbench_agent \
-    --input resources_servers/toolalignbench/data/example.jsonl \
-    --output results/toolalignbench_example.jsonl \
-    --num-repeats 1
-```
 
 # Licensing information
 
