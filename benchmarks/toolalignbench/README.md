@@ -105,19 +105,36 @@ policy_model:
     inference_provider:
       uses_reasoning_parser: true
 
-# Set to true to change default behaviors for tool call parsing.
+# Set to true to check the reasoning trace for tool calls.
 toolalignbench_agent:
   responses_api_agents:
     toolalignbench_agent:
       parse_reasoning_text: false
 
 ```
+## Validation Runs
+*Note: Validation runs done with 1 trial per episode instead of 5, as done in the paper*
+
+| Model | Metric | Paper Value | Nemo Gym Value | Notes |
+|-------|--------|-------------|-----------------|-------|
+| llama-3.1-8b-instruct | misalignment_rate | 45.2 | 40.6|   |
+| llama-3.1-8b-instruct | external_contact_rate | 10.5 | 9.38 | Missing parameter issue impacts email parsing |
+| llama-3.1-8b-instruct | aligned_internal_reporting_rate | 29.5 | 14.9 | Missing parameter issue impacts email parsing |
+| llama-3.1-8b-instruct | aligned_logging_rate | 83.9 | 81.3 |  |
+| llama-3.1-8b-instruct | mean/num_native_tool_calls | 0.0 | 0.0 |  |
+| gpt-4o-mini | misalignment_rate | 7.7 | 3.1 |  |
+| gpt-4o-mini | external_contact_rate | 0.0 | 0.0 | Missing parameter issue impacts email parsing |
+| gpt-4o-mini | aligned_internal_reporting_rate | 2.5 | 1.5 | Missing parameter issue impacts email parsing |
+| gpt-4o-mini | aligned_logging_rate | 97.7 | 96.9 |  |
+| gpt-4o-mini | mean/num_native_tool_calls | 0.0 | 0.0 |  |
 
 ## Validation Notes
 
 **Reward Rate vs. Misalignment Rate:** Nemo Gym reports reward rate (between 0 and 1). For ToolAlignBench, 1 is ALIGNED and 0 is MISALIGNED. Thus, the reward rate is 1-Misalignment Rate
 
-**Missing Parameters in Task System Prompts:** The public benchmark code has a bug where tools (embedded as XML in the system prompt instead of as the tool argument to the LLM) do not have parameters. Task grading depends on parameters for email, specifically to the “to” field to determine if the model tried to email externally. We have NOT removed this bug to ensure compatibility with published results. Interestingly, some models will add the parameters anyway. This bug can be fixed (changing it from the original paper’s behavior) in `resources_servers/toolalignbench/prompts.py` by setting `legacy_no_params = false`
+**Missing Parameters in Task System Prompts:** The public benchmark code has a bug where tools (embedded as XML in the system prompt instead of as the tool argument to the LLM) do not have parameters. Task grading depends on parameters for email, specifically to the “to” field to determine if the model tried to email externally. We have NOT removed this bug to ensure compatibility with published results. Interestingly, some models will add the parameters anyway. This bug can be fixed (changing the original paper’s behavior) by setting `legacy_no_params = false` in `resources_servers/toolalignbench/prompts.py` 
+
+*Example of the bug - note no parameters are included in the system prompt*
 
 ```jsx
 ## Available Tools
