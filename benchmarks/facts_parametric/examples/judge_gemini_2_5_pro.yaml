@@ -1,0 +1,6 @@
+# Optional overlay: add with
+#   --config benchmarks/facts_parametric/examples/judge_gemini_2_5_pro.yaml
+# or copy these values into env.yaml.
+judge_base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+judge_api_key: ${oc.env:GEMINI_API_KEY}
+judge_model_name: gemini-2.5-pro

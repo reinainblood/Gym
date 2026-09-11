@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Semantic-equivalence prompt derived from the FACTS grading description.
+# It is not presented as the unreleased authors' exact prompt.
+user: |-
+  Judge whether a predicted answer conveys the same fact as the gold answer for
+  the given question. Grade semantic meaning, not character overlap. Ignore
+  harmless differences in wording, capitalization, punctuation, word order, or
+  a clearly equivalent name, place, date, or unit. Do not apply a numeric
+  tolerance: a numeric answer is correct only when it states the same fact as
+  the gold answer in the context of the question.
+
+  Return exactly one lowercase label:
+  - correct: the response gives the requested fact and does not contradict it.
+  - incorrect: the response makes a factual claim that conflicts with the gold
+    answer, including a conflicting guess or alternative.
+  - not-attempted: the response does not supply the requested fact, but does
+    not make a conflicting factual claim.
+  - unknown: after considering the question, gold answer, and response, you
+    cannot reliably decide whether the response and gold answer express the
+    same fact. Use this only for genuine grading ambiguity, not for a response
+    that is simply incomplete or wrong.
+
+  Question: {question}
+  Gold answer: {expected_answer}
+  Model response: {generation}

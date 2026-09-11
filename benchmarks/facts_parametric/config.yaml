@@ -1,0 +1,44 @@
+config_paths:
+  - resources_servers/facts_parametric/configs/facts_parametric.yaml
+
+# Defaults keep data preparation and configuration inspection model-free.
+# Supply real judge settings in env.yaml or an explicit overlay.
+judge_base_url: ''
+judge_api_key: ''
+judge_model_name: ''
+policy_base_url: ''
+policy_api_key: ''
+policy_model_name: ''
+
+# Keep a transient provider or agent /run failure from cancelling all in-flight
+# episodes.  It is written to <output>_failures.jsonl and is retried by
+# `gym eval run --resume` (up to Gym's configured attempt limit).
+route_failures_to_sidecar: true
+policy_model:
+  responses_api_models:
+    inference_provider:
+      entrypoint: app.py
+      base_url: ${policy_base_url}
+      api_key: ${policy_api_key}
+      model: ${policy_model_name}
+
+facts_parametric_benchmark:
+  _inherit_from: facts_parametric
+
+facts_parametric_benchmark_simple_agent:
+  _inherit_from: facts_parametric_simple_agent
+  responses_api_agents:
+    simple_agent:
+      resources_server:
+        name: facts_parametric_benchmark
+      datasets:
+      - name: example
+        type: example
+        jsonl_fpath: resources_servers/facts_parametric/data/example.jsonl
+        license: TBD
+      - name: facts_parametric
+        type: benchmark
+        jsonl_fpath: benchmarks/facts_parametric/data/facts_parametric_benchmark.jsonl
+        prepare_script: benchmarks/facts_parametric/prepare.py
+        prompt_config: benchmarks/prompts/generic/default.yaml
+        license: TBD
