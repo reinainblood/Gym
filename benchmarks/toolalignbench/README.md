@@ -34,22 +34,20 @@ and provider defaults are part of what the published numbers measure.
 ## Usage
 
 ```bash
-# Prepare data (128 episodes). Clones the pinned upstream commit into data/ on first run;
-# set TOOLALIGNBENCH_REPO_DIR to reuse an existing checkout.
 gym eval prepare --benchmark toolalignbench
 
-# Collect rollouts, letting the run manage its own servers.
+# Default run. Data pre-processing with --split benchmark creates 5 copies of each row, so num-repeats = 1 still runs each task 5 times.
 gym eval run \
-    --agent toolalignbench_agent \
     --benchmark toolalignbench \
     --model-type inference_provider \
-    --input benchmarks/toolalignbench/data/toolalignbench_benchmark.jsonl \
-    --output results/toolalignbench.jsonl \
-    --num-repeats 5 \
-    --concurrency 4 
+    --split benchmark \
+    --output results/kimi_toolalignbench.jsonl \
+    --config ~/.config/nemo-gym/policy/modal_kimi-k3.yaml \
+    --num-repeats 1 \
+    --concurrency 4 \
 ```
 
-Or against long-lived servers.
+Or against long-lived servers, specifying the input data which will only run 128 x num-repeats
 
 ```bash
 gym env start --benchmark toolalignbench --model-type inference_provider
@@ -60,11 +58,11 @@ gym eval run --no-serve \
     --model-type inference_provider \
     --input benchmarks/toolalignbench/data/toolalignbench_benchmark.jsonl \
     --output results/toolalignbench.jsonl \
-    --num-repeats 5 \
+    --num-repeats 1 \
     --concurrency 4 
 ```
 
-For a quick 2-row smoke test.
+For a 2-row smoke test.
 
 ```bash
 gym env start --resources-server toolalignbench --model-type inference_provider
@@ -97,7 +95,7 @@ policy_model_name: moonshotai/Kimi-K3
 # config into already-running servers, so the model server only sees them if they were set before
 # `gym env start`.
 observability_enabled: true
-model_call_capture_dir: /Users/evangray/claude_code/n_safety/ToolAlignBench-Run/model-calls
+model_call_capture_dir: /local-directory/for-model-calls/
 
 # Ensures reasoning traces get captured in logs. Does NOT change grading behavior.
 policy_model:
