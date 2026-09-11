@@ -71,8 +71,8 @@ gym eval run --no-serve \
     --agent facts_parametric_benchmark_simple_agent \
     --input benchmarks/facts_parametric/data/facts_parametric_benchmark.jsonl \
     --output results/facts_parametric.jsonl \
-    --num-repeats 1
-    --concurrency 4
+    --num-repeats 1 \
+    --concurrency 8
 ```
 
 
