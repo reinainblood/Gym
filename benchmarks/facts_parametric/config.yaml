@@ -40,5 +40,4 @@ facts_parametric_benchmark_simple_agent:
         type: benchmark
         jsonl_fpath: benchmarks/facts_parametric/data/facts_parametric_benchmark.jsonl
         prepare_script: benchmarks/facts_parametric/prepare.py
-        prompt_config: benchmarks/prompts/generic/default.yaml
         license: TBD
