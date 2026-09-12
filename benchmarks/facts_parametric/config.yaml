@@ -1,15 +1,6 @@
 config_paths:
   - resources_servers/facts_parametric/configs/facts_parametric.yaml
 
-# Defaults keep data preparation and configuration inspection model-free.
-# Supply real judge settings in env.yaml or an explicit overlay.
-judge_base_url: ''
-judge_api_key: ''
-judge_model_name: ''
-policy_base_url: ''
-policy_api_key: ''
-policy_model_name: ''
-
 # Keep a transient provider or agent /run failure from cancelling all in-flight
 # episodes.  It is written to <output>_failures.jsonl and is retried by
 # `gym eval run --resume` (up to Gym's configured attempt limit).
@@ -18,9 +9,9 @@ policy_model:
   responses_api_models:
     inference_provider:
       entrypoint: app.py
-      base_url: ${policy_base_url}
-      api_key: ${policy_api_key}
-      model: ${policy_model_name}
+      base_url: ${oc.select:policy_base_url,''}
+      api_key: ${oc.select:policy_api_key,''}
+      model: ${oc.select:policy_model_name,''}
 
 facts_parametric_benchmark:
   _inherit_from: facts_parametric
