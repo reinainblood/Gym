@@ -38,12 +38,23 @@ Gym JSONL before a full run:
 ```bash
 # Converts FACTS-Parametric-public.csv into 1,052 task rows.
 gym eval prepare --benchmark facts_parametric
+```
 
-# Validate the five committed smoke-test rows and the simple_agent wiring.
-gym dataset collate \
-    --config benchmarks/facts_parametric/config.yaml \
-    --output-dir /tmp/facts-parametric \
-    --mode example_validation
+
+Collect full-benchmark rollouts:
+
+```bash
+ gym eval run \
+    --benchmark facts_parametric \
+    --model-type inference_provider \
+    --split benchmark \
+    --output results/kimi_facts_parametric.jsonl \
+    --config ~/.config/nemo-gym/policy/modal_kimi-k3.yaml \
+    --config ~/.config/nemo-gym/judge/modal_glm-5-3.yaml \
+    --num-repeats 1 \
+    --concurrency 8 \
+    ++observability_enabled=true \
+    ++model_call_capture_dir="$PWD/results/model-calls/kimi_facts_parametric"
 ```
 
 For a five-row smoke test (status should show 4 healthy):
@@ -59,22 +70,6 @@ gym eval run --no-serve \
     --output results/facts_parametric_smoke.jsonl \
     --num-repeats 1
 ```
-
-Collect full-benchmark rollouts on long-lived servers (status should show 4 healthy):
-
-```bash
-gym env start --benchmark facts_parametric
-
-gym env status
-
-gym eval run --no-serve \
-    --agent facts_parametric_benchmark_simple_agent \
-    --input benchmarks/facts_parametric/data/facts_parametric_benchmark.jsonl \
-    --output results/facts_parametric.jsonl \
-    --num-repeats 1 \
-    --concurrency 8
-```
-
 
 
 ## Endpoints
@@ -99,12 +94,6 @@ judge_model_name: your-judge-model
 policy_base_url: https://your-policy-endpoint/v1
 policy_api_key: ${oc.env:POLICY_API_KEY}
 policy_model_name: your-policy-model
-
-# Raw model-call capture. Each FACTS episode writes one JSONL file containing
-# the policy-model call and its three judge calls. The directory must be
-# absolute and should be gitignored.
-observability_enabled: true
-model_call_capture_dir: /absolute/path/to/facts-parametric-model-calls
 
 # Preserve provider reasoning separately in rollout records. FACTS scores only
 # the final assistant answer, so this does not change the verifier's behaviour.
