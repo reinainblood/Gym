@@ -1,0 +1,16 @@
+config_paths:
+  - resources_servers/vera_mh/configs/vera_mh.yaml
+
+vera_mh_recommended:
+  _inherit_from: vera_mh_agent
+  responses_api_agents:
+    vera_mh_agent:
+      datasets:
+        - name: vera_mh
+          type: benchmark
+          jsonl_fpath: benchmarks/vera_mh/data/vera_mh_recommended.jsonl
+          prepare_script: benchmarks/vera_mh/prepare.py
+          # Rows carry the provider system prompt as `responses_create_params.input`; the agent builds every turn.
+          prompt_config: null
+          # 100 personas x 2 user simulators, one 30-turn conversation each (upstream --runs 1).
+          num_repeats: 1
