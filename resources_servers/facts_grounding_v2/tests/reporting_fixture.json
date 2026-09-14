@@ -1,0 +1,656 @@
+{
+ "stem": "facts_grounding_v2",
+ "run_info": {
+  "endpoint_type": "fixture endpoint",
+  "harness": "simple_agent",
+  "sampling": "temperature 0.0, top_p 1.0",
+  "generation_limits": "max_output_tokens 16384",
+  "verifier": {
+   "summary": "Gemini 2.5 Flash + GPT-5 eligibility and grounding judges, starter v2 prompts"
+  },
+  "finished_at": "2026-01-01T00:00:00Z",
+  "generation_summary": "fixture"
+ },
+ "rollouts": [
+  {
+   "id": "facts_grounding_v2_public_0007",
+   "system_instruction": "Only use the provided text to answer the question. Do not use outside resources. The entire answer should be short.",
+   "user_request": "According to the provided text, what is the typical maximum range for Infrared (IR)?",
+   "domain": "Internet/Technology",
+   "type": "Fact Finding",
+   "high_level_type": "Q&A",
+   "reward": 1.0,
+   "generation": "According to the text, the typical maximum range for Infrared (IR) sensors is **50 to 100 cm**. The text notes that IR sensors are short range.",
+   "generation_empty": false,
+   "generation_truncated": false,
+   "generation_chars": 143,
+   "policy_input_tokens": 2681,
+   "policy_output_tokens": 111,
+   "eligible": true,
+   "eligibility_deciding_judge": "gemini-2.5-flash",
+   "eligibility_ratings": {
+    "gemini-2.5-flash": "No Issues"
+   },
+   "eligibility_invalid_count": 0,
+   "grounding_verdicts": {
+    "gemini-2.5-flash": true,
+    "gpt-5": true
+   },
+   "grounding_parsed_sentences": {
+    "gemini-2.5-flash": 2,
+    "gpt-5": 2
+   },
+   "grounding_unparseable_lines": {
+    "gemini-2.5-flash": 0,
+    "gpt-5": 0
+   },
+   "grounding_label_counts": {
+    "gemini-2.5-flash": {
+     "supported": 2,
+     "not_supported": 0,
+     "no_rad": 0,
+     "unknown": 0
+    },
+    "gpt-5": {
+     "supported": 2,
+     "not_supported": 0,
+     "no_rad": 0,
+     "unknown": 0
+    }
+   },
+   "grounding_score": 1.0,
+   "unadjusted_score": 1.0,
+   "judges_agree": true,
+   "prompt_variant": "kaggle-starter-prathameshbang-facts-grounding-v2-benchmark-starter-v4",
+   "is_eligible": 1.0,
+   "is_grounded_all_judges": 1.0,
+   "context_document": "**Robotics Sensors and Actuators**\n\nRobot Sensors\n\n• Sensors are devices that can sense and measure\nphysical properties of the environment,\n• e.g. temperature, luminance, resistance to touch, weight,\nsize, etc.\n• The key phenomenon is transduction\n• Transduction (engineering) is a process that converts one\ntype of energy to another\n• They deliver low-­‐level information about the\nenvironment the r",
+   "full_prompt": "<System Instruction>\nOnly use the provided text to answer the question. Do not use outside resources. The entire answer should be short.\n----------------\n<Question>\nAccording to the provided text, what is the typical maximum range for Infrared (IR)?\n----------------\n<Text>\n**Robotics Sensors and Actuators**\n\nRobot Sensors\n\n• Sensors are devices that can sense and measure\nphysical properties of the",
+   "judge_receipts": [
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "baseline",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-1dRZDAKq0v8gYKGusEk1FEa0efFSV",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "3bf3b58eac96dc41da57ee55aec4917181decd7c17675ec5acbc02dad71bf82a",
+     "content": "The typical maximum range for Infrared (IR) sensors is 50 to 100 cm.",
+     "content_sha256": "7c325369c9ea6a19d860f3701760f1ec7acaa40fd135fdb6c8c80aeb618c2eab",
+     "sentences": []
+    },
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "eligibility",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-KizfeyVytGx2cqr6WnxoBEFtvRHsP",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "b98c9ca73df339f107ae7249fd4e101f4468035e014402bd278daf797495c413",
+     "content": "Analysis:\nThe user query asks a direct question based on a provided text.\n\n**Instructions in the user query:**\n1.  **\"According to the provided text\"**: This is a **very important** instruction, emphasizing that the information must be sourced exclusively from the given document, preventing hallucin",
+     "content_sha256": "15fb391cc7a39fa652f8cc35d27a6700ad7341e0cbfb2b469b3993cc65b5c346",
+     "rating": "No Issues",
+     "eligible": true,
+     "sentences": []
+    },
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "grounding",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-eKy8XyC4Lq1Hlg1DHnvvDpEbeW3sV",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "393df2f9fb6f914f6d6fb258a3f576a1336b019edf056ec90fda0f48325fb1e4",
+     "content": "```json\n{\"sentence\": \"According to the text, the typical maximum range for Infrared (IR) sensors is 50 to 100 cm.\", \"label\": \"supported\", \"rationale\": \"The context explicitly states the typical maximum range for IR sensors in the 'Infrared Problems' section.\", \"excerpt\": \"IR are short range – typica",
+     "content_sha256": "dd48774a9ffe5787f46ac3e84f1886b537ead5cdd4ca057dc3955bba19b82720",
+     "grounded": true,
+     "sentences": [
+      {
+       "sentence": "According to the text, the typical maximum range for Infrared (IR) sensors is 50 to 100 cm.",
+       "label": "supported",
+       "rationale": "The context explicitly states the typical maximum range for IR sensors in the 'Infrared Problems' section.",
+       "excerpt": "IR are short range – typical maximum range is 50 to 100 cm"
+      },
+      {
+       "sentence": "The text notes that IR sensors are short range.",
+       "label": "supported",
+       "rationale": "The context explicitly states that IR sensors are short range.",
+       "excerpt": "IR are short range – typical maximum range is 50 to 100 cm"
+      }
+     ],
+     "parsed_sentences": 2,
+     "unparseable_lines": 0,
+     "label_counts": {
+      "supported": 2,
+      "not_supported": 0,
+      "no_rad": 0,
+      "unknown": 0
+     }
+    },
+    {
+     "judge": "gpt-5",
+     "stage": "grounding",
+     "judge_model": "gpt-5-2025-08-07",
+     "response_id": "chatcmpl-ENtgCQyhA6Mr9AnqP962MLNwZOOzb",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "393df2f9fb6f914f6d6fb258a3f576a1336b019edf056ec90fda0f48325fb1e4",
+     "content": "{\"sentence\": \"According to the text, the typical maximum range for Infrared (IR) sensors is **50 to 100 cm**.\", \"label\": \"supported\", \"rationale\": \"The context explicitly states the typical maximum range for IR sensors as 50 to 100 cm, matching the claim exactly.\", \"excerpt\": \"IR are short range – t",
+     "content_sha256": "3a8847f018d536215e309776928d478bab4dd2067150eb900b49f294ca767e15",
+     "grounded": true,
+     "sentences": [
+      {
+       "sentence": "According to the text, the typical maximum range for Infrared (IR) sensors is **50 to 100 cm**.",
+       "label": "supported",
+       "rationale": "The context explicitly states the typical maximum range for IR sensors as 50 to 100 cm, matching the claim exactly.",
+       "excerpt": "IR are short range – typical maximum range is 50 to 100 cm"
+      },
+      {
+       "sentence": "The text notes that IR sensors are short range.",
+       "label": "supported",
+       "rationale": "The context directly says that IR are short range.",
+       "excerpt": "IR are short range – typical maximum range is 50 to 100 cm"
+      }
+     ],
+     "parsed_sentences": 2,
+     "unparseable_lines": 0,
+     "label_counts": {
+      "supported": 2,
+      "not_supported": 0,
+      "no_rad": 0,
+      "unknown": 0
+     }
+    }
+   ],
+   "responses_create_params": {
+    "input": [
+     {
+      "role": "user",
+      "content": "<System Instruction>\nOnly use the provided text to answer the question. Do not use outside resources. The entire answer should be short.\n----------------\n<Question>\nAccording to the provided text, what is the typical maximum range for Infrared (IR)?\n----------------\n<Text>\n**Robotics Sensors and Actuators**\n\nRobot Sensors\n\n• Sensors are devices that can sense and measure\nphysical properties of the"
+     }
+    ]
+   },
+   "response": {
+    "id": "r",
+    "created_at": 0,
+    "model": "fixture",
+    "object": "response",
+    "output": [
+     {
+      "type": "message",
+      "id": "m",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+       {
+        "type": "output_text",
+        "text": "According to the text, the typical maximum range for Infrared (IR) sensors is **50 to 100 cm**. The text notes that IR sensors are short range.",
+        "annotations": []
+       }
+      ]
+     }
+    ],
+    "parallel_tool_calls": false,
+    "tool_choice": "auto",
+    "tools": [],
+    "usage": {
+     "input_tokens": 500,
+     "input_tokens_details": {
+      "cached_tokens": 0
+     },
+     "output_tokens": 100,
+     "output_tokens_details": {
+      "reasoning_tokens": 60
+     },
+     "total_tokens": 600
+    }
+   },
+   "_ng_task_index": 0,
+   "_ng_rollout_index": 0
+  },
+  {
+   "id": "facts_grounding_v2_public_0014",
+   "system_instruction": "[question]\n [user request]\n \n\n =====================\n \n\n [text]\n [context document]\n \n\n =====================\n \n\n [instruction]\n Answer the question using only the information provided in the context. Do not rely on external knowledge or sources.",
+   "user_request": "I just adopted a German Shepard puppy through a local pet rescue. I also own a small business with inventory in an outbuilding on my property. Can I deduct the adoption fee and all of the expenses for this dog if I am using him a few hours a day as a guard dog?",
+   "domain": "Legal",
+   "type": "Fact Finding",
+   "high_level_type": "Q&A",
+   "reward": 0.0,
+   "generation": "Based on the information provided, here's how your situation breaks down:\n\n## The Adoption Fee: Not Deductible\n\nAccording to the context, \"The IRS doesn't allow you to write off the cost of buying the dog itself.\" Since the adoption fee represents the cost of acquiring the dog, it would not be deductible.\n\n## Ongoing Expenses: Partially Deductible, With Conditions\n\nYou *may* be able to deduct care",
+   "generation_empty": false,
+   "generation_truncated": false,
+   "generation_chars": 1636,
+   "policy_input_tokens": 1243,
+   "policy_output_tokens": 905,
+   "eligible": true,
+   "eligibility_deciding_judge": "gemini-2.5-flash",
+   "eligibility_ratings": {
+    "gemini-2.5-flash": "No Issues"
+   },
+   "eligibility_invalid_count": 0,
+   "grounding_verdicts": {
+    "gemini-2.5-flash": false,
+    "gpt-5": false
+   },
+   "grounding_parsed_sentences": {
+    "gemini-2.5-flash": 13,
+    "gpt-5": 17
+   },
+   "grounding_unparseable_lines": {
+    "gemini-2.5-flash": 0,
+    "gpt-5": 0
+   },
+   "grounding_label_counts": {
+    "gemini-2.5-flash": {
+     "supported": 11,
+     "not_supported": 1,
+     "no_rad": 1,
+     "unknown": 0
+    },
+    "gpt-5": {
+     "supported": 13,
+     "not_supported": 2,
+     "no_rad": 2,
+     "unknown": 0
+    }
+   },
+   "grounding_score": 0.0,
+   "unadjusted_score": 0.0,
+   "judges_agree": true,
+   "prompt_variant": "kaggle-starter-prathameshbang-facts-grounding-v2-benchmark-starter-v4",
+   "is_eligible": 1.0,
+   "is_grounded_all_judges": 0.0,
+   "context_document": "When you’re trying to score a break at tax time, maxing out your deductions can potentially lower your bill or result in a bigger tax return. Apart from the standard write-offs for things like mortgage interest or business travel, you may be able to claim more unusual expenses, including the cost of taking care of a pet. The IRS has certain rules about when pet expenses are tax-deductible, so if y",
+   "full_prompt": "[question]\n I just adopted a German Shepard puppy through a local pet rescue. I also own a small business with inventory in an outbuilding on my property. Can I deduct the adoption fee and all of the expenses for this dog if I am using him a few hours a day as a guard dog?\n \n\n =====================\n \n\n [text]\n When you’re trying to score a break at tax time, maxing out your deductions can potentia",
+   "judge_receipts": [
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "baseline",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-d6HSLAmGBaufzsBsAt9sHy5sutaKO",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "770953a45c22827a15a8d5723d92ca88a0c6f118da24699467baf71897ad9451",
+     "content": "No, you cannot deduct the adoption fee for the dog. The text states, \"The IRS doesn’t allow you to write off the cost of buying the dog itself.\"\n\nYou may be able to deduct some expenses for the dog if it is primarily used to guard your business premises and inventory. These deductible expenses inclu",
+     "content_sha256": "99066e692a2c6c8f0233b77406fd26650380c29b5a78c8bb19e1826126ad3591",
+     "sentences": []
+    },
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "eligibility",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-ud5aalTJrojsT7SFCryMePRJCHqnA",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "846988c777f61500cceadabb1b5a6e3325b1dfa1e8b83424780d7d6149f4d914",
+     "content": "Analysis:\nThe user's query asks for tax deduction advice regarding a newly adopted German Shepherd puppy used as a guard dog for a business.\n\n**Instructions in the user query:**\n1.  Determine if the adoption fee is deductible. (Very Important: Directly asked)\n2.  Determine if *all* the expenses for ",
+     "content_sha256": "176f9ea0ec81c1ab4ad6250febeb93fc01b2b96a2886429fc73e7351505f6892",
+     "rating": "No Issues",
+     "eligible": true,
+     "sentences": []
+    },
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "grounding",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-aBsdL5P11DJBlVTDGxOxSOOrpZ0Aa",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "ddfb4946204b803fe46e0a431fd5e37946debb5268dfc24ed96b9fd9bff51478",
+     "content": "```json\n{\"sentence\": \"Based on the information provided, here's how your situation breaks down:\", \"label\": \"no_rad\", \"rationale\": \"This is an introductory sentence that does not make a factual claim verifiable against the context.\", \"excerpt\": null}\n```\n```json\n{\"sentence\": \"According to the context",
+     "content_sha256": "56a42b6ecfa83087b0b484b3bce3862aa4558f61adc92b967630bad1012e04fc",
+     "grounded": false,
+     "sentences": [
+      {
+       "sentence": "Based on the information provided, here's how your situation breaks down:",
+       "label": "no_rad",
+       "rationale": "This is an introductory sentence that does not make a factual claim verifiable against the context.",
+       "excerpt": null
+      },
+      {
+       "sentence": "According to the context, The IRS doesn't allow you to write off the cost of buying the dog itself.",
+       "label": "supported",
+       "rationale": "The sentence directly quotes the provided context regarding the non-deductibility of buying a dog for business use.",
+       "excerpt": "The IRS doesn’t allow you to write off the cost of buying the dog itself"
+      }
+     ],
+     "parsed_sentences": 13,
+     "unparseable_lines": 0,
+     "label_counts": {
+      "supported": 11,
+      "not_supported": 1,
+      "no_rad": 1,
+      "unknown": 0
+     }
+    },
+    {
+     "judge": "gpt-5",
+     "stage": "grounding",
+     "judge_model": "gpt-5-2025-08-07",
+     "response_id": "chatcmpl-ENtgTawPKcvmrr8NjVh4aJVBTHEI4",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "ddfb4946204b803fe46e0a431fd5e37946debb5268dfc24ed96b9fd9bff51478",
+     "content": "{\"sentence\": \"Based on the information provided, here's how your situation breaks down:\", \"label\": \"no_rad\", \"rationale\": \"Introductory framing statement without a verifiable factual claim.\", \"excerpt\": null}\n{\"sentence\": \"## The Adoption Fee: Not Deductible\", \"label\": \"supported\", \"rationale\": \"The",
+     "content_sha256": "296be57c5ab37a2a08838fef911427e4a668f61351b1441b8e11a1cd88dd07a9",
+     "grounded": false,
+     "sentences": [
+      {
+       "sentence": "Based on the information provided, here's how your situation breaks down:",
+       "label": "no_rad",
+       "rationale": "Introductory framing statement without a verifiable factual claim.",
+       "excerpt": null
+      },
+      {
+       "sentence": "## The Adoption Fee: Not Deductible",
+       "label": "supported",
+       "rationale": "The context explicitly states that the IRS does not allow writing off the cost of buying the dog, which covers acquisition costs like an adoption fee.",
+       "excerpt": "The IRS doesn’t allow you to write off the cost of buying the dog itself."
+      }
+     ],
+     "parsed_sentences": 17,
+     "unparseable_lines": 0,
+     "label_counts": {
+      "supported": 13,
+      "not_supported": 2,
+      "no_rad": 2,
+      "unknown": 0
+     }
+    }
+   ],
+   "responses_create_params": {
+    "input": [
+     {
+      "role": "user",
+      "content": "[question]\n I just adopted a German Shepard puppy through a local pet rescue. I also own a small business with inventory in an outbuilding on my property. Can I deduct the adoption fee and all of the expenses for this dog if I am using him a few hours a day as a guard dog?\n \n\n =====================\n \n\n [text]\n When you’re trying to score a break at tax time, maxing out your deductions can potentia"
+     }
+    ]
+   },
+   "response": {
+    "id": "r",
+    "created_at": 0,
+    "model": "fixture",
+    "object": "response",
+    "output": [
+     {
+      "type": "message",
+      "id": "m",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+       {
+        "type": "output_text",
+        "text": "Based on the information provided, here's how your situation breaks down:\n\n## The Adoption Fee: Not Deductible\n\nAccording to the context, \"The IRS doesn't allow you to write off the cost of buying the dog itself.\" Since the adoption fee represents the cost of acquiring the dog, it would not be deductible.\n\n## Ongoing Expenses: Partially Deductible, With Conditions\n\nYou *may* be able to deduct care",
+        "annotations": []
+       }
+      ]
+     }
+    ],
+    "parallel_tool_calls": false,
+    "tool_choice": "auto",
+    "tools": [],
+    "usage": {
+     "input_tokens": 500,
+     "input_tokens_details": {
+      "cached_tokens": 0
+     },
+     "output_tokens": 100,
+     "output_tokens_details": {
+      "reasoning_tokens": 60
+     },
+     "total_tokens": 600
+    }
+   },
+   "_ng_task_index": 1,
+   "_ng_rollout_index": 0
+  },
+  {
+   "id": "facts_grounding_v2_public_0004",
+   "system_instruction": "You must only use the context to answer the question. You must respond in a bullet point list. The list can be divided into sections.",
+   "user_request": "What are all  the contexts when it is right for testing for leptospirosis in dogs specifically?",
+   "domain": "Medical",
+   "type": "Fact Finding",
+   "high_level_type": "Q&A",
+   "reward": 0.5,
+   "generation": "**Acute Leptospirosis in Dogs — Testing is indicated when there is:**\n- Acute renal failure\n- Jaundice\n\n**Chronic Leptospirosis in Dogs — Testing should be considered when there is:**\n- Chronic renal failure\n- Chronic active hepatitis",
+   "generation_empty": false,
+   "generation_truncated": false,
+   "generation_chars": 234,
+   "policy_input_tokens": 294,
+   "policy_output_tokens": 207,
+   "eligible": true,
+   "eligibility_deciding_judge": "gemini-2.5-flash",
+   "eligibility_ratings": {
+    "gemini-2.5-flash": "No Issues"
+   },
+   "eligibility_invalid_count": 0,
+   "grounding_verdicts": {
+    "gemini-2.5-flash": true,
+    "gpt-5": false
+   },
+   "grounding_parsed_sentences": {
+    "gemini-2.5-flash": 6,
+    "gpt-5": 6
+   },
+   "grounding_unparseable_lines": {
+    "gemini-2.5-flash": 0,
+    "gpt-5": 0
+   },
+   "grounding_label_counts": {
+    "gemini-2.5-flash": {
+     "supported": 4,
+     "not_supported": 0,
+     "no_rad": 2,
+     "unknown": 0
+    },
+    "gpt-5": {
+     "supported": 4,
+     "not_supported": 2,
+     "no_rad": 0,
+     "unknown": 0
+    }
+   },
+   "grounding_score": 0.5,
+   "unadjusted_score": 0.5,
+   "judges_agree": false,
+   "prompt_variant": "kaggle-starter-prathameshbang-facts-grounding-v2-benchmark-starter-v4",
+   "is_eligible": 1.0,
+   "is_grounded_all_judges": 0.0,
+   "context_document": "Description of the disease: Leptospirosis is a transmissible disease of animals and humans caused\nby infection with any of the pathogenic members of the genus Leptospira. Acute leptospirosis should\nbe suspected in the following cases: sudden onset of agalactia (in adult milking cattle and sheep);\nicterus and haemoglobinuria, especially in young animals; meningitis; and acute renal failure or\njaund",
+   "full_prompt": "System instruction: You must only use the context to answer the question. You must respond in a bullet point list. The list can be divided into sections. \nQuestion: What are all  the contexts when it is right for testing for leptospirosis in dogs specifically?\nContext: Description of the disease: Leptospirosis is a transmissible disease of animals and humans caused\nby infection with any of the pat",
+   "judge_receipts": [
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "baseline",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-GwcGkG5K8VYdK2hlXs9XmB88iSJzu",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "bef948a9806c21d660d468f871907cff3b7adf020e3573a6fc9af5800803368d",
+     "content": "*   **Acute Leptospirosis**\n    *   Acute renal failure\n    *   Jaundice\n\n*   **Chronic Leptospirosis**\n    *   Chronic renal failure\n    *   Chronic active hepatitis",
+     "content_sha256": "783157f3efd0bd2571fa1e5acfc6ac147c4c838a6775c96315c2d16a6acda0ef",
+     "sentences": []
+    },
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "eligibility",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-Z1km0i0hIBPmTjwCUczqi3aQ2zD2u",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "613901ebd151fad6a9f3f86b9adf41002c381428a5d6ef48c01683a74616c5cd",
+     "content": "Analysis:\nThe user query asks: \"What are all the contexts when it is right for testing for leptospirosis in dogs specifically?\"\n\nHere's a breakdown of the instructions:\n\n1.  **Identify \"all the contexts\"**: This is a direct instruction asking for a comprehensive list of situations. (Highly important",
+     "content_sha256": "fa43e0af80902e0605342060db536033291910dd08b0722ba5e64323af56f3a4",
+     "rating": "No Issues",
+     "eligible": true,
+     "sentences": []
+    },
+    {
+     "judge": "gemini-2.5-flash",
+     "stage": "grounding",
+     "judge_model": "gemini-2.5-flash",
+     "response_id": "chatcmpl-Iy7hAv9IgDO8hjmgwus1ePI0O4y2q",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "25af2645cacca6a8794136ec1f24e1eabcbbfaee9e6d24861ac3ffc945a39fb9",
+     "content": "```json\n{\"sentence\": \"Acute Leptospirosis in Dogs — Testing is indicated when there is:\", \"label\": \"no_rad\", \"rationale\": \"This sentence serves as a heading or introductory statement and does not make a factual claim that can be verified against the context.\", \"excerpt\": \"null\"}\n```\n```json\n{\"senten",
+     "content_sha256": "c507917e95ca9786daa468f77749779bc88b8b83f7145d746b06c853fb613c49",
+     "grounded": true,
+     "sentences": [
+      {
+       "sentence": "Acute Leptospirosis in Dogs — Testing is indicated when there is:",
+       "label": "no_rad",
+       "rationale": "This sentence serves as a heading or introductory statement and does not make a factual claim that can be verified against the context.",
+       "excerpt": null
+      },
+      {
+       "sentence": "- Acute renal failure",
+       "label": "supported",
+       "rationale": "The context explicitly states that acute leptospirosis should be suspected in cases of `acute renal failure or jaundice in dogs`.",
+       "excerpt": "Acute leptospirosis should be suspected in the following cases: ...acute renal failure or jaundice in dogs."
+      }
+     ],
+     "parsed_sentences": 6,
+     "unparseable_lines": 0,
+     "label_counts": {
+      "supported": 4,
+      "not_supported": 0,
+      "no_rad": 2,
+      "unknown": 0
+     }
+    },
+    {
+     "judge": "gpt-5",
+     "stage": "grounding",
+     "judge_model": "gpt-5-2025-08-07",
+     "response_id": "chatcmpl-ENthGVJXYGrooL4fV7iHgqztx0I2e",
+     "finish_reason": "stop",
+     "usage": {
+      "prompt_tokens": 10,
+      "completion_tokens": 5
+     },
+     "prompt_sha256": "25af2645cacca6a8794136ec1f24e1eabcbbfaee9e6d24861ac3ffc945a39fb9",
+     "content": "{\"sentence\": \"**Acute Leptospirosis in Dogs — Testing is indicated when there is:**\", \"label\": \"not_supported\", \"rationale\": \"The context specifies when acute leptospirosis should be suspected but does not mention that testing is indicated. Introducing testing is beyond what the text states.\", \"exce",
+     "content_sha256": "065c8ce965fbd5dcd903745edc23ef9311090a87ac61c6cf0515250b7febcdd4",
+     "grounded": false,
+     "sentences": [
+      {
+       "sentence": "**Acute Leptospirosis in Dogs — Testing is indicated when there is:**",
+       "label": "not_supported",
+       "rationale": "The context specifies when acute leptospirosis should be suspected but does not mention that testing is indicated. Introducing testing is beyond what the text states.",
+       "excerpt": null
+      },
+      {
+       "sentence": "- Acute renal failure",
+       "label": "supported",
+       "rationale": "The context explicitly lists acute renal failure in dogs as a situation where acute leptospirosis should be suspected.",
+       "excerpt": "Acute leptospirosis should be suspected in the following cases:; acute renal failure or jaundice in dogs."
+      }
+     ],
+     "parsed_sentences": 6,
+     "unparseable_lines": 0,
+     "label_counts": {
+      "supported": 4,
+      "not_supported": 2,
+      "no_rad": 0,
+      "unknown": 0
+     }
+    }
+   ],
+   "responses_create_params": {
+    "input": [
+     {
+      "role": "user",
+      "content": "System instruction: You must only use the context to answer the question. You must respond in a bullet point list. The list can be divided into sections. \nQuestion: What are all  the contexts when it is right for testing for leptospirosis in dogs specifically?\nContext: Description of the disease: Leptospirosis is a transmissible disease of animals and humans caused\nby infection with any of the pat"
+     }
+    ]
+   },
+   "response": {
+    "id": "r",
+    "created_at": 0,
+    "model": "fixture",
+    "object": "response",
+    "output": [
+     {
+      "type": "message",
+      "id": "m",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+       {
+        "type": "output_text",
+        "text": "**Acute Leptospirosis in Dogs — Testing is indicated when there is:**\n- Acute renal failure\n- Jaundice\n\n**Chronic Leptospirosis in Dogs — Testing should be considered when there is:**\n- Chronic renal failure\n- Chronic active hepatitis",
+        "annotations": []
+       }
+      ]
+     }
+    ],
+    "parallel_tool_calls": false,
+    "tool_choice": "auto",
+    "tools": [],
+    "usage": {
+     "input_tokens": 500,
+     "input_tokens_details": {
+      "cached_tokens": 0
+     },
+     "output_tokens": 100,
+     "output_tokens_details": {
+      "reasoning_tokens": 60
+     },
+     "total_tokens": 600
+    }
+   },
+   "_ng_task_index": 2,
+   "_ng_rollout_index": 0
+  }
+ ],
+ "failures": [
+  {
+   "id": "facts_grounding_v2_public_0007",
+   "_ng_task_index": 0,
+   "_ng_rollout_index": 0,
+   "_ng_failure_class": "judge_failed",
+   "_ng_failure_judge_error": "ClientResponseError: 500"
+  },
+  {
+   "id": "facts_grounding_v2_public_9999",
+   "_ng_task_index": 3,
+   "_ng_rollout_index": 0,
+   "_ng_failure_class": "agent_request_failed",
+   "error": "timeout"
+  }
+ ]
+}
