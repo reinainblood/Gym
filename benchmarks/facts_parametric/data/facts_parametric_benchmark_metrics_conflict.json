@@ -1,0 +1,57 @@
+{
+    "name": "facts_parametric",
+    "type": "benchmark",
+    "jsonl_fpath": "benchmarks/facts_parametric/data/facts_parametric_benchmark.jsonl",
+    "prepare_script": "benchmarks/facts_parametric/prepare.py",
+    "prompt_config": null,
+    "num_repeats": 1,
+    "Number of examples": 1052,
+    "Number of tools": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "Json-dumped number of words (proxy for token count)": {
+        "Total # non-null values": 1052,
+        "Average": 10.19,
+        "Min": 6.0,
+        "Max": 29.0,
+        "Standard deviation": 4.05
+    },
+    "Number of turns": {
+        "Total # non-null values": 1052,
+        "Average": 1.0,
+        "Min": 1.0,
+        "Max": 1.0,
+        "Standard deviation": 0.0
+    },
+    "Temperature": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "id": {
+        "unique_count": 1052,
+        "total_count": 1052
+    },
+    "question": {
+        "unique_count": 1052,
+        "total_count": 1052
+    },
+    "expected_answer": {
+        "unique_count": 1037,
+        "total_count": 1052
+    },
+    "source_url": {
+        "unique_count": 1026,
+        "total_count": 1052
+    },
+    "topic": {
+        "unique_count": 54,
+        "total_count": 1052
+    }
+}
