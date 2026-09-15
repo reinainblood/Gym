@@ -1,0 +1,34 @@
+config_paths:
+  - resources_servers/even_handedness/configs/even_handedness.yaml
+
+# Keep a transient provider or agent /run failure from cancelling all in-flight
+# paired episodes. Failures are written to a sidecar and retried by --resume.
+route_failures_to_sidecar: true
+
+policy_model:
+  responses_api_models:
+    inference_provider:
+      entrypoint: app.py
+      base_url: ${oc.select:policy_base_url,''}
+      api_key: ${oc.select:policy_api_key,''}
+      model: ${oc.select:policy_model_name,''}
+
+even_handedness_benchmark:
+  _inherit_from: even_handedness
+
+even_handedness_benchmark_agent:
+  _inherit_from: even_handedness_agent
+  responses_api_agents:
+    even_handedness:
+      resources_server:
+        name: even_handedness_benchmark
+      datasets:
+      - name: example
+        type: example
+        jsonl_fpath: resources_servers/even_handedness/data/example.jsonl
+        license: Creative Commons Attribution 4.0 International
+      - name: even_handedness
+        type: benchmark
+        jsonl_fpath: benchmarks/even_handedness/data/even_handedness_eval.jsonl
+        prepare_script: benchmarks/even_handedness/prepare.py
+        license: Creative Commons Attribution 4.0 International
