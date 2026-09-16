@@ -189,24 +189,11 @@ gym eval reverify \
 | GPT 5 Mini | Gemini 2.5 Flash | Accuracy(Pass@1) | 40.7 | 30.6 |  |
 | GPT 5 Mini | Gemini 2.5 Flash | Coverage | 58.8 | 53.9 |  |
 | GPT 5 Mini | Gemini 2.5 Flash | Factuality | 65.1 | 41.0 | |
-| GPT 5 Mini | GLM 5.3 Flash | Accuracy(Pass@1) | 40.7 | x |  |
-| GPT 5 Mini | GLM 5.3 Flash | Coverage | 58.8 | x |  |
-| GPT 5 Mini | GLM 5.3 Flash | Factuality | 65.1 | x |  |
+| GPT 5 Mini | GLM 5.3 Flash | Accuracy(Pass@1) | 40.7 | 45.9 |  |
+| GPT 5 Mini | GLM 5.3 Flash | Coverage | 58.8 | 64.1 |  |
+| GPT 5 Mini | GLM 5.3 Flash | Factuality | 65.1 | 62.05 |  |
 
-Gemini is substantially stricter, often converting a response-quality issue into
-a factual contradiction. Recurring examples include treating abstention or
-refusal as false because the rubric contains the omitted answer
-(`facts_multimodal_10170748582326508945`), interpreting creative caption
-language literally (`facts_multimodal_10277852077522498694`), and rejecting
-minor descriptive looseness such as calling an egg-shaped building an “orb”
-(`facts_multimodal_10766554115674076413`). RUN2 generally preserves the
-distinction between omission and contradiction.
-
-GLM is not uniformly lenient: it more readily penalizes specific unsupported
-additions, such as calling the arena in *Gladiator* the Colosseum
-(`facts_multimodal_11428814426005986094`), saying “bowls of food” where one
-bowl is visible (`facts_multimodal_15010980526031154594`), or giving an
-incorrect count (`facts_multimodal_13039074476983734485`).
+A sample of 20 instances where Gemini 2.5 Flash and GLM 5.3 Flash differed were reviewed by a human annotator. GLM was preferred in 15/20, with the most common reason being Gemini 2.5 Flash treating an omitted fact as a contradiction.
 
 
 ## Scope and limitations
