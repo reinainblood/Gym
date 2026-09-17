@@ -32,8 +32,7 @@ model under test and `judge_model` for the semantic judge.
 
 ## Usage
 
-The Kaggle CSV is a local source download, not benchmark data committed to Git. Convert it into
-Gym JSONL before a full run:
+Make sure you download and place the file `benchmarks/facts_parametric/FACTS-Parametric-public.csv` before running below.
 
 ```bash
 # Converts FACTS-Parametric-public.csv into 1,052 task rows.
