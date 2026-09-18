@@ -56,12 +56,14 @@ or ``~/.modal.toml`` from ``modal token new``. Nothing secret lives in the YAML.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Any, TypeVar
+from types import TracebackType
+from typing import Any, Self, TypeVar
 
 from nemo_gym.sandbox.providers.base import (
     SandboxCreateError,
@@ -69,6 +71,9 @@ from nemo_gym.sandbox.providers.base import (
     SandboxEndpoint,
     SandboxExecResult,
     SandboxHandle,
+    SandboxPtyError,
+    SandboxPtySession,
+    SandboxPtySpec,
     SandboxResources,
     SandboxSpec,
     SandboxStatus,
@@ -93,6 +98,8 @@ _PROVIDER_OPTION_KEYS = frozenset(
         "image_secret",  # modal.Secret name holding registry credentials
         "name",  # Modal sandbox name (unique within the app)
         "tags",  # extra tags merged over spec.metadata
+        "outer_modal_image_id",  # prebuilt Modal image used as the VM host filesystem
+        "vm_runtime",  # run the outer image in Modal's full-VM runtime
     }
 )
 
@@ -332,6 +339,91 @@ class _ModalSandbox:
     port_mode: str = "encrypted"
 
 
+class _ModalProcessSession(SandboxPtySession):
+    """Bidirectional pipe/PTY around a Modal ``ContainerProcess``."""
+
+    def __init__(self, process: Any, *, pty: bool) -> None:
+        self._process = process
+        self._stdout = process.stdout.__aiter__()
+        self._stderr = None if pty else process.stderr.__aiter__()
+        self._closed = False
+        self.session_id = str(getattr(process, "_process_id", "modal-process"))
+        self.mode = "pty" if pty else "pipe"
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    @staticmethod
+    async def _read_stream(stream: Any, timeout_s: float | None) -> bytes:
+        if stream is None:
+            return b""
+        try:
+            chunk = await anext(stream) if timeout_s is None else await asyncio.wait_for(anext(stream), timeout_s)
+        except StopAsyncIteration:
+            return b""
+        return chunk if isinstance(chunk, bytes) else str(chunk).encode()
+
+    async def read(self, *, timeout_s: float | None = None) -> bytes:
+        return await self._read_stream(self._stdout, timeout_s)
+
+    async def read_stderr(self, *, timeout_s: float | None = None) -> bytes:
+        return await self._read_stream(self._stderr, timeout_s)
+
+    def __aiter__(self) -> Self:
+        return self
+
+    async def __anext__(self) -> bytes:
+        chunk = await self.read()
+        if not chunk:
+            raise StopAsyncIteration
+        return chunk
+
+    async def write(self, data: bytes) -> None:
+        if self._closed:
+            raise SandboxPtyError("cannot write to a closed Modal process session")
+        self._process.stdin.write(data)
+        await self._process.stdin.drain.aio()
+
+    async def resize(self, rows: int, cols: int) -> None:
+        if rows <= 0 or cols <= 0:
+            raise ValueError("rows and cols must be positive")
+        if self.mode == "pipe":
+            return
+        raise SandboxPtyError("Modal does not expose dynamic ContainerProcess PTY resize")
+
+    async def send_signal(self, signal: str) -> None:
+        raise SandboxPtyError(
+            f"Modal does not expose per-process signal delivery ({signal}); close the sandbox instead"
+        )
+
+    async def wait_exit(self, *, timeout_s: float | None = None) -> int:
+        waiter = self._process.wait.aio()
+        return int(await waiter if timeout_s is None else await asyncio.wait_for(waiter, timeout_s))
+
+    async def run_detached(self, command: str, *, poll_interval_s: float = 15.0) -> tuple[bytes, int | None]:
+        raise SandboxPtyError("run_detached is not supported by the Modal process adapter")
+
+    async def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        with contextlib.suppress(Exception):
+            self._process.stdin.write_eof()
+            await self._process.stdin.drain.aio()
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await self.close()
+
+
 # ----------------------------------------------------------------------------
 # provider
 # ----------------------------------------------------------------------------
@@ -551,7 +643,20 @@ class ModalProvider:
             raise ModalCreateError("modal image_secret must be a non-empty modal.Secret name")
 
         app = await self._get_app()
-        image = self._build_image(modal, spec.image, image_secret)
+        outer_modal_image_id = options.get("outer_modal_image_id")
+        vm_runtime = options.get("vm_runtime", False)
+        if not isinstance(vm_runtime, bool):
+            raise ModalCreateError("modal vm_runtime must be a boolean")
+        if vm_runtime and not outer_modal_image_id:
+            raise ModalCreateError("modal vm_runtime requires provider_options.outer_modal_image_id")
+        if outer_modal_image_id:
+            if not isinstance(outer_modal_image_id, str) or not outer_modal_image_id.strip():
+                raise ModalCreateError("modal outer_modal_image_id must be a non-empty Modal image id")
+            if image_secret is not None:
+                raise ModalCreateError("modal image_secret cannot be combined with outer_modal_image_id")
+            image = modal.Image.from_id(outer_modal_image_id)
+        else:
+            image = self._build_image(modal, spec.image, image_secret)
 
         kwargs: dict[str, Any] = {"app": app, "image": image}
         if ttl_s is not None:
@@ -587,12 +692,23 @@ class ModalProvider:
             raise ModalCreateError("Modal does not allow block_network with exposed sandbox ports")
         kwargs["block_network"] = block_network
 
+        if vm_runtime:
+            if not block_network:
+                raise ModalCreateError("modal VM sandbox profile requires block_network=true")
+            if spec.ports:
+                raise ModalCreateError("modal VM sandbox profile forbids inbound ports")
+            kwargs["experimental_options"] = {"vm_runtime": True}
+
         secret_names = [*self._create.secrets, *_coerce_str_list(options.get("secrets"), "provider_options.secrets")]
         if secret_names:
+            if vm_runtime:
+                raise ModalCreateError("modal VM sandbox profile forbids secret injection")
             kwargs["secrets"] = [self._secret(modal, n) for n in secret_names]
 
         volumes = options.get("volumes")
         if volumes:
+            if vm_runtime:
+                raise ModalCreateError("modal VM sandbox profile forbids mounted volumes")
             if not isinstance(volumes, Mapping):
                 raise ModalCreateError("modal provider option 'volumes' must map mount paths to Volume names")
             kwargs["volumes"] = {str(mount): self._volume(modal, str(vol)) for mount, vol in volumes.items()}
@@ -843,6 +959,27 @@ class ModalProvider:
         stdout = stdout.decode("utf-8", "replace") if isinstance(stdout, bytes) else stdout
         stderr = stderr.decode("utf-8", "replace") if isinstance(stderr, bytes) else stderr
         return SandboxExecResult(stdout=stdout, stderr=stderr, return_code=int(return_code))
+
+    async def create_pty(self, handle: SandboxHandle, spec: SandboxPtySpec) -> SandboxPtySession:
+        """Start a persistent Modal exec session; ``pty=False`` preserves MCP stdio framing."""
+
+        if spec.rows <= 0 or spec.cols <= 0:
+            raise ValueError("rows and cols must be positive")
+        if spec.cwd is not None and not str(spec.cwd).startswith("/"):
+            raise ValueError("modal exec cwd must be an absolute path")
+        sandbox = self._sandbox(handle)
+        command = spec.command or "exec sh"
+        argv = self._shell_argv(command, user=spec.user)
+        process = await sandbox.exec.aio(
+            *argv,
+            workdir=spec.cwd,
+            env={str(key): str(value) for key, value in (spec.env or {}).items()},
+            timeout=None,
+            text=False,
+            bufsize=-1,
+            pty=spec.pty,
+        )
+        return _ModalProcessSession(process, pty=spec.pty)
 
     # -------------------------------------------------------------------- files
 

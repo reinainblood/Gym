@@ -29,10 +29,11 @@ from typing import Any
 
 import pytest
 
-from nemo_gym.sandbox import AsyncSandbox, ConnectableProvider, SupportsSandboxEndpoint
+from nemo_gym.sandbox import AsyncSandbox, ConnectableProvider, SupportsSandboxEndpoint, SupportsSandboxPty
 from nemo_gym.sandbox.providers.base import (
     SandboxCreateVerificationError,
     SandboxProvider,
+    SandboxPtySpec,
     SandboxSpec,
     SandboxStatus,
 )
@@ -72,9 +73,19 @@ class _Aio:
 class FakeStream:
     def __init__(self, data):
         self._data = data
+        self._iterated = False
         self.read = _Aio(self._read)
 
     def _read(self):
+        return self._data
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._iterated:
+            raise StopAsyncIteration
+        self._iterated = True
         return self._data
 
 
@@ -291,11 +302,17 @@ def _build_fake_modal(*, exec_script=None, create_exc=None):
 
     class Image:
         calls: list[tuple[str, dict[str, Any]]] = []
+        ids: list[str] = []
 
         @staticmethod
         def from_registry(tag, **kwargs):
             Image.calls.append((tag, kwargs))
             return types.SimpleNamespace(tag=tag, kwargs=kwargs)
+
+        @staticmethod
+        def from_id(image_id):
+            Image.ids.append(image_id)
+            return types.SimpleNamespace(object_id=image_id)
 
     class Secret:
         @staticmethod
@@ -368,6 +385,7 @@ class TestProtocolConformance:
         provider = ModalProvider()
         assert isinstance(provider, SupportsSandboxEndpoint)
         assert isinstance(provider, ConnectableProvider)
+        assert isinstance(provider, SupportsSandboxPty)
 
 
 class TestRegistry:
@@ -490,6 +508,42 @@ class TestCreate:
         assert tag == "ghcr.io/acme/task:1.0"
         assert kwargs["secret"].name == "ghcr-creds"
 
+    async def test_vm_runtime_uses_prebuilt_outer_image_and_fail_closed_profile(self, fake_modal):
+        modal, created = fake_modal()
+        provider = _provider(probe={"command": None})
+        await provider.create(
+            _spec(
+                provider_options={
+                    "outer_modal_image_id": "im-trusted-docker-host",
+                    "vm_runtime": True,
+                    "block_network": True,
+                }
+            )
+        )
+        assert modal.Image.ids == ["im-trusted-docker-host"]
+        assert created[0].create_kwargs["block_network"] is True
+        assert created[0].create_kwargs["experimental_options"] == {"vm_runtime": True}
+
+    @pytest.mark.parametrize(
+        "provider_options,match",
+        [
+            ({"vm_runtime": True}, "requires provider_options.outer_modal_image_id"),
+            (
+                {"outer_modal_image_id": "im-host", "vm_runtime": True, "block_network": False},
+                "requires block_network=true",
+            ),
+            (
+                {"outer_modal_image_id": "im-host", "vm_runtime": True, "block_network": True, "secrets": ["x"]},
+                "forbids secret injection",
+            ),
+        ],
+    )
+    async def test_vm_runtime_rejects_unsafe_profiles(self, fake_modal, provider_options, match):
+        _, created = fake_modal()
+        with pytest.raises(ModalCreateError, match=match):
+            await _provider(probe={"command": None}).create(_spec(provider_options=provider_options))
+        assert created == []
+
     async def test_unknown_provider_option_is_rejected_before_any_sandbox_exists(self, fake_modal):
         _, created = fake_modal()
         with pytest.raises(ValueError, match="Unknown modal provider option"):
@@ -607,6 +661,18 @@ class TestExec:
         provider, handle, _, _ = await self._started(fake_modal)
         with pytest.raises(ValueError, match="absolute"):
             await provider.exec(handle, "pwd", cwd="relative/dir")
+
+    async def test_pipe_session_preserves_binary_stdio(self, fake_modal):
+        provider, handle, sb, _ = await self._started(fake_modal)
+        process = FakeProcess(stdout=b'{"jsonrpc":"2.0"}\n')
+        sb.exec_script = {"docker run": process}
+        session = await provider.create_pty(handle, SandboxPtySpec(command="docker run -i image", pty=False))
+        assert await session.read(timeout_s=1) == b'{"jsonrpc":"2.0"}\n'
+        await session.write(b'{"id":1}\n')
+        assert process.stdin.chunks == [b'{"id":1}\n']
+        argv, kwargs = sb.exec_calls[-1]
+        assert argv == ("/bin/sh", "-c", "docker run -i image")
+        assert kwargs["text"] is False and kwargs["bufsize"] == -1 and kwargs["pty"] is False
 
 
 # --------------------------------------------------------------------------
