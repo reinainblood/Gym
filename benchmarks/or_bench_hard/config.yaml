@@ -1,0 +1,20 @@
+config_paths:
+  - resources_servers/or_bench_hard/configs/or_bench_hard.yaml
+
+or_bench_hard_benchmark_resources_server:
+  _inherit_from: or_bench_hard_resources_server
+
+or_bench_hard_benchmark_simple_agent:
+  _inherit_from: or_bench_hard_simple_agent
+  responses_api_agents:
+    simple_agent:
+      resources_server:
+        name: or_bench_hard_benchmark_resources_server
+      datasets:
+        - name: or_bench_hard
+          type: benchmark
+          jsonl_fpath: benchmarks/or_bench_hard/data/or_bench_hard.jsonl
+          prompt_config: null
+          prepare_script: benchmarks/or_bench_hard/prepare.py
+          num_repeats: 1
+          license: CC-BY-4.0
