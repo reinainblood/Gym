@@ -13,6 +13,7 @@ import agentdojo
 import agentdojo.agent_pipeline.agent_pipeline as agentdyn_pipeline
 import openai
 from fastapi import Body
+from huggingface_hub import snapshot_download
 from pydantic import ConfigDict
 
 from responses_api_agents.agentdojo_family.app import (
@@ -32,11 +33,15 @@ AGENTDYN_DEFENSES = (
     "progent",
     "drift",
 )
+PROMPT_GUARD_2_UPSTREAM_MODEL = "meta-llama/Llama-Prompt-Guard-2-86M"
 
 
 class AgentDynAgentConfig(AgentDojoFamilyAgentConfig):
     metric_prefix: str = "agentdyn"
     defense_model_alias: str | None = "gpt-4o-2024-08-06"
+    prompt_guard_2_model_name: str = PROMPT_GUARD_2_UPSTREAM_MODEL
+    prompt_guard_2_model_revision: str | None = None
+    prompt_guard_2_local_path: str | None = None
 
 
 class AgentDynRunRequest(AgentDojoFamilyRunRequest):
@@ -54,6 +59,8 @@ class AgentDynRunRequest(AgentDojoFamilyRunRequest):
         | None
     ) = None
     external_model_base_url: str | None = None
+    detector_model_name: str | None = None
+    detector_model_revision: str | None = None
 
 
 class AgentDynAgent(AgentDojoFamilyAgent):
@@ -70,9 +77,30 @@ class AgentDynAgent(AgentDojoFamilyAgent):
                     )
                 }
             )
+        elif defense == "prompt_guard_2_detector":
+            body = body.model_copy(
+                update={
+                    "detector_model_name": self.config.prompt_guard_2_model_name,
+                    "detector_model_revision": self.config.prompt_guard_2_model_revision,
+                }
+            )
         return await super().run(body)
 
     def _run_agentdojo(self, body, bridge, benchmark_version):
+        if body.defense == "prompt_guard_2_detector":
+            model_path = self.config.prompt_guard_2_local_path or snapshot_download(
+                repo_id=self.config.prompt_guard_2_model_name,
+                revision=self.config.prompt_guard_2_model_revision,
+            )
+            original_detector = agentdyn_pipeline.TransformersBasedPIDetector
+
+            def build_prompt_guard_detector(*args, **kwargs):
+                if kwargs.get("model_name") == PROMPT_GUARD_2_UPSTREAM_MODEL:
+                    kwargs["model_name"] = model_path
+                return original_detector(*args, **kwargs)
+
+            with patch.object(agentdyn_pipeline, "TransformersBasedPIDetector", build_prompt_guard_detector):
+                return super()._run_agentdojo(body, bridge, benchmark_version)
         if body.defense not in {"camel", "progent", "drift"}:
             return super()._run_agentdojo(body, bridge, benchmark_version)
         if body.external_model_base_url is None:

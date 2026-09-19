@@ -12,6 +12,12 @@ agentdyn_agent:
       benchmark_version: v1.2.2
       attack_model_alias: local
       defense_model_alias: gpt-4o-2024-08-06
+      # Provisional public mirror of Meta's gated PromptGuard2 repository. Replace
+      # with meta-llama/Llama-Prompt-Guard-2-86M and its verified revision once
+      # canonical access is granted.
+      prompt_guard_2_model_name: project-free-llama/Llama-Prompt-Guard-2-86M
+      prompt_guard_2_model_revision: 43882965632dcb7b20299530f6436ac759d07fd9
+      prompt_guard_2_local_path: null
       metric_prefix: agentdyn
       default_defense: null
       system_message: null

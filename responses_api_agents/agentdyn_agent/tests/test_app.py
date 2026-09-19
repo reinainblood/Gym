@@ -3,15 +3,18 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+import agentdojo.agent_pipeline.agent_pipeline as agentdyn_pipeline
 import pytest
 
 from nemo_gym.config_types import ModelServerRef
 from nemo_gym.server_utils import ServerClient
+from responses_api_agents.agentdojo_family.app import AgentDojoFamilyAgent
 from responses_api_agents.agentdyn_agent.app import (
     AGENTDYN_DEFENSES,
     AGENTDYN_SUITES,
+    PROMPT_GUARD_2_UPSTREAM_MODEL,
     AgentDynAgent,
     AgentDynAgentConfig,
     AgentDynRunRequest,
@@ -67,6 +70,50 @@ async def test_configured_defense_is_applied_to_request() -> None:
 
     assert result.defense == "piguard_detector"
     assert result.reward == 1.0
+
+
+async def test_prompt_guard_source_is_recorded_on_rollout() -> None:
+    agent = _agent(default_defense="prompt_guard_2_detector")
+    agent.config.prompt_guard_2_model_name = "mirror/prompt-guard-2"
+    agent.config.prompt_guard_2_model_revision = "abc123"
+    agent._run_agentdojo = MagicMock(return_value=(True, True))
+
+    result = await agent.run(_request())
+
+    assert result.detector_model_name == "mirror/prompt-guard-2"
+    assert result.detector_model_revision == "abc123"
+
+
+def test_prompt_guard_local_cache_replaces_only_upstream_detector() -> None:
+    agent = _agent(default_defense="prompt_guard_2_detector")
+    agent.config.prompt_guard_2_local_path = "/tmp/prompt-guard-2"
+    body = _request().model_copy(
+        update={
+            "defense": "prompt_guard_2_detector",
+            "detector_model_name": agent.config.prompt_guard_2_model_name,
+            "detector_model_revision": agent.config.prompt_guard_2_model_revision,
+        }
+    )
+    constructed_model_names: list[str] = []
+
+    class FakeDetector:
+        def __init__(self, *args, **kwargs):
+            constructed_model_names.append(kwargs["model_name"])
+
+    def exercise_detector(*args, **kwargs):
+        agentdyn_pipeline.TransformersBasedPIDetector(
+            model_name=PROMPT_GUARD_2_UPSTREAM_MODEL,
+            safe_label="LABEL_0",
+        )
+        return True, True
+
+    with (
+        patch.object(agentdyn_pipeline, "TransformersBasedPIDetector", FakeDetector),
+        patch.object(AgentDojoFamilyAgent, "_run_agentdojo", side_effect=exercise_detector),
+    ):
+        assert agent._run_agentdojo(body, MagicMock(), "v1.2.2") == (True, True)
+
+    assert constructed_model_names == ["/tmp/prompt-guard-2"]
 
 
 def test_agentdyn_metrics_use_separate_namespace() -> None:

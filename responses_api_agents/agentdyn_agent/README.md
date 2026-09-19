@@ -13,6 +13,12 @@ selects exactly one defense; defenses are not stacked. The base config starts on
 defense treatment can set `default_defense` in its run config without duplicating the task matrix. Filter and
 system-defense runtime parity must be established independently before defense-specific configs are published.
 
+PromptGuard2's detector source is configurable independently of the defense name. During gated-access validation,
+`prompt_guard_2_model_name` and `prompt_guard_2_model_revision` may identify a provenance-recorded mirror while the
+run remains labeled `prompt_guard_2_detector`. Before publication, replace the mirror with Meta's canonical model,
+verify the model checksum, and rerun the same treatment. `prompt_guard_2_local_path` is a development-only cache
+override; it does not replace the source repository and revision recorded in each rollout.
+
 CaMeL, Progent, and DRIFT construct auxiliary OpenAI-compatible clients upstream. The adapter routes those clients to
 the rollout-prefixed NeMo policy-model URL rather than allowing them to use unrelated provider credentials. A
 separate compatibility alias selects the upstream OpenAI code path; the actual served model remains the model named
