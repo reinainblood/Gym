@@ -3,24 +3,20 @@
 
 from __future__ import annotations
 
-from agentdojo.task_suite.load_suites import get_suites
-
-from benchmarks.agentdojo.prepare import BENCHMARK_VERSION, SUITES, _row
+from benchmarks.agentdojo.prepare import SUITE_COUNTS, _row
 
 
 def test_materialized_matrix_count_is_derived_from_upstream() -> None:
-    suites = get_suites(BENCHMARK_VERSION)
-    expected = sum(len(suites[name].user_tasks) * (1 + len(suites[name].injection_tasks)) for name in SUITES)
+    expected = sum(user_count * (1 + injection_count) for user_count, injection_count in SUITE_COUNTS.values())
 
     assert expected == 1046
 
 
 def test_clean_and_attacked_rows_are_unambiguous() -> None:
-    clean = _row(suite="banking", user_task_id="user_task_0", prompt="pay bill")
+    clean = _row(suite="banking", user_task_id="user_task_0")
     attacked = _row(
         suite="banking",
         user_task_id="user_task_0",
-        prompt="pay bill",
         injection_task_id="injection_task_0",
     )
 

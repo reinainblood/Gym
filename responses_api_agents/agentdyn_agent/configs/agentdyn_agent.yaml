@@ -1,0 +1,23 @@
+agentdyn_agent:
+  responses_api_agents:
+    agentdyn_agent:
+      entrypoint: app.py
+      domain: safety
+      description: AgentDyn dynamic suites executed by the pinned upstream harness through a NeMo Gym model server.
+      value: Measure utility and indirect prompt-injection security under dynamic, helpful, long-horizon workflows.
+      model_server:
+        type: responses_api_models
+        name: policy_model
+      concurrency: 1
+      benchmark_version: v1.2.2
+      attack_model_alias: local
+      metric_prefix: agentdyn
+      default_defense: null
+      system_message: null
+      system_message_name: null
+      tool_output_format: null
+      token_id_capture: true
+      datasets:
+        - name: example
+          type: example
+          jsonl_fpath: responses_api_agents/agentdyn_agent/data/example.jsonl
