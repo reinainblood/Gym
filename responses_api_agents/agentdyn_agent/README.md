@@ -12,3 +12,13 @@ The request contract admits the five requested defenses: PromptGuard2, PIGuard, 
 selects exactly one defense; defenses are not stacked. The base config starts only the undefended agent. A complete
 defense treatment can set `default_defense` in its run config without duplicating the task matrix. Filter and
 system-defense runtime parity must be established independently before defense-specific configs are published.
+
+CaMeL, Progent, and DRIFT construct auxiliary OpenAI-compatible clients upstream. The adapter routes those clients to
+the rollout-prefixed NeMo policy-model URL rather than allowing them to use unrelated provider credentials. A
+separate compatibility alias selects the upstream OpenAI code path; the actual served model remains the model named
+by the NeMo model server and is preserved in run provenance.
+
+The shared adapter records the outer upstream pipeline transcript even when a system defense bypasses the ordinary
+model bridge. `model_call_count` is exact for ordinary/filter pipelines and a lower bound for defenses that hide
+auxiliary planner or policy-model calls inside their own clients; NeMo model-server observability remains the
+authoritative call ledger for those treatments.

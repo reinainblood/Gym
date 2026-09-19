@@ -11,6 +11,7 @@ agentdyn_agent:
       concurrency: 1
       benchmark_version: v1.2.2
       attack_model_alias: local
+      defense_model_alias: gpt-4o-2024-08-06
       metric_prefix: agentdyn
       default_defense: null
       system_message: null

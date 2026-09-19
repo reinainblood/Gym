@@ -4,8 +4,14 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Literal
+from unittest.mock import patch
 
+import agentdojo
+import agentdojo.agent_pipeline.agent_pipeline as agentdyn_pipeline
+import openai
 from fastapi import Body
 from pydantic import ConfigDict
 
@@ -15,6 +21,7 @@ from responses_api_agents.agentdojo_family.app import (
     AgentDojoFamilyRunRequest,
     AgentDojoFamilyVerifyResponse,
 )
+from responses_api_agents.agentdojo_family.model_bridge import NeMoGymOpenAIProxy
 
 
 AGENTDYN_SUITES = ("shopping", "github", "dailylife")
@@ -29,6 +36,7 @@ AGENTDYN_DEFENSES = (
 
 class AgentDynAgentConfig(AgentDojoFamilyAgentConfig):
     metric_prefix: str = "agentdyn"
+    defense_model_alias: str | None = "gpt-4o-2024-08-06"
 
 
 class AgentDynRunRequest(AgentDojoFamilyRunRequest):
@@ -45,13 +53,44 @@ class AgentDynRunRequest(AgentDojoFamilyRunRequest):
         ]
         | None
     ) = None
+    external_model_base_url: str | None = None
 
 
 class AgentDynAgent(AgentDojoFamilyAgent):
     config: AgentDynAgentConfig
 
     async def run(self, body: AgentDynRunRequest = Body()) -> AgentDojoFamilyVerifyResponse:
+        defense = body.defense or self.config.default_defense
+        if defense in {"camel", "progent", "drift"}:
+            body = body.model_copy(
+                update={
+                    "external_model_base_url": self.resolve_model_base_url(
+                        self.config.model_server.name,
+                        self.rollout_id_from_run(body),
+                    )
+                }
+            )
         return await super().run(body)
+
+    def _run_agentdojo(self, body, bridge, benchmark_version):
+        if body.defense not in {"camel", "progent", "drift"}:
+            return super()._run_agentdojo(body, bridge, benchmark_version)
+        if body.external_model_base_url is None:
+            raise RuntimeError(f"{body.defense} requires the routed NeMo model-server URL")
+        model_alias = self.config.defense_model_alias or self.config.attack_model_alias
+        routed_environment = {
+            "OPENAI_BASE_URL": body.external_model_base_url,
+            "OPENAI_API_KEY": "EMPTY",
+            "SECAGENT_POLICY_MODEL": model_alias,
+            "SECAGENT_IGNORE_UPDATE_ERROR": "False",
+        }
+        installed_defenses = Path(agentdojo.__file__).resolve().parent / "defenses"
+        with (
+            patch.dict(os.environ, routed_environment, clear=False),
+            patch.object(agentdyn_pipeline, "_defenses_root", return_value=installed_defenses),
+            patch.object(openai, "OpenAI", side_effect=lambda *args, **kwargs: NeMoGymOpenAIProxy(bridge)),
+        ):
+            return super()._run_agentdojo(body, bridge, benchmark_version)
 
 
 if __name__ == "__main__":

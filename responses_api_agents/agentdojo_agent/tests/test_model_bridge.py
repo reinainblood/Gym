@@ -75,8 +75,7 @@ def test_assistant_text_is_preserved_in_both_directions() -> None:
     assert agentdojo_messages_to_response_output(messages)[0].content[0].text == "finished"
 
 
-@pytest.mark.parametrize("for_output", [False, True])
-def test_tool_result_without_call_id_is_rejected(for_output: bool) -> None:
+def test_tool_result_without_call_id_is_rejected_for_model_replay() -> None:
     call = FunctionCall(function="read_file", args={})
     messages = [
         {
@@ -87,9 +86,24 @@ def test_tool_result_without_call_id_is_rejected(for_output: bool) -> None:
             "error": None,
         }
     ]
-    converter = agentdojo_messages_to_response_output if for_output else agentdojo_messages_to_responses_input
     with pytest.raises(ValueError, match="require a call id"):
-        converter(messages)
+        agentdojo_messages_to_responses_input(messages)
+
+
+def test_output_serialization_pairs_missing_tool_result_id() -> None:
+    call = FunctionCall(function="read_file", args={})
+    messages = [
+        {"role": "assistant", "content": None, "tool_calls": [call]},
+        {
+            "role": "tool",
+            "tool_call": call,
+            "tool_call_id": None,
+            "content": [text_content_block_from_string("contents")],
+            "error": None,
+        },
+    ]
+    output = agentdojo_messages_to_response_output(messages)
+    assert output[0].call_id == output[1].call_id == "agentdojo-0-0"
 
 
 def test_unsupported_role_is_rejected() -> None:

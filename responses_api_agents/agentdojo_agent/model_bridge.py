@@ -2,6 +2,7 @@
 
 from responses_api_agents.agentdojo_family.model_bridge import (
     NeMoGymAgentDojoLLM,
+    NeMoGymOpenAIProxy,
     agentdojo_messages_to_response_output,
     agentdojo_messages_to_responses_input,
     agentdojo_tools_to_responses_tools,
@@ -11,6 +12,7 @@ from responses_api_agents.agentdojo_family.model_bridge import (
 
 __all__ = [
     "NeMoGymAgentDojoLLM",
+    "NeMoGymOpenAIProxy",
     "agentdojo_messages_to_response_output",
     "agentdojo_messages_to_responses_input",
     "agentdojo_tools_to_responses_tools",

@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Sequence
+from types import SimpleNamespace
 from typing import Any
 
 from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
@@ -18,6 +19,7 @@ from agentdojo.types import (
     get_text_content_as_str,
     text_content_block_from_string,
 )
+from openai._types import NOT_GIVEN, NotGiven
 
 from nemo_gym.openai_utils import (
     NeMoGymChatCompletion,
@@ -129,6 +131,7 @@ def response_to_agentdojo_message(response: NeMoGymResponse) -> ChatAssistantMes
 def agentdojo_messages_to_response_output(messages: Sequence[ChatMessage]) -> list[Any]:
     """Serialize AgentDojo's generated assistant/tool trajectory as response output."""
     output: list[Any] = []
+    pending_call_ids: dict[str, list[str]] = {}
     for message_index, message in enumerate(messages):
         if message["role"] == "assistant":
             text = _content_text(message)
@@ -140,9 +143,11 @@ def agentdojo_messages_to_response_output(messages: Sequence[ChatMessage]) -> li
                     )
                 )
             for call_index, tool_call in enumerate(message.get("tool_calls") or []):
+                call_id = tool_call.id or f"agentdojo-{message_index}-{call_index}"
+                pending_call_ids.setdefault(tool_call.function, []).append(call_id)
                 output.append(
                     NeMoGymResponseFunctionToolCall(
-                        call_id=tool_call.id or f"agentdojo-{message_index}-{call_index}",
+                        call_id=call_id,
                         name=tool_call.function,
                         arguments=json.dumps(tool_call.args),
                     )
@@ -151,7 +156,8 @@ def agentdojo_messages_to_response_output(messages: Sequence[ChatMessage]) -> li
             tool_call = message["tool_call"]
             call_id = message.get("tool_call_id") or tool_call.id
             if call_id is None:
-                raise ValueError("AgentDojo tool results require a call id for Responses API serialization.")
+                pending = pending_call_ids.get(tool_call.function, [])
+                call_id = pending.pop(0) if pending else f"agentdojo-tool-{message_index}"
             output.append(
                 NeMoGymResponseFunctionCallOutput(
                     id=f"agentdojo-tool-output-{message_index}",
@@ -194,7 +200,7 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
         self.responses: list[NeMoGymResponse] = []
         self.last_messages: Sequence[ChatMessage] = []
 
-    async def _request(self, payload: dict[str, Any]) -> NeMoGymResponse:
+    async def _request_chat(self, payload: dict[str, Any]) -> NeMoGymChatCompletion:
         response = await self._server_client.post(
             server_name=self._model_server_name,
             url_path=self._model_url_path,
@@ -203,7 +209,13 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
         )
         await raise_for_status(response)
         self._cookies = response.cookies
-        chat_completion = NeMoGymChatCompletion.model_validate(await get_response_json(response))
+        return NeMoGymChatCompletion.model_validate(await get_response_json(response))
+
+    def _chat_to_response(
+        self,
+        payload: dict[str, Any],
+        chat_completion: NeMoGymChatCompletion,
+    ) -> NeMoGymResponse:
         chat_params = NeMoGymChatCompletionCreateParamsNonStreaming.model_validate(payload)
         converter = ResponsesConverter(return_token_id_information=False, uses_reasoning_parser=True)
         # We only need the normalized response envelope and usage here; app.py replaces
@@ -222,6 +234,27 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
             chat_completion,
             preserve_envelope_id=True,
         )
+
+    async def _request(self, payload: dict[str, Any]) -> NeMoGymResponse:
+        chat_completion = await self._request_chat(payload)
+        return self._chat_to_response(payload, chat_completion)
+
+    def create_chat_completion(self, **kwargs: Any) -> NeMoGymChatCompletion:
+        """Synchronous OpenAI-compatible entrypoint for upstream defense clients."""
+        def drop_not_given(value: Any) -> Any:
+            if value is NOT_GIVEN or isinstance(value, NotGiven):
+                return None
+            if isinstance(value, dict):
+                return {key: cleaned for key, item in value.items() if (cleaned := drop_not_given(item)) is not None}
+            if isinstance(value, list):
+                return [cleaned for item in value if (cleaned := drop_not_given(item)) is not None]
+            return value
+
+        payload = drop_not_given(kwargs)
+        future = asyncio.run_coroutine_threadsafe(self._request_chat(payload), self._event_loop)
+        chat_completion = future.result()
+        self.responses.append(self._chat_to_response(payload, chat_completion))
+        return chat_completion
 
     def query(
         self,
@@ -259,3 +292,10 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
         for response in self.responses:
             usage = accumulate_response_usage(usage, response.usage)
         return usage
+
+
+class NeMoGymOpenAIProxy:
+    """Minimal OpenAI client surface used by AgentDyn's bundled defenses."""
+
+    def __init__(self, bridge: NeMoGymAgentDojoLLM) -> None:
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=bridge.create_chat_completion))

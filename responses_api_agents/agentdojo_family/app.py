@@ -32,6 +32,7 @@ class AgentDojoFamilyAgentConfig(BaseResponsesAPIAgentConfig):
     concurrency: int = Field(default=1, ge=1)
     benchmark_version: str = "v1.2.2"
     attack_model_alias: str = "local"
+    defense_model_alias: str | None = None
     metric_prefix: str = "agentdojo"
     default_defense: str | None = None
     system_message: str | None = None
@@ -120,7 +121,7 @@ class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
 
             event_loop = asyncio.get_running_loop()
             bridge = NeMoGymAgentDojoLLM(
-                pipeline_name=self.config.attack_model_alias,
+                pipeline_name=self.config.defense_model_alias or self.config.attack_model_alias,
                 event_loop=event_loop,
                 server_client=self.server_client,
                 model_server_name=self.config.model_server.name,
@@ -149,10 +150,14 @@ class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
                 if bridge.responses
                 else NeMoGymResponse.model_validate(_empty_response())
             )
-            response.output = agentdojo_messages_to_response_output(bridge.last_messages)
+            transcript_output = agentdojo_messages_to_response_output(bridge.last_messages)
+            if not transcript_output and bridge.responses:
+                transcript_output = [item for model_response in bridge.responses for item in model_response.output]
+            response.output = transcript_output
             response.usage = bridge.accumulated_usage()
             reward_utility = float(utility)
             reward_security = float(security)
+            generated_turns = sum(1 for message in bridge.last_messages if message["role"] == "assistant")
             result_data = body.model_dump()
             result_data["benchmark_version"] = benchmark_version
             return AgentDojoFamilyVerifyResponse(
@@ -164,7 +169,7 @@ class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
                 attack_success=not security,
                 reward_utility=reward_utility,
                 reward_security=reward_security,
-                model_call_count=len(bridge.responses),
+                model_call_count=max(len(bridge.responses), generated_turns),
             )
 
     def _run_agentdojo(
@@ -186,12 +191,25 @@ class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
         if "suite_name" in PipelineConfig.model_fields:
             pipeline_config["suite_name"] = body.suite
         pipeline = AgentPipeline.from_config(PipelineConfig(**pipeline_config))
+        original_query = pipeline.query
+
+        def recording_query(*args, **kwargs):
+            result = original_query(*args, **kwargs)
+            bridge.last_messages = result[3]
+            return result
+
+        pipeline.query = recording_query
         if body.injection_task_id is None:
             utility, _ = suite.run_task_with_pipeline(pipeline, user_task, injection_task=None, injections={})
             return utility, True
 
         injection_task = suite.get_injection_task_by_id(body.injection_task_id)
-        attack = load_attack(body.attack or "", suite, pipeline)
+        pipeline_name = pipeline.name
+        pipeline.name = self.config.attack_model_alias
+        try:
+            attack = load_attack(body.attack or "", suite, pipeline)
+        finally:
+            pipeline.name = pipeline_name
         injections = attack.attack(user_task, injection_task)
         utility, upstream_attack_success = suite.run_task_with_pipeline(
             pipeline,
