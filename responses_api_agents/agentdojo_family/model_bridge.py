@@ -251,6 +251,9 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
             return value
 
         payload = drop_not_given(kwargs)
+        for message in payload.get("messages", []):
+            if message.get("role") == "tool":
+                message.pop("name", None)
         future = asyncio.run_coroutine_threadsafe(self._request_chat(payload), self._event_loop)
         chat_completion = future.result()
         self.responses.append(self._chat_to_response(payload, chat_completion))

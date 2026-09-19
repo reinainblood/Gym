@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import Mock, patch
 
 import pytest
 from agentdojo.functions_runtime import FunctionCall
@@ -11,6 +12,7 @@ from agentdojo.types import text_content_block_from_string
 
 from nemo_gym.openai_utils import NeMoGymResponse
 from responses_api_agents.agentdojo_agent.model_bridge import (
+    NeMoGymAgentDojoLLM,
     agentdojo_messages_to_response_output,
     agentdojo_messages_to_responses_input,
     response_to_agentdojo_message,
@@ -104,6 +106,37 @@ def test_output_serialization_pairs_missing_tool_result_id() -> None:
     ]
     output = agentdojo_messages_to_response_output(messages)
     assert output[0].call_id == output[1].call_id == "agentdojo-0-0"
+
+
+def test_openai_proxy_strips_legacy_tool_result_name() -> None:
+    bridge = object.__new__(NeMoGymAgentDojoLLM)
+    bridge._event_loop = Mock()
+    bridge._request_chat = Mock()
+    bridge.responses = []
+
+    with (
+        patch("responses_api_agents.agentdojo_family.model_bridge.asyncio.run_coroutine_threadsafe") as submit,
+        patch.object(bridge, "_chat_to_response", return_value=Mock()),
+    ):
+        submit.return_value.result.return_value = Mock()
+        bridge.create_chat_completion(
+            model="compatibility-alias",
+            messages=[
+                {
+                    "role": "tool",
+                    "content": "result",
+                    "tool_call_id": "call-1",
+                    "name": "search_product",
+                }
+            ],
+        )
+
+    submitted_payload = bridge._request_chat.call_args.args[0]
+    assert submitted_payload["messages"][0] == {
+        "role": "tool",
+        "content": "result",
+        "tool_call_id": "call-1",
+    }
 
 
 def test_unsupported_role_is_rejected() -> None:
