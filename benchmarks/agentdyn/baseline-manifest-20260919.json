@@ -1,0 +1,54 @@
+{
+  "benchmark": "AgentDyn",
+  "benchmark_version": "v1.2.2",
+  "condition": "undefended",
+  "concurrency": 4,
+  "num_repeats": 1,
+  "selector_count": 620,
+  "clean_count": 60,
+  "attacked_count": 560,
+  "selector_sha256": "819443fea5cb747eabf50a42adf7ba2106abeaa2e8a2e5d7dbf3f60066a86de2",
+  "materialized_inputs_sha256": "89a6c2838bf38b5af4302aed2095adea14d5270b6a5592ad88f21f79dd964808",
+  "runs": [
+    {
+      "model": "moonshotai/Kimi-K3",
+      "artifact_prefix": "results/agentdyn-baselines/kimi-k3/full-undefended",
+      "rollouts_sha256": "20a775c339aa73b50f67f0c910485a6444c37cd9c16033a183e162a09fb463ee",
+      "aggregate_metrics_sha256": "b24e6704e8c7c03fc234fb9a1fbe961db272f20d628168fceb112a2752b90fcf",
+      "reward_profile_sha256": "c403936f141c23a0607a53d5968025a904d20b221cfb64d12a98be7c564b9c56",
+      "benign_utility": 0.7666666666666667,
+      "utility_under_attack": 0.7607142857142857,
+      "attack_success_rate": 0.0017857142857142857
+    },
+    {
+      "model": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
+      "artifact_prefix": "results/agentdyn-baselines/nemotron-3-ultra/full-undefended",
+      "rollouts_sha256": "3e0e353c0c652362af6179e4c5930d97252db88cbe643d8be7a7d8cb2e379335",
+      "aggregate_metrics_sha256": "3a669a7cd468d1ed3f0825e69a91b00c17c657731c9719fe551db1eb96fd2e4a",
+      "reward_profile_sha256": "b3c7d36c5553746179de66ec02444e3a1e4a3836c52e56ba4bd45d6a71a1f402",
+      "benign_utility": 0.7,
+      "utility_under_attack": 0.6410714285714286,
+      "attack_success_rate": 0.007142857142857143
+    },
+    {
+      "model": "Qwen/Qwen3.5-122B-A10B-FP8",
+      "artifact_prefix": "results/agentdyn-baselines/qwen-3-5-122b-a10b/full-undefended",
+      "rollouts_sha256": "4b493d8a933a36e49b59f4dc88c3f53142eb7d09ff310e2219d0223f4a71ca8b",
+      "aggregate_metrics_sha256": "51ce5d113c155798fea1a123ccde217470d9d496db98fb67aed459f3ba1bd0b9",
+      "reward_profile_sha256": "6b1932054dec1286a360ab5ae289b978a288bad3b2a5a9e784b98436862636a0",
+      "benign_utility": 0.7,
+      "utility_under_attack": 0.6196428571428572,
+      "attack_success_rate": 0.3535714285714286
+    },
+    {
+      "model": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+      "artifact_prefix": "results/agentdyn-baselines/nemotron-3-5-super-vl/full-undefended",
+      "rollouts_sha256": "944785c8b69fe29b493268e2b2ff58cd00d31b1bdd7363de1c0678449c57a85d",
+      "aggregate_metrics_sha256": "eab663bc504d40b1a65459c1911c75602cca2e5a934f7b1425376d23bd30439d",
+      "reward_profile_sha256": "6b52a9981a8cfae1c84f7ee0cf6fd46eb319333bc87b66affd269900a2bb4f08",
+      "benign_utility": 0.7,
+      "utility_under_attack": 0.6571428571428571,
+      "attack_success_rate": 0.15892857142857142
+    }
+  ]
+}

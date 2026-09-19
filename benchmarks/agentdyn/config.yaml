@@ -1,0 +1,15 @@
+config_paths:
+  - responses_api_agents/agentdyn_agent/configs/agentdyn_agent.yaml
+
+agentdyn_benchmark:
+  _inherit_from: agentdyn_agent
+  responses_api_agents:
+    agentdyn_agent:
+      datasets:
+        - name: agentdyn
+          type: benchmark
+          jsonl_fpath: benchmarks/agentdyn/data/agentdyn_v1_2_2.jsonl
+          prepare_script: benchmarks/agentdyn/prepare.py
+          prompt_config: null
+          num_repeats: 1
+          license: MIT
