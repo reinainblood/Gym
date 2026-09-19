@@ -15,3 +15,4 @@ one of PromptGuard2, PIGuard, CaMeL, Progent, or DRIFT as a pipeline treatment o
 unverified until their auxiliary-model routing and upstream parity are individually exercised.
 
 The first undefended live smoke receipt is recorded in [`LIVE-VALIDATION.md`](LIVE-VALIDATION.md).
+Per-defense runtime status is tracked in [`DEFENSE-VALIDATION.md`](DEFENSE-VALIDATION.md).
