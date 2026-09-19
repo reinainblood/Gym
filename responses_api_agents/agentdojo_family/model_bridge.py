@@ -243,6 +243,7 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
 
     def create_chat_completion(self, **kwargs: Any) -> NeMoGymChatCompletion:
         """Synchronous OpenAI-compatible entrypoint for upstream defense clients."""
+
         def drop_not_given(value: Any) -> Any:
             if value is NOT_GIVEN or isinstance(value, NotGiven):
                 return None
