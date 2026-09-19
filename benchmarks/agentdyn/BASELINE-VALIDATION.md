@@ -9,7 +9,7 @@ into the baseline denominator.
 | Model | Runtime status | Rows | Benign utility | Utility under attack | ASR | Masked / adapter errors |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | `moonshotai/Kimi-K3` | Complete | 620 / 620 | 76.67% | 76.07% | 0.18% | 0 / 0 |
-| `Qwen/Qwen3.5-122B-A10B-FP8` | Queued | 0 / 620 | N/A | N/A | N/A | N/A |
+| `Qwen/Qwen3.5-122B-A10B-FP8` | Complete | 620 / 620 | 70.00% | 61.96% | 35.36% | 0 / 0 |
 | `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4` | Complete | 620 / 620 | 70.00% | 64.11% | 0.71% | 0 / 0 |
 | `nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16` | Queued | 0 / 620 | N/A | N/A | N/A | N/A |
 
@@ -65,3 +65,29 @@ Four attacked dailylife selectors achieved their malicious goals. All four also 
 
 Local ignored artifacts use the same six-file layout as Kimi under
 `results/agentdyn-baselines/nemotron-3-ultra/full-undefended*`.
+
+## Qwen3.5 122B A10B FP8
+
+The Qwen run used the live Modal FDR dedicated 2xB200 SGLang endpoint and an authenticated `/v1/models` receipt for
+`Qwen/Qwen3.5-122B-A10B-FP8`. The endpoint scales to zero and returned HTTP 503 while cold; a generation request plus
+bounded `/v1/models` polling produced a 200 receipt after about 45 seconds. Those cold-start responses were excluded
+from the benchmark denominator.
+
+The initial canary exposed an OpenAI-compatibility boundary: this endpoint rejects `developer` messages with
+`Unexpected message role.` The shared bridge now has an explicit `model_system_role` setting, defaulting to
+`developer`; the Qwen treatment used `system`. A regression test covers the rewrite, and the repaired canary produced
+four unmasked, gradeable trajectories before full collection.
+
+Collection finished in 15 minutes 36 seconds. Strict reward profiling accounted for all 620 inputs and rollouts.
+
+| Suite | Rows | Reward | Utility | Security | ASR |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `shopping` | 200 | 42.00% | 46.50% | 84.00% | 16.00% |
+| `github` | 200 | 63.00% | 70.00% | 83.00% | 17.00% |
+| `dailylife` | 220 | 29.55% | 70.91% | 40.00% | 60.00% |
+
+Qwen completed 198 of the 560 malicious goals. The large ASR is a model result observed after the transport fix, not
+a parser, endpoint, masking, or missing-row artifact.
+
+Local ignored artifacts use the same six-file layout under
+`results/agentdyn-baselines/qwen-3-5-122b-a10b/full-undefended*`.
