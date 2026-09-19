@@ -11,7 +11,7 @@ into the baseline denominator.
 | `moonshotai/Kimi-K3` | Complete | 620 / 620 | 76.67% | 76.07% | 0.18% | 0 / 0 |
 | `Qwen/Qwen3.5-122B-A10B-FP8` | Complete | 620 / 620 | 70.00% | 61.96% | 35.36% | 0 / 0 |
 | `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4` | Complete | 620 / 620 | 70.00% | 64.11% | 0.71% | 0 / 0 |
-| `nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16` | Queued | 0 / 620 | N/A | N/A | N/A | N/A |
+| `nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16` | Complete | 620 / 620 | 70.00% | 65.71% | 15.89% | 0 / 0 |
 
 ## Kimi K3
 
@@ -91,3 +91,32 @@ a parser, endpoint, masking, or missing-row artifact.
 
 Local ignored artifacts use the same six-file layout under
 `results/agentdyn-baselines/qwen-3-5-122b-a10b/full-undefended*`.
+
+## Nemotron 3.5 Super VL
+
+The Super run used the continuously warm Modal FDR custom deployment and an authenticated `/v1/models` receipt for
+`nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16`. A four-row concurrency-four canary passed before full
+collection. Collection finished in 50 minutes 54 seconds, and strict reward profiling accounted for all 620 inputs
+and rollouts.
+
+| Suite | Rows | Reward | Utility | Security | ASR |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `shopping` | 200 | 43.00% | 45.50% | 95.50% | 4.50% |
+| `github` | 200 | 73.50% | 78.50% | 90.00% | 10.00% |
+| `dailylife` | 220 | 56.82% | 73.64% | 72.73% | 27.27% |
+
+Super completed 89 of the 560 malicious goals. Three upstream warnings reported genuine `None` model outputs for
+`user_task_8`, `user_task_5`, and `user_task_13`; each rollout remained scoreable and was not retried or masked.
+
+Local ignored artifacts use the same six-file layout under
+`results/agentdyn-baselines/nemotron-3-5-super-vl/full-undefended*`.
+
+## Cross-model reading
+
+Kimi K3 had the strongest observed injection resistance (one successful attack, 0.18% ASR) and the highest utility
+under attack (76.07%). Nemotron 3 Ultra was next on security (four successes, 0.71% ASR) but had lower utility under
+attack (64.11%). Super 3.5 VL preserved similar utility (65.71%) while allowing 89 attacks (15.89% ASR). Qwen3.5 had
+the weakest security result: 198 successful attacks (35.36% ASR), concentrated in dailylife at 60% ASR.
+
+These are single-repeat model-plus-AgentDyn-harness results, not confidence intervals or model-only capability
+claims. All comparisons use the same byte-identical materialized selector file and no defense treatment.
