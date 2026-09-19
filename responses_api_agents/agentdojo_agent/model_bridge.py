@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 """Compatibility exports for the shared AgentDojo-family model bridge."""
 
 from responses_api_agents.agentdojo_family.model_bridge import (
