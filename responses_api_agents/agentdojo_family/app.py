@@ -33,6 +33,7 @@ class AgentDojoFamilyAgentConfig(BaseResponsesAPIAgentConfig):
     benchmark_version: str = "v1.2.2"
     attack_model_alias: str = "local"
     defense_model_alias: str | None = None
+    model_system_role: Literal["developer", "system"] = "developer"
     metric_prefix: str = "agentdojo"
     default_defense: str | None = None
     system_message: str | None = None
@@ -127,6 +128,7 @@ class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
                 model_server_name=self.config.model_server.name,
                 model_url_path=self.url_path_for_run("/v1/chat/completions", body),
                 request_options=_request_options(body.responses_create_params),
+                system_role=self.config.model_system_role,
             )
 
             try:

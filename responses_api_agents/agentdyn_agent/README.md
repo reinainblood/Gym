@@ -19,6 +19,10 @@ run remains labeled `prompt_guard_2_detector`. Before publication, replace the m
 verify the model checksum, and rerun the same treatment. `prompt_guard_2_local_path` is a development-only cache
 override; it does not replace the source repository and revision recorded in each rollout.
 
+Some OpenAI-compatible endpoints, including the Qwen3.5 SGLang deployment used for baselining, reject the newer
+`developer` message role. Set `model_system_role: system` for those endpoints. The default remains `developer`, and
+the bridge applies the configured role consistently to ordinary policy calls and defense-owned auxiliary clients.
+
 CaMeL, Progent, and DRIFT construct auxiliary OpenAI-compatible clients upstream. The adapter routes those clients to
 the rollout-prefixed NeMo policy-model URL rather than allowing them to use unrelated provider credentials. A
 separate compatibility alias selects the upstream OpenAI code path; the actual served model remains the model named

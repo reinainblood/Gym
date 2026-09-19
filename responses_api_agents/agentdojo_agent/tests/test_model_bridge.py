@@ -112,6 +112,7 @@ def test_openai_proxy_strips_legacy_tool_result_name() -> None:
     bridge = object.__new__(NeMoGymAgentDojoLLM)
     bridge._event_loop = Mock()
     bridge._request_chat = Mock()
+    bridge._system_role = "developer"
     bridge.responses = []
 
     with (
@@ -137,6 +138,27 @@ def test_openai_proxy_strips_legacy_tool_result_name() -> None:
         "content": "result",
         "tool_call_id": "call-1",
     }
+
+
+def test_system_role_compatibility_rewrites_developer_messages() -> None:
+    bridge = object.__new__(NeMoGymAgentDojoLLM)
+    bridge._event_loop = Mock()
+    bridge._request_chat = Mock()
+    bridge._system_role = "system"
+    bridge.responses = []
+
+    with (
+        patch("responses_api_agents.agentdojo_family.model_bridge.asyncio.run_coroutine_threadsafe") as submit,
+        patch.object(bridge, "_chat_to_response", return_value=Mock()),
+    ):
+        submit.return_value.result.return_value = Mock()
+        bridge.create_chat_completion(
+            model="compatibility-alias",
+            messages=[{"role": "developer", "content": "instructions"}],
+        )
+
+    submitted_payload = bridge._request_chat.call_args.args[0]
+    assert submitted_payload["messages"] == [{"role": "system", "content": "instructions"}]
 
 
 def test_unsupported_role_is_rejected() -> None:

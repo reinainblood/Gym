@@ -8,7 +8,7 @@ import asyncio
 import json
 from collections.abc import Sequence
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
 from agentdojo.agent_pipeline.llms.openai_llm import _function_to_openai, _message_to_openai
@@ -189,6 +189,7 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
         model_server_name: str,
         model_url_path: str,
         request_options: dict[str, Any],
+        system_role: Literal["developer", "system"] = "developer",
     ) -> None:
         self.name = pipeline_name
         self._event_loop = event_loop
@@ -196,6 +197,7 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
         self._model_server_name = model_server_name
         self._model_url_path = model_url_path
         self._request_options = request_options
+        self._system_role = system_role
         self._cookies: Any = None
         self.responses: list[NeMoGymResponse] = []
         self.last_messages: Sequence[ChatMessage] = []
@@ -252,6 +254,8 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
 
         payload = drop_not_given(kwargs)
         for message in payload.get("messages", []):
+            if self._system_role == "system" and message.get("role") == "developer":
+                message["role"] = "system"
             if message.get("role") == "tool":
                 message.pop("name", None)
         future = asyncio.run_coroutine_threadsafe(self._request_chat(payload), self._event_loop)
@@ -270,6 +274,8 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
         tools = [dict(_function_to_openai(function)) for function in runtime.functions.values()]
         chat_messages = [dict(_message_to_openai(message, self.name)) for message in messages]
         for chat_message in chat_messages:
+            if self._system_role == "system" and chat_message.get("role") == "developer":
+                chat_message["role"] = "system"
             # AgentDojo emits the optional legacy `name` field on tool results.
             # Gym's current Chat schema rejects it; call_id already identifies the
             # function unambiguously, so removing it is semantics-preserving.
