@@ -396,9 +396,9 @@ def test_multi_turn_judge_sees_its_own_prior_verdicts() -> None:
     verifier._script = [json.dumps({metric: 4 for metric in CORE_METRICS})] * 3
     original = verifier._judge
 
-    async def recording_judge(messages):
+    async def recording_judge(messages, *, track="single_turn"):
         seen.append(len(messages))
-        return await original(messages)
+        return await original(messages, track=track)
 
     verifier._judge = recording_judge
     request = KidbenchVerifyRequest.model_validate(
@@ -453,3 +453,58 @@ def test_reverifying_an_already_scored_row_does_not_collide_on_verifier_fields()
     assert result.judge_name == "scripted"
     assert result.response_text == "a fresh answer"
     assert result.failure_modes == []
+
+
+def test_judge_routing_follows_upstreams_per_track_split() -> None:
+    """Upstream scores the two tracks with different models; the config must too."""
+    import yaml
+
+    from benchmarks.kidbench.prepare import REPO_ROOT
+    from benchmarks.kidbench.upstream_spec import MULTI_TURN_JUDGE, SINGLE_TURN_JUDGE
+
+    config = yaml.safe_load(
+        (REPO_ROOT / "resources_servers" / "kidbench" / "configs" / "kidbench.yaml").read_text(encoding="utf-8")
+    )
+    server = config["kidbench_resources_server"]["resources_servers"]["kidbench"]
+    assert server["judge_name"] == SINGLE_TURN_JUDGE
+    assert server["multi_turn_judge_name"] == MULTI_TURN_JUDGE
+    assert server["judge_model_server"]["name"] != server["multi_turn_judge_model_server"]["name"]
+
+
+def test_judge_for_falls_back_to_the_single_turn_judge_when_multi_is_unset() -> None:
+    from nemo_gym.config_types import ModelServerRef
+    from nemo_gym.openai_utils import NeMoGymResponseCreateParamsNonStreaming
+
+    from ..app import KidbenchResourcesServerConfig
+
+    config = KidbenchResourcesServerConfig.model_construct(
+        judge_model_server=ModelServerRef(type="responses_api_models", name="pro"),
+        judge_responses_create_params=NeMoGymResponseCreateParamsNonStreaming(input=[]),
+        judge_name="deepseek-v4-pro",
+        multi_turn_judge_model_server=None,
+        multi_turn_judge_responses_create_params=None,
+        multi_turn_judge_name=None,
+    )
+    server, _, name = config.judge_for("multi_turn")
+    assert server.name == "pro"
+    assert name == "deepseek-v4-pro"
+
+
+def test_judge_for_routes_each_track_to_its_own_judge() -> None:
+    from nemo_gym.config_types import ModelServerRef
+    from nemo_gym.openai_utils import NeMoGymResponseCreateParamsNonStreaming
+
+    from ..app import KidbenchResourcesServerConfig
+
+    config = KidbenchResourcesServerConfig.model_construct(
+        judge_model_server=ModelServerRef(type="responses_api_models", name="pro"),
+        judge_responses_create_params=NeMoGymResponseCreateParamsNonStreaming(input=[]),
+        judge_name="deepseek-v4-pro",
+        multi_turn_judge_model_server=ModelServerRef(type="responses_api_models", name="flash"),
+        multi_turn_judge_responses_create_params=NeMoGymResponseCreateParamsNonStreaming(input=[]),
+        multi_turn_judge_name="deepseek-v4-flash",
+    )
+    assert config.judge_for("single_turn")[0].name == "pro"
+    assert config.judge_for("single_turn")[2] == "deepseek-v4-pro"
+    assert config.judge_for("multi_turn")[0].name == "flash"
+    assert config.judge_for("multi_turn")[2] == "deepseek-v4-flash"

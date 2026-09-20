@@ -31,6 +31,20 @@ kidbench_resources_server:
         max_output_tokens: 4096
       judge_name: deepseek-v4-pro
 
+      # Upstream scores multi-turn with the cheaper DeepSeek-V4-Flash — see
+      # scripts/evaluation/multi_turn/deepseek.sh at the pinned revision. That asymmetry is
+      # reproduced rather than normalized so the degradation numbers stay comparable to the
+      # published ones.
+      multi_turn_judge_model_server:
+        type: responses_api_models
+        name: kidbench_multi_turn_judge_model
+      multi_turn_judge_responses_create_params:
+        input: []
+        temperature: 0.0
+        top_p: 1.0
+        max_output_tokens: 4096
+      multi_turn_judge_name: deepseek-v4-flash
+
       datasets:
       - name: single_turn
         type: validation

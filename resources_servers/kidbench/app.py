@@ -288,10 +288,11 @@ def peak_quality_drop(turn_scores: list[Optional[float]]) -> Optional[float]:
 class KidbenchResourcesServerConfig(BaseResourcesServerConfig):
     """Judge wiring for the KIDBench verifier.
 
-    ``judge_model_server`` should point at the paper's judge (DeepSeek-V4-Pro for single
-    turn, DeepSeek-V4-Flash for multi turn, per upstream's own scripts). Swapping it is
-    supported but changes what the scores mean, so the judge identity is recorded on every
-    verified row.
+    Upstream judges the two tracks with *different* models — DeepSeek-V4-Pro for single
+    turn, DeepSeek-V4-Flash for multi turn — visible in its own evaluation scripts. That
+    asymmetry is reproduced rather than normalized, so multi-turn numbers stay comparable
+    to the published ones. Leaving the multi-turn fields unset falls back to the
+    single-turn judge, which is a deviation and is recorded as one on every row.
     """
 
     REVERIFY_MODE: ClassVar[ReverifyMode] = ReverifyMode.STATELESS
@@ -300,8 +301,31 @@ class KidbenchResourcesServerConfig(BaseResourcesServerConfig):
     judge_responses_create_params: NeMoGymResponseCreateParamsNonStreaming
     judge_name: str = Field(
         default="deepseek-v4-pro",
-        description="Judge identity recorded on each row, for provenance in reports.",
+        description="Judge identity recorded on each single-turn row, for provenance in reports.",
     )
+    multi_turn_judge_model_server: Optional[ModelServerRef] = Field(
+        default=None,
+        description="Judge for the multi-turn track; falls back to judge_model_server when unset.",
+    )
+    multi_turn_judge_responses_create_params: Optional[NeMoGymResponseCreateParamsNonStreaming] = Field(
+        default=None,
+        description="Decoding for the multi-turn judge; falls back to judge_responses_create_params.",
+    )
+    multi_turn_judge_name: Optional[str] = Field(
+        default=None,
+        description="Judge identity recorded on each multi-turn row; falls back to judge_name.",
+    )
+
+    def judge_for(self, track: str) -> tuple[ModelServerRef, NeMoGymResponseCreateParamsNonStreaming, str]:
+        """The server, decoding, and recorded name for one track's judge."""
+        if track == "multi_turn":
+            return (
+                self.multi_turn_judge_model_server or self.judge_model_server,
+                self.multi_turn_judge_responses_create_params or self.judge_responses_create_params,
+                self.multi_turn_judge_name or self.judge_name,
+            )
+        return self.judge_model_server, self.judge_responses_create_params, self.judge_name
+
     upstream_dir: Path = Field(
         default=DEFAULT_UPSTREAM_DIR,
         description="Pinned upstream KIDBench checkout holding the rubrics and rules.",
@@ -389,12 +413,13 @@ class KidbenchVerifier:
 
     config: KidbenchResourcesServerConfig
 
-    async def _judge(self, messages: list[NeMoGymEasyInputMessage]) -> str:
-        params = self.config.judge_responses_create_params.model_copy(deep=True)
+    async def _judge(self, messages: list[NeMoGymEasyInputMessage], *, track: str = "single_turn") -> str:
+        server, create_params, _ = self.config.judge_for(track)
+        params = create_params.model_copy(deep=True)
         params.input = messages
         judge_response = await call_judge(
             self.server_client,
-            server_name=self.config.judge_model_server.name,
+            server_name=server.name,
             url_path="/v1/responses",
             json=params,
             response_model=NeMoGymResponse,
@@ -473,7 +498,7 @@ class KidbenchVerifier:
                     ),
                 )
             )
-            raw = await self._judge(messages)
+            raw = await self._judge(messages, track="multi_turn")
             messages.append(NeMoGymEasyInputMessage(role="assistant", content=raw))
 
             parsed = parse_judge_json(raw)
@@ -502,7 +527,7 @@ class KidbenchVerifier:
         return KidbenchVerifyResponse(
             **request_fields(body),
             reward=to_reward(conversation_score),
-            judge_name=self.config.judge_name,
+            judge_name=self.config.judge_for("multi_turn")[2],
             judge_parse_failed=any(turn["judge_parse_failed"] for turn in per_turn),
             total_quality_score=conversation_score,
             safety=mean_dimension("safety"),
@@ -583,12 +608,22 @@ class _ScriptedJudgeVerifier(KidbenchVerifier):
     """
 
     def __init__(self) -> None:
+        # A complete config, not a partial one: judge_for() reads the routing fields, so a
+        # model_construct that skipped the required ones would fail on attribute access
+        # rather than on anything the fixture is actually testing.
         self.config = KidbenchResourcesServerConfig.model_construct(
+            judge_model_server=ModelServerRef(type="responses_api_models", name="scripted"),
+            judge_responses_create_params=NeMoGymResponseCreateParamsNonStreaming(input=[]),
             judge_name="scripted",
+            multi_turn_judge_model_server=None,
+            multi_turn_judge_responses_create_params=None,
+            multi_turn_judge_name=None,
             upstream_dir=DEFAULT_UPSTREAM_DIR,
         )
 
-    async def _judge(self, messages: list[NeMoGymEasyInputMessage]) -> str:  # type: ignore[override]
+    async def _judge(  # type: ignore[override]
+        self, messages: list[NeMoGymEasyInputMessage], *, track: str = "single_turn"
+    ) -> str:
         script = self._script
         if not script:
             raise JudgeError("scripted judge exhausted")
