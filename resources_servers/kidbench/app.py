@@ -352,6 +352,19 @@ class KidbenchVerifyResponse(BaseVerifyResponse):
     peak_quality_drop: Optional[float] = None
 
 
+def request_fields(body: "KidbenchVerifyRequest") -> dict[str, Any]:
+    """The request's own fields, with any verifier-owned ones dropped.
+
+    ``gym eval reverify`` feeds a previously scored row back in as the request, and
+    ``extra="allow"`` means that row still carries ``total_quality_score``,
+    ``failure_modes`` and the rest. Splatting those alongside freshly computed values
+    would raise a duplicate-keyword TypeError, so the stale copies are dropped here and
+    the current verdict always wins.
+    """
+    verifier_owned = set(KidbenchVerifyResponse.model_fields) - set(KidbenchVerifyRequest.model_fields)
+    return body.model_dump(exclude=verifier_owned)
+
+
 def assistant_turns(response: NeMoGymResponse) -> list[str]:
     """Every assistant message in the response, oldest first.
 
@@ -418,7 +431,7 @@ class KidbenchVerifier:
         scores = extract_scores(parsed, expect_cultural=bool(body.country))
 
         return KidbenchVerifyResponse(
-            **body.model_dump(),
+            **request_fields(body),
             reward=to_reward(scores["total_quality_score"]),
             judge_name=self.config.judge_name,
             judge_parse_failed=parsed is None,
@@ -487,7 +500,7 @@ class KidbenchVerifier:
             return fmean(values) if values else None
 
         return KidbenchVerifyResponse(
-            **body.model_dump(),
+            **request_fields(body),
             reward=to_reward(conversation_score),
             judge_name=self.config.judge_name,
             judge_parse_failed=any(turn["judge_parse_failed"] for turn in per_turn),

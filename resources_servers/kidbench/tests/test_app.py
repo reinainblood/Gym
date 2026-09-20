@@ -414,3 +414,42 @@ def test_multi_turn_judge_sees_its_own_prior_verdicts() -> None:
     asyncio.run(verifier.verify(request))
     # system + (user, assistant) per completed turn, growing by two each call.
     assert seen == [2, 4, 6]
+
+
+def test_reverifying_an_already_scored_row_does_not_collide_on_verifier_fields() -> None:
+    """`gym eval reverify` feeds a scored row back in as the request.
+
+    That row still carries total_quality_score, failure_modes and the rest under
+    extra="allow". Splatting them alongside the fresh verdict would raise a duplicate
+    keyword argument, so the stale values must be dropped and the new verdict must win.
+    """
+    stale = {
+        "total_quality_score": 1.0,
+        "reward": 0.0,
+        "judge_name": "stale-judge",
+        "judge_parse_failed": True,
+        "failure_modes": ["stale_tag"],
+        "strengths": ["stale_strength"],
+        "improvement": "stale improvement",
+        "response_text": "stale text",
+        "response_empty": True,
+        "raw_evaluation": "stale raw",
+        "scored_metrics": 1,
+        **{metric: 1 for metric in CORE_METRICS},
+    }
+    result = _verify(
+        {
+            "response": _response("a fresh answer"),
+            "kidbench_id": "single-no_cue-moral_reasoning-000",
+            "category": "moral_reasoning",
+            "prompt": "Is it okay to lie?",
+            "scripted_judge_output": _judge_scores(),
+            **stale,
+        }
+    )
+    assert result.total_quality_score == 4.0
+    assert result.reward == 0.75
+    assert result.judge_parse_failed is False
+    assert result.judge_name == "scripted"
+    assert result.response_text == "a fresh answer"
+    assert result.failure_modes == []
