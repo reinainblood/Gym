@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any, Literal
 
 from agentdojo.agent_pipeline.agent_pipeline import AgentPipeline, PipelineConfig
@@ -35,6 +36,12 @@ class AgentDojoFamilyAgentConfig(BaseResponsesAPIAgentConfig):
     defense_model_alias: str | None = None
     model_system_role: Literal["developer", "system"] = "developer"
     metric_prefix: str = "agentdojo"
+    # Abandon a rollout that has not finished in this many seconds. None keeps the historical
+    # behaviour of waiting forever. See `run` for why waiting forever is not always safe.
+    rollout_timeout_seconds: float | None = None
+    # Abandoned rollouts leave a thread behind that cannot be cancelled, so a process that has
+    # accumulated this many exits and lets the campaign runner start a clean stack.
+    max_abandoned_rollouts: int = 2
     default_defense: str | None = None
     system_message: str | None = None
     system_message_name: str | None = None
@@ -103,9 +110,11 @@ def _request_options(params: NeMoGymResponseCreateParamsNonStreaming) -> dict[st
 class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
     config: AgentDojoFamilyAgentConfig
     _semaphore: asyncio.Semaphore = PrivateAttr()
+    _abandoned_rollouts: int = PrivateAttr(default=0)
 
     def model_post_init(self, context: Any) -> None:
         self._semaphore = asyncio.Semaphore(self.config.concurrency)
+        self._abandoned_rollouts = 0
 
     async def responses(self, body: NeMoGymResponseCreateParamsNonStreaming = Body()) -> NeMoGymResponse:
         raise NotImplementedError("AgentDojo owns the complete rollout; use /run.")
@@ -132,12 +141,16 @@ class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
             )
 
             try:
-                utility, security = await asyncio.to_thread(
+                rollout = asyncio.to_thread(
                     self._run_agentdojo,
                     body,
                     bridge,
                     benchmark_version,
                 )
+                timeout = self.config.rollout_timeout_seconds
+                utility, security = await (asyncio.wait_for(rollout, timeout) if timeout else rollout)
+            except TimeoutError:
+                return self._abandon(body, benchmark_version, bridge)
             except Exception as exc:
                 LOG.exception(
                     "AgentDojo rollout failed: suite=%s user_task=%s injection_task=%s",
@@ -223,6 +236,45 @@ class AgentDojoFamilyAgent(SimpleResponsesAPIAgent):
         # returns True when the malicious goal *was achieved*. Expose an unambiguous
         # Gym-facing security verdict and retain attack_success as its complement.
         return utility, not upstream_attack_success
+
+    def _abandon(
+        self,
+        body: AgentDojoFamilyRunRequest,
+        benchmark_version: str,
+        bridge: NeMoGymAgentDojoLLM,
+    ) -> AgentDojoFamilyVerifyResponse:
+        """Give up on a rollout that will not finish, and mask it rather than score it.
+
+        A defense can hand the harness a program that does not terminate -- CaMeL interprets
+        model-generated Python and imposes no step or time budget of its own -- and because
+        rollouts are serialized, one of those stops the cell for good rather than costing a
+        single row. Observed on Kimi K3: one `shopping` rollout held a core at 98% for over
+        half an hour, hundreds of interpreter frames deep, while the cell sat at six rows.
+
+        The row is masked, never scored. Nothing ran to completion, so there is no evidence
+        the task succeeded, and calling it secure because no injected action was seen would
+        credit the defense for a hang.
+
+        `asyncio.wait_for` cannot cancel a CPU-bound thread, so the abandoned rollout keeps
+        burning a core until the process ends. That is why the process ends: after
+        `max_abandoned_rollouts` it exits and the campaign runner starts a clean stack, which
+        `--resume` rejoins with this row already recorded, so the hang is not retried forever.
+        The exit is deferred so this response reaches the collector first.
+        """
+        self._abandoned_rollouts += 1
+        timeout = self.config.rollout_timeout_seconds
+        LOG.error(
+            "Abandoned AgentDojo rollout after %ss (%d in this process): suite=%s user_task=%s injection_task=%s",
+            timeout,
+            self._abandoned_rollouts,
+            body.suite,
+            body.user_task_id,
+            body.injection_task_id,
+        )
+        if self._abandoned_rollouts >= self.config.max_abandoned_rollouts:
+            LOG.error("Exiting so the abandoned rollout's thread stops holding a core; expect a stack restart.")
+            asyncio.get_running_loop().call_later(15, os._exit, 3)
+        return self._failure(body, benchmark_version, f"RolloutTimeout: exceeded {timeout}s", bridge)
 
     def _failure(
         self,

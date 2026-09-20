@@ -44,6 +44,11 @@ EXPECTED="${EXPECTED:-620}"
 LIMIT="${LIMIT:-}"
 OUT_SUFFIX="${OUT_SUFFIX:-}"
 DEFENSES="${DEFENSES:-prompt_guard_2_detector camel progent piguard_detector drift}"
+# Abandon a rollout that has not finished in this long. CaMeL interprets model-generated
+# Python with no step or time budget of its own, and because the agent serializes rollouts a
+# program that does not terminate stops the cell rather than costing one row. Generous next to
+# the slowest legitimate rollout seen (DRIFT, ~290s).
+ROLLOUT_TIMEOUT_SECONDS="${ROLLOUT_TIMEOUT_SECONDS:-1200}"
 GYM_RUNNER_NAME="agentdyn"
 # The detector defenses download their classifiers from the Hub. Gym defaults HF_HOME to
 # <checkout>/cache/huggingface, which for a worktree means re-downloading what the main
@@ -99,6 +104,7 @@ agentdyn_benchmark:
     agentdyn_agent:
       default_defense: ${defense}
       model_system_role: ${system_role}
+      rollout_timeout_seconds: ${ROLLOUT_TIMEOUT_SECONDS}
 
 policy_model:
   responses_api_models:

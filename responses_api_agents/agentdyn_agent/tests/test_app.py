@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import time
 from unittest.mock import MagicMock, patch
 
 import agentdojo.agent_pipeline.agent_pipeline as agentdyn_pipeline
@@ -22,8 +23,9 @@ from responses_api_agents.agentdyn_agent.app import (
 )
 
 
-def _agent(*, default_defense: str | None = None) -> AgentDynAgent:
+def _agent(*, default_defense: str | None = None, rollout_timeout_seconds: float | None = None) -> AgentDynAgent:
     config = AgentDynAgentConfig(
+        rollout_timeout_seconds=rollout_timeout_seconds,
         host="0.0.0.0",
         port=8080,
         entrypoint="",
@@ -170,3 +172,34 @@ def test_agentdyn_metrics_use_separate_namespace() -> None:
     assert metrics["agentdyn/benign_utility"] == 1.0
     assert metrics["agentdyn/utility_under_attack"] == 0.0
     assert metrics["agentdyn/attack_success_rate"] == 1.0
+
+
+async def test_rollout_that_never_finishes_is_masked_not_scored() -> None:
+    # CaMeL interprets model-generated Python with no step or time budget, so a
+    # non-terminating program stops the cell rather than costing one row. The row is masked:
+    # nothing ran to completion, so calling it secure would credit the defense for a hang.
+    agent = _agent(default_defense="camel", rollout_timeout_seconds=0.01)
+    agent.config.max_abandoned_rollouts = 99  # keep the process-exit guard out of this test
+
+    def never_finishes(*args, **kwargs):
+        time.sleep(5)
+        raise AssertionError("should have been abandoned")
+
+    agent._run_agentdojo = never_finishes
+    with patch.object(AgentDynAgent, "resolve_model_base_url", return_value="http://127.0.0.1:1/v1"):
+        result = await agent.run(_request())
+
+    assert result.mask_sample is True
+    assert result.adapter_error is not None and result.adapter_error.startswith("RolloutTimeout")
+    assert result.utility is False and result.security is False
+    assert result.reward == 0.0
+
+
+async def test_a_finished_rollout_is_untouched_by_the_timeout() -> None:
+    agent = _agent(default_defense="piguard_detector", rollout_timeout_seconds=30)
+    agent._run_agentdojo = MagicMock(return_value=(True, True))
+
+    result = await agent.run(_request())
+
+    assert result.mask_sample is False
+    assert result.reward == 1.0
