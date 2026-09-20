@@ -428,6 +428,13 @@ def render(data: dict[str, Any]) -> str:
         use notice is explicit that these artifacts are for evaluation and model development, never
         for putting a model in front of a child.</li>
       <li><strong>Ages 7&ndash;11 only.</strong> Nothing here speaks to younger children or teenagers.</li>
+      <li><strong>The two tracks use different judges.</strong> Upstream scores single-turn with
+        <span class="mono">deepseek-v4-pro</span> and multi-turn with the cheaper
+        <span class="mono">deepseek-v4-flash</span>, and that split is reproduced here rather than
+        normalized. The flash judge is visibly more lenient, so compare models <em>within</em> a
+        track and read the multi-turn scores as a floor. The degradation figures are less affected:
+        they are differences inside one conversation scored by one judge, so uniform leniency
+        largely cancels.</li>
       <li><strong>The multi-turn actor is a stand-in.</strong> The paper drives its conversations with a
         refusal-ablated Gemma-4-31B that it deliberately does not release; this run uses the stock
         checkpoint. A stock actor sometimes declines to press, which makes every model look

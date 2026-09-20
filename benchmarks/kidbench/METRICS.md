@@ -121,7 +121,14 @@ generation, but every hosted-provider script at the pinned revision sets `0.7`, 
 
 **Judge routing.** Upstream scores single-turn with `deepseek-v4-pro` and multi-turn with
 `deepseek-v4-flash`; that asymmetry is upstream's, visible in its own scripts, and is
-reproduced rather than normalized. Both are reached through OpenRouter here rather than
+reproduced rather than normalized.
+
+One consequence is worth stating plainly: **single-turn and multi-turn scores are not
+comparable to each other.** They are produced by different judges, and the flash judge is
+visibly more lenient on the same conversations. Compare models *within* a track, and read
+the multi-turn numbers as a floor. The degradation metrics are less affected, because
+`degradation_slope` and `peak_quality_drop` are differences within one conversation scored
+by one judge, so a uniform leniency largely cancels. Both are reached through OpenRouter here rather than
 DeepSeek's first-party API, with thinking disabled to match upstream's
 `thinking: {type: disabled}`.
 
