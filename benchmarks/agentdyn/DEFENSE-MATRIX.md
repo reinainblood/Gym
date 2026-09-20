@@ -59,4 +59,35 @@ past forty hours for one cell.
 
 ## Results
 
-No cell has reached 620 rows yet. Nothing is recorded here until one does.
+### `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4`
+
+| Defense | Rows | Benign utility | Utility under attack | ASR | Mean calls | Masked | Adapter errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| _(undefended baseline)_ | 620 | 70.00% | 64.11% | 0.71% | 9.4 | 0 | 0 |
+| `camel` | 620 / 620 | 0.00% | 1.25% | 0.00% | 4.6 | 0 | 0 |
+
+CaMeL stopped all four attacks that succeeded undefended, and completed none of the sixty benign tasks. Seven of the
+560 attacked rows kept utility.
+
+**A 0% attack success rate here is not evidence of protection.** An agent that completes no tasks executes almost no
+tool calls, so there is little for an injection to subvert; security and utility collapsed together. The two numbers
+have to be read as a pair.
+
+The utility collapse has one dominant, visible mode rather than a scatter of task-specific failures. CaMeL asks the
+model for one complete program and interprets it once -- its own system prompt instructs "Do not use `while` loops and
+generators" -- so a program that explores instead of finishing has no second chance. 342 of the 620 rollouts ended
+after two policy calls, and the generated programs characteristically read one thing and print it:
+
+```python
+result = browse_webpage(url="www.homework.com")
+print(result)
+```
+
+That is the same failure the pre-fix smoke recorded, where the generated code passed a product name to a tool that
+required the product ID, and it is a model-under-defense result rather than an adapter one: no masked rows, no adapter
+errors, and the trajectories show the programs running to completion and simply not doing the task.
+
+It is still worth a second look before publication. A benign utility of exactly zero across all three suites is a
+strong claim, and the check that would settle it is a comparison against upstream's published CaMeL utility on
+AgentDojo for a model of this class -- if upstream also reports near-total utility loss on dynamic long-horizon
+tasks, this cell is unremarkable; if it does not, the gap is worth explaining before the number is published.
