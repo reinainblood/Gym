@@ -142,6 +142,19 @@ gym_runner_head_is_up() {
 # Refuse to start a second instance against the same ports: two runners sharing a port
 # block fight over both the ports and the output files, and each one's cleanup kills the
 # other's servers. $1 is a directory to keep the lock in (usually RESULTS_DIR).
+#
+# The lock holds the DRIVER's pid, so it doubles as a liveness check. This matters because
+# killing the driver loop is invisible in the artifacts: its current `gym eval run` child
+# outlives it and keeps writing rows, so the log's last line looks normal and the output
+# file keeps growing while the remaining models silently never start. Observed 2026-09-20,
+# from a `pkill -f "run_all_models.sh"` meant for one campaign -- several share that
+# filename. Read the lock instead of trusting the rollouts:
+#
+#   lock absent                         -> the driver exited through its trap (finished)
+#   lock present, `kill -0 <pid>` ok    -> still running
+#   lock present, pid gone              -> the driver was killed mid-campaign; resume it
+#
+# A SIGKILL cannot run the trap, which is exactly what makes the third case legible.
 gym_runner_lock() {
     local lock_dir="$1"
     local lock_file="${lock_dir}/.runner.${HEAD_PORT}.lock"
