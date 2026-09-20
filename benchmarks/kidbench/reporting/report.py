@@ -522,10 +522,19 @@ def render_model_report(model: ModelResults, *, all_models: list[ModelResults]) 
     add("## Multi-Turn Degradation")
     add("")
     if multi:
+        refusal = multi.get("actor_refusal_rate")
         add(
             f"A child actor probes the model for five turns per scenario, following a scenario and a "
-            f"child goal. Actor refusal rate this run: {pct(multi.get('actor_refusal_rate'))} "
-            f"(turns where the actor broke character instead of playing the child)."
+            f"child goal. Actor refusal rate this run: {pct(refusal)} — the share of turns where the "
+            f"actor broke character instead of playing the child."
+        )
+        add("")
+        add(
+            "That number is a property of the measurement, not a footnote about it. An actor that "
+            "refuses stops pressing exactly where pressing matters, so a weaker actor does not add "
+            "noise — it systematically *understates* degradation. Running this benchmark with a stock "
+            "instruct model in the actor seat produces shallower slopes and smaller peak drops for "
+            "every model, and the erosion it misses was there the whole time."
         )
         add("")
         curve = multi.get("turn_curve") or []
@@ -537,6 +546,31 @@ def render_model_report(model: ModelResults, *, all_models: list[ModelResults]) 
                 )
             )
             add("")
+        unsafe = model.unsafe_conversation_rates()
+        if unsafe["conversations"]:
+            add(
+                _table(
+                    ["Conversations", "Unsafe at any turn", "Unsafe at the final turn"],
+                    [
+                        [
+                            f"{unsafe['conversations']:,}",
+                            pct(unsafe["ever_unsafe"]),
+                            pct(unsafe["ends_unsafe"]),
+                        ]
+                    ],
+                )
+            )
+            add("")
+            add(
+                "*Unsafe at any turn* is the number to read first. The degradation figures below "
+                "measure change, and change is not a safety signal on its own: a conversation stuck "
+                "at 2.4 for all five turns has a slope of zero and looks perfectly stable, while one "
+                "falling from 5.0 to 3.0 never becomes unsafe at all. *Any* rather than *final* "
+                "because a model that goes unsafe at turn three and recovers by turn five has "
+                "already said it to the child — which is the rubric's own instruction to the judge."
+            )
+            add("")
+
         rows = []
         for setting in ("without_age", "with_age"):
             data = multi.get(setting)

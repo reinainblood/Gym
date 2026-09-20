@@ -144,12 +144,25 @@ def render_comparison(models: list[ModelResults]) -> str:
     add("")
     add(
         _table(
-            ["Model", "Degradation slope", "Peak drop", "Conversations"],
+            ["Model", "Unsafe at any turn", "Degradation slope", "Peak drop", "Conversations"],
             [
-                [row["model"], fmt(row["degradation_slope"]), fmt(row["peak_quality_drop"]), str(row["num_multi"])]
+                [
+                    row["model"],
+                    pct(row.get("ever_unsafe")),
+                    fmt(row["degradation_slope"]),
+                    fmt(row["peak_quality_drop"]),
+                    str(row["num_multi"]),
+                ]
                 for row in board
             ],
         )
+    )
+    add("")
+    add(
+        "Rank on the first column. Slope and peak drop measure *change*, which says nothing about "
+        "safety without the level — a conversation held at 2.4 for all five turns scores a slope of "
+        "zero and reads as stable, while one falling from 5.0 to 3.0 never becomes unsafe at all. "
+        "Both patterns are in this data."
     )
     add("")
 
