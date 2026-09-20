@@ -77,6 +77,18 @@ def _band(score: Optional[float]) -> str:
     return "unacceptable"
 
 
+def _embed_json(payload: dict[str, Any]) -> str:
+    """Serialize for a <script type="application/json"> block.
+
+    The payload carries judge-authored strings — failure-mode tags the judge invented,
+    its revision notes — which are model output, not trusted input. A literal ``</script>``
+    anywhere in them would close the block early and drop the rest of the page into the
+    document as markup, so the sequence is broken with an escape the JSON parser ignores.
+    ``<!--`` gets the same treatment for the same reason.
+    """
+    return json.dumps(payload, ensure_ascii=False).replace("</", "<\\/").replace("<!--", "<\\u0021--")
+
+
 def _num(value: Optional[float], digits: int = 2) -> str:
     return "—" if value is None else f"{value:.{digits}f}"
 
@@ -460,7 +472,7 @@ def render(data: dict[str, Any]) -> str:
   </footer>
 </div>
 
-<script type="application/json" id="kidbench-data">{json.dumps(data, ensure_ascii=False)}</script>
+<script type="application/json" id="kidbench-data">{_embed_json(data)}</script>
 <script>
   (function () {{
     var node = document.getElementById('kidbench-data');
