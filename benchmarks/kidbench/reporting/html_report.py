@@ -211,33 +211,33 @@ def render(data: dict[str, Any]) -> str:
         model = models[row["slug"]]
         rows.append(
             f"""
-        <article class="model" id="model-{escape(row['slug'])}">
+        <article class="model" id="model-{escape(row["slug"])}">
           <header class="model-head">
             <span class="rank">{rank}</span>
             <div class="model-id">
-              <h3>{escape(row['model'])}</h3>
-              <p class="model-sub">{row['num_single']:,} single-turn · {row['num_multi']:,} conversations</p>
+              <h3>{escape(row["model"])}</h3>
+              <p class="model-sub">{row["num_single"]:,} single-turn · {row["num_multi"]:,} conversations</p>
             </div>
             <div class="model-score">
-              <span class="big-num">{_num(row['total_quality_score'])}</span>
+              <span class="big-num">{_num(row["total_quality_score"])}</span>
               <span class="big-unit">/ 5</span>
             </div>
           </header>
-          <div class="model-track">{_scale_track(row['total_quality_score'], label=False)}</div>
+          <div class="model-track">{_scale_track(row["total_quality_score"], label=False)}</div>
           <dl class="model-stats">
-            <div><dt>Unsafe answers</dt><dd class="{'warn' if (row['unsafe_rate'] or 0) > 0.2 else ''}">{_pct(row['unsafe_rate'])}</dd></div>
-            <div><dt>Cue gap</dt><dd>{_signed(row['no_cue_penalty'])}</dd></div>
-            <div><dt>Peak drop</dt><dd>{_num(row['peak_quality_drop'])}</dd></div>
+            <div><dt>Unsafe answers</dt><dd class="{"warn" if (row["unsafe_rate"] or 0) > 0.2 else ""}">{_pct(row["unsafe_rate"])}</dd></div>
+            <div><dt>Cue gap</dt><dd>{_signed(row["no_cue_penalty"])}</dd></div>
+            <div><dt>Peak drop</dt><dd>{_num(row["peak_quality_drop"])}</dd></div>
             <div><dt>Weakest</dt><dd class="weak">{escape(_weakest_label(row))}</dd></div>
           </dl>
           <div class="model-viz">
             <figure>
               <figcaption>Cue ladder</figcaption>
-              {_cue_slope(model.get('cue_ladder') or {})}
+              {_cue_slope(model.get("cue_ladder") or {})}
             </figure>
             <figure>
               <figcaption>Quality by turn</figcaption>
-              {_turn_curve((model.get('multi_turn') or {}).get('turn_curve') or [])}
+              {_turn_curve((model.get("multi_turn") or {}).get("turn_curve") or [])}
             </figure>
           </div>
           <div class="model-fam">
@@ -254,19 +254,17 @@ def render(data: dict[str, Any]) -> str:
             f'<td><span class="cell-num">{_num(row.get(metric))}</span>{_scale_track(row.get(metric), label=False)}</td>'
             for row in board
         )
-        dimension_rows.append(f"<tr><th scope=\"row\">{escape(DIMENSION_LABELS[metric])}</th>{cells}</tr>")
+        dimension_rows.append(f'<tr><th scope="row">{escape(DIMENSION_LABELS[metric])}</th>{cells}</tr>')
 
     # -- condition matrix -----------------------------------------------------
     condition_rows = []
     for condition in ("no_cue", "implicit_cue", "explicit_age", "cultural", "cross_lingual"):
         cells = "".join(
             f'<td><span class="cell-num">{_num((models[row["slug"]].get("by_condition") or {}).get(condition))}</span>'
-            f'{_scale_track((models[row["slug"]].get("by_condition") or {}).get(condition), label=False)}</td>'
+            f"{_scale_track((models[row['slug']].get('by_condition') or {}).get(condition), label=False)}</td>"
             for row in board
         )
-        condition_rows.append(
-            f'<tr><th scope="row">{escape(CONDITION_LABELS[condition])}</th>{cells}</tr>'
-        )
+        condition_rows.append(f'<tr><th scope="row">{escape(CONDITION_LABELS[condition])}</th>{cells}</tr>')
 
     # -- root cause findings --------------------------------------------------
     findings_blocks = []
@@ -277,8 +275,8 @@ def render(data: dict[str, Any]) -> str:
             continue
         items = "".join(
             f'<li><code class="code">{escape(cause["code"])}</code>'
-            f'<strong>{escape(cause["finding"])}</strong>'
-            f'<span>{escape(cause["evidence"])}</span></li>'
+            f"<strong>{escape(cause['finding'])}</strong>"
+            f"<span>{escape(cause['evidence'])}</span></li>"
             for cause in causes
         )
         findings_blocks.append(
@@ -286,15 +284,15 @@ def render(data: dict[str, Any]) -> str:
         )
 
     blade_rows = "".join(
-        f"<tr><th scope=\"row\"><code class=\"code\">{escape(cause.code)}</code></th>"
-        f"<td class=\"muted\">{escape(cause.generic_name)}</td>"
-        f"<td><strong>{escape(cause.kidbench_name)}</strong><br><span class=\"muted\">{escape(cause.meaning)}</span></td></tr>"
+        f'<tr><th scope="row"><code class="code">{escape(cause.code)}</code></th>'
+        f'<td class="muted">{escape(cause.generic_name)}</td>'
+        f'<td><strong>{escape(cause.kidbench_name)}</strong><br><span class="muted">{escape(cause.meaning)}</span></td></tr>'
         for cause in ROOT_CAUSES
     )
 
     family_legend = "".join(
         f'<li><span class="swatch seg-{index}"></span><strong>{escape(FAMILY_BY_KEY[key].label)}</strong>'
-        f'<span>{escape(FAMILY_BY_KEY[key].harm_model)}</span></li>'
+        f"<span>{escape(FAMILY_BY_KEY[key].harm_model)}</span></li>"
         for index, key in enumerate(family_keys)
     )
 
@@ -445,8 +443,8 @@ def render(data: dict[str, Any]) -> str:
   <footer class="colophon">
     <p>
       KidBench &mdash; <em>The Age of Curiosity Meets the Age of AI</em>, Arif, Borah &amp; Mihalcea,
-      Findings of EMNLP 2026 · <a href="https://arxiv.org/abs/{data.get('paper', '').replace('arXiv:', '')}">arXiv:{escape(data.get('paper', '').replace('arXiv:', ''))}</a>
-      · benchmark pinned at <span class="mono">{escape(data.get('upstream_revision', '')[:12])}</span>
+      Findings of EMNLP 2026 · <a href="https://arxiv.org/abs/{data.get("paper", "").replace("arXiv:", "")}">arXiv:{escape(data.get("paper", "").replace("arXiv:", ""))}</a>
+      · benchmark pinned at <span class="mono">{escape(data.get("upstream_revision", "")[:12])}</span>
     </p>
     <details class="data">
       <summary>Machine-readable data</summary>
@@ -507,8 +505,7 @@ def _verdict_sentence(board: list[dict[str, Any]], models: dict[str, Any]) -> st
             f"{steepest[0]} falls {steepest[1]:.2f} points below its own opening answer."
         )
     parts.append(
-        "The ranking is the least interesting thing on this page. What the conditions do to each "
-        "model is the finding."
+        "The ranking is the least interesting thing on this page. What the conditions do to each model is the finding."
     )
     return " ".join(parts)
 

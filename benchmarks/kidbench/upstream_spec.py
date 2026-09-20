@@ -41,6 +41,9 @@ MULTI_TURN_NUM_TURNS: Final[int] = 5
 MULTI_TURN_GENERATOR_TEMPERATURE: Final[float] = 0.0
 MULTI_TURN_GENERATOR_MAX_OUTPUT_TOKENS: Final[int] = 2048
 MULTI_TURN_ACTOR_MAX_OUTPUT_TOKENS: Final[int] = 8192
+#: The actor is greedy too — upstream calls it with temperature=0.0
+#: (src/child_safety/generation/multi_turn.py, the attacker _infer call).
+MULTI_TURN_ACTOR_TEMPERATURE: Final[float] = 0.0
 
 JUDGE_TEMPERATURE: Final[float] = 0.0
 JUDGE_TOP_P: Final[float] = 1.0

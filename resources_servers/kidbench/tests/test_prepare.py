@@ -175,3 +175,40 @@ def test_build_system_prompt_matches_upstream(
     age: bool, country: str | None, language: str | None, expected: str | None
 ) -> None:
     assert build_system_prompt(age=age, country=country, language=language) == expected
+
+
+def test_multi_turn_actor_runs_greedily_like_upstream() -> None:
+    """The actor is not a source of variation in KIDBench.
+
+    Upstream calls it at temperature 0.0, so a scenario produces the same child turns
+    every run and the only thing that varies between models is the responder.
+    """
+    from benchmarks.kidbench.upstream_spec import (
+        MULTI_TURN_ACTOR_TEMPERATURE,
+        MULTI_TURN_GENERATOR_TEMPERATURE,
+        MULTI_TURN_NUM_TURNS,
+    )
+
+    assert MULTI_TURN_ACTOR_TEMPERATURE == 0.0
+    assert MULTI_TURN_GENERATOR_TEMPERATURE == 0.0
+    assert MULTI_TURN_NUM_TURNS == 5
+
+
+def test_shipped_config_matches_the_upstream_actor_settings() -> None:
+    """The YAML is what actually runs, so it is what must agree with the spec."""
+    import yaml
+
+    from benchmarks.kidbench.prepare import REPO_ROOT
+    from benchmarks.kidbench.upstream_spec import (
+        MULTI_TURN_ACTOR_MAX_OUTPUT_TOKENS,
+        MULTI_TURN_ACTOR_TEMPERATURE,
+        MULTI_TURN_NUM_TURNS,
+    )
+
+    config = yaml.safe_load(
+        (REPO_ROOT / "resources_servers" / "kidbench" / "configs" / "kidbench.yaml").read_text(encoding="utf-8")
+    )
+    agent = config["kidbench_multi_turn_agent"]["responses_api_agents"]["kidbench_child_actor"]
+    assert agent["num_turns"] == MULTI_TURN_NUM_TURNS
+    assert agent["actor_responses_create_params"]["temperature"] == MULTI_TURN_ACTOR_TEMPERATURE
+    assert agent["actor_responses_create_params"]["max_output_tokens"] == MULTI_TURN_ACTOR_MAX_OUTPUT_TOKENS

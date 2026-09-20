@@ -91,7 +91,8 @@ kidbench_multi_turn_agent:
         name: kidbench_actor_model
       actor_responses_create_params:
         input: []
-        temperature: 1.0
+        # Upstream drives the actor greedily, same as the responder.
+        temperature: 0.0
         max_output_tokens: 8192
       datasets:
       - name: multi_turn
