@@ -19,18 +19,22 @@ cd "$ROOT_DIR"
 
 RESULTS_DIR="${RESULTS_DIR:-results/kidbench}"
 LOG_DIR="${LOG_DIR:-${RESULTS_DIR}/logs}"
-SINGLE_CONCURRENCY="${SINGLE_CONCURRENCY:-96}"
-MULTI_CONCURRENCY="${MULTI_CONCURRENCY:-48}"
+# Concurrency is set per model in MODELS below, since the deployments differ in how much
+# load they absorb. Set SINGLE_CONCURRENCY_OVERRIDE to force one value for every model.
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 
 set -a; source "${ENV_FILE:-/Users/kruge/Documents/ChatGPT/NVIDIA/.env}"; set +a
 
-# key | slug | base_url | model id | which token env var
+# Per-model concurrency, because the deployments do not all absorb the same load. Kimi K3
+# returns 503 "No available prefill workers (all circuits open or unhealthy)" well before
+# the others do, so it gets a lower ceiling rather than a retry storm against a sick router.
+#
+# key | slug | base_url | model id | token env var | single-turn concurrency
 MODELS=(
-"ultra|nemotron-3-ultra-550b|https://snorkelai-fdr--ep-nvidia-nemotron-3-ultra-550b-a55b-nvfp-63eebc.us-west.modal.direct/v1|nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4|MODAL_PROXY_TOKEN"
-"kimi|kimi-k3|https://snorkelai-fdr--ep-kimi-k3-server.us-west.modal.direct/v1|moonshotai/Kimi-K3|MODAL_PROXY_TOKEN"
-"qwen|qwen3.5-122b-a10b|https://snorkelai-fdr--ep-qwen3-5-122b-a10b-fp8-server.us-west.modal.direct/v1|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN"
-"supervl|nemotron-3.5-super-vl|https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct/v1|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN"
+"ultra|nemotron-3-ultra-550b|https://snorkelai-fdr--ep-nvidia-nemotron-3-ultra-550b-a55b-nvfp-63eebc.us-west.modal.direct/v1|nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4|MODAL_PROXY_TOKEN|96"
+"kimi|kimi-k3|https://snorkelai-fdr--ep-kimi-k3-server.us-west.modal.direct/v1|moonshotai/Kimi-K3|MODAL_PROXY_TOKEN|16"
+"qwen|qwen3.5-122b-a10b|https://snorkelai-fdr--ep-qwen3-5-122b-a10b-fp8-server.us-west.modal.direct/v1|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN|48"
+"supervl|nemotron-3.5-super-vl|https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct/v1|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN|48"
 )
 
 write_env_yaml() {
@@ -111,24 +115,43 @@ start_servers() {
 }
 
 run_track() {
-    local slug="$1" agent="$2" input="$3" track="$4" concurrency="$5"
+    local slug="$1" agent="$2" input="$3" track="$4" concurrency="$5" expected="$6"
     local out="${RESULTS_DIR}/${slug}.${track}.jsonl"
-    echo "  [$(date +%H:%M:%S)] ${slug} / ${track} -> ${out}"
-    .venv/bin/gym eval run --no-serve --resume \
-        --agent "$agent" \
-        --input "$input" \
-        --output "$out" \
-        --num-repeats 1 \
-        --concurrency "$concurrency" \
-        > "${LOG_DIR}/${slug}.${track}.log" 2>&1
-    local status=$?
-    echo "  [$(date +%H:%M:%S)] ${slug} / ${track} exit=${status} rows=$(wc -l < "$out" 2>/dev/null || echo 0)"
-    return $status
+    local attempt status rows
+
+    for attempt in 1 2 3; do
+        echo "  [$(date +%H:%M:%S)] ${slug} / ${track} attempt ${attempt} (concurrency ${concurrency}) -> ${out}"
+        .venv/bin/gym eval run --no-serve --resume \
+            --agent "$agent" \
+            --input "$input" \
+            --output "$out" \
+            --num-repeats 1 \
+            --concurrency "$concurrency" \
+            > "${LOG_DIR}/${slug}.${track}.attempt${attempt}.log" 2>&1
+        status=$?
+        rows=$(wc -l < "$out" 2>/dev/null || echo 0)
+        echo "  [$(date +%H:%M:%S)] ${slug} / ${track} attempt ${attempt} exit=${status} rows=${rows}/${expected}"
+
+        if [ "$status" -eq 0 ] && [ "$rows" -ge "$expected" ]; then
+            echo "  [$(date +%H:%M:%S)] ${slug} / ${track} complete"
+            return 0
+        fi
+
+        # A 503 from an overloaded router means back off, not push harder. Halve the
+        # ceiling and let the endpoint's circuit breakers reset before trying again.
+        concurrency=$(( concurrency / 2 ))
+        [ "$concurrency" -lt 4 ] && concurrency=4
+        echo "  [$(date +%H:%M:%S)] ${slug} / ${track} backing off to concurrency ${concurrency}"
+        sleep 60
+    done
+
+    echo "  [$(date +%H:%M:%S)] ${slug} / ${track} INCOMPLETE after 3 attempts (${rows}/${expected})"
+    return 1
 }
 
 WANTED=("$@")
 for entry in "${MODELS[@]}"; do
-    IFS='|' read -r key slug base_url model token_var <<< "$entry"
+    IFS='|' read -r key slug base_url model token_var model_concurrency <<< "$entry"
     if [ ${#WANTED[@]} -gt 0 ] && [[ ! " ${WANTED[*]} " =~ " ${key} " ]]; then
         continue
     fi
@@ -141,10 +164,14 @@ for entry in "${MODELS[@]}"; do
     stop_servers
     start_servers "$slug" || continue
 
+    single_concurrency="${SINGLE_CONCURRENCY_OVERRIDE:-$model_concurrency}"
+    multi_concurrency=$(( single_concurrency / 2 ))
+    [ "$multi_concurrency" -lt 4 ] && multi_concurrency=4
+
     run_track "$slug" kidbench_simple_agent \
-        resources_servers/kidbench/data/single_turn.jsonl single_turn "$SINGLE_CONCURRENCY"
+        resources_servers/kidbench/data/single_turn.jsonl single_turn "$single_concurrency" 5000
     run_track "$slug" kidbench_multi_turn_agent \
-        resources_servers/kidbench/data/multi_turn.jsonl multi_turn "$MULTI_CONCURRENCY"
+        resources_servers/kidbench/data/multi_turn.jsonl multi_turn "$multi_concurrency" 200
 done
 
 stop_servers

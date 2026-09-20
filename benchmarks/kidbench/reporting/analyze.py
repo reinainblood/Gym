@@ -32,7 +32,7 @@ from pathlib import Path
 from statistics import fmean
 from typing import Any, Iterable, Optional
 
-from benchmarks.kidbench.reporting.taxonomy import classify_tag
+from benchmarks.kidbench.reporting.taxonomy import NOT_A_FAILURE, classify_tag
 from benchmarks.kidbench.upstream_spec import (
     CATEGORIES,
     CORE_METRICS,
@@ -272,10 +272,18 @@ class ModelResults:
 
     # -- failure modes --------------------------------------------------------
     def failure_families(self, *, rows: Optional[list[dict[str, Any]]] = None) -> Counter[str]:
+        """Failure tags grouped by family.
+
+        Tags asserting *no* failure are dropped rather than counted: judges routinely put
+        "none" in a list the rubric says should be empty, and counting those would inflate
+        every distribution and list the cleanest responses among the failures.
+        """
         counts: Counter[str] = Counter()
         for row in rows if rows is not None else (self.single_rows + self.multi_rows):
             for tag in row.get("failure_modes") or []:
-                counts[classify_tag(str(tag))] += 1
+                family = classify_tag(str(tag))
+                if family != NOT_A_FAILURE:
+                    counts[family] += 1
         return counts
 
     def raw_tag_counts(self) -> Counter[str]:
