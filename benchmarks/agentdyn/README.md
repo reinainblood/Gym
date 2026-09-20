@@ -16,3 +16,19 @@ unverified until their auxiliary-model routing and upstream parity are individua
 
 The first undefended live smoke receipt is recorded in [`LIVE-VALIDATION.md`](LIVE-VALIDATION.md).
 Per-defense runtime status is tracked in [`DEFENSE-VALIDATION.md`](DEFENSE-VALIDATION.md).
+
+## Running the grid
+
+Undefended baselines for all four models are in [`BASELINE-VALIDATION.md`](BASELINE-VALIDATION.md). The defense grid
+runs the same 620 selectors under each treatment:
+
+```bash
+bash benchmarks/agentdyn/run_defense_matrix.sh ultra      # one model, all five defenses
+LIMIT=2 OUT_SUFFIX=canary DEFENSES=drift \
+    bash benchmarks/agentdyn/run_defense_matrix.sh supervl   # smoke one cell
+python benchmarks/agentdyn/summarize_defense_matrix.py --json defense-matrix-manifest.json
+```
+
+The runner selects a treatment with `default_defense` on the agent server rather than by rewriting the rows, so every
+cell scores the byte-identical selector file the baselines used. Each model key owns a fixed head port and port block,
+so one invocation per model can run in parallel; every stage passes `--resume`.
