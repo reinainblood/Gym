@@ -34,9 +34,12 @@ cd "$ROOT_DIR"
 RESULTS_DIR="${RESULTS_DIR:-results/agentdyn-defense-matrix}"
 LOG_DIR="${LOG_DIR:-${RESULTS_DIR}/logs}"
 INPUT="${INPUT:-benchmarks/agentdyn/data/agentdyn_v1_2_2.jsonl}"
-# Parity with the undefended baselines, which the manifest records at concurrency 4. The
-# defense scores are read against those numbers, so the load profile stays the same.
-CONCURRENCY="${CONCURRENCY:-4}"
+# Per-model, from the MODELS table below, because the deployments do not absorb the same
+# load. Set CONCURRENCY to force one value for every model. Concurrency is a throughput
+# knob, not an experimental variable: each rollout runs an isolated suite environment and
+# is verified deterministically, so a cell scores the same at 4 as at 16. Whatever a cell
+# actually used is recorded with its result.
+CONCURRENCY="${CONCURRENCY:-}"
 EXPECTED="${EXPECTED:-620}"
 LIMIT="${LIMIT:-}"
 OUT_SUFFIX="${OUT_SUFFIX:-}"
@@ -56,17 +59,25 @@ export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
 mkdir -p "$RESULTS_DIR" "$LOG_DIR"
 
-# key | slug | base_url | model id | token env var | head port | port low | port high
+# key | slug | base_url | model id | token env var | head port | port low | port high | concurrency
+#
+# Concurrency is measured, not guessed (FDR endpoints, 2026-09-20, ~32k ASB rollouts):
+# ultra and kimi hold up well past 64 concurrent requests, while qwen and supervl are
+# single-replica and queue rather than erroring -- their latency inflates 20-30x under load
+# with zero 503s, so pushing more client concurrency at them buys nothing and only starves
+# the neighbouring campaigns. The ceilings here are further limited by this host: every
+# rollout runs an AgentDyn suite in-process, and the detector defenses hold a CPU
+# classifier per concurrent rollout.
 #
 # Ports are disjoint from the campaign blocks registered in scripts/benchmark_runner_lib.sh
 # (asb 20001-29000, kidbench 30001-34000, xstest 34001-38000, over_refusal 38001-42000) and
 # from Gym's default 10001-20000, so a parallel AgentDyn campaign cannot sweep up a
 # neighbour's servers on cleanup.
 MODELS=(
-"ultra|nemotron-3-ultra|https://snorkelai-fdr--ep-nvidia-nemotron-3-ultra-550b-a55b-nvfp-63eebc.us-west.modal.direct/v1|nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4|MODAL_PROXY_TOKEN|11810|45001|45900"
-"kimi|kimi-k3|https://snorkelai-fdr--ep-kimi-k3-server.us-west.modal.direct/v1|moonshotai/Kimi-K3|MODAL_PROXY_TOKEN|11811|46001|46900"
-"qwen|qwen-3-5-122b-a10b|https://snorkelai-fdr--ep-qwen3-5-122b-a10b-fp8-server.us-west.modal.direct/v1|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN|11812|47001|47900"
-"supervl|nemotron-3-5-super-vl|https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct/v1|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN|11813|48001|48900"
+"ultra|nemotron-3-ultra|https://snorkelai-fdr--ep-nvidia-nemotron-3-ultra-550b-a55b-nvfp-63eebc.us-west.modal.direct/v1|nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4|MODAL_PROXY_TOKEN|11810|45001|45900|16"
+"kimi|kimi-k3|https://snorkelai-fdr--ep-kimi-k3-server.us-west.modal.direct/v1|moonshotai/Kimi-K3|MODAL_PROXY_TOKEN|11811|46001|46900|16"
+"qwen|qwen-3-5-122b-a10b|https://snorkelai-fdr--ep-qwen3-5-122b-a10b-fp8-server.us-west.modal.direct/v1|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN|11812|47001|47900|6"
+"supervl|nemotron-3-5-super-vl|https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct/v1|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN|11813|48001|48900|6"
 )
 
 source "${ROOT_DIR}/scripts/benchmark_runner_lib.sh"
@@ -210,7 +221,14 @@ fi
 
 # Ports come from the first selected model, so `... ultra kimi` (sequential, one stack at a
 # time) and two parallel single-key invocations both get a coherent, non-overlapping block.
-IFS='|' read -r _k _s _u _m _t HEAD_PORT PORT_LOW PORT_HIGH <<< "${SELECTED[0]}"
+# An explicit HEAD_PORT/PORT_LOW/PORT_HIGH wins, which is how the grid runs several cells of
+# one model at once: the agent server serializes rollouts behind a semaphore of one (its
+# defense setup monkeypatches process globals, so concurrent rollouts inside one process
+# would race over them), and the only safe way to go faster is more processes.
+IFS='|' read -r _k _s _u _m _t table_head table_low table_high _c <<< "${SELECTED[0]}"
+HEAD_PORT="${HEAD_PORT:-$table_head}"
+PORT_LOW="${PORT_LOW:-$table_low}"
+PORT_HIGH="${PORT_HIGH:-$table_high}"
 export HEAD_PORT PORT_LOW PORT_HIGH
 ENV_YAML="${ENV_YAML:-${RESULTS_DIR}/env.${HEAD_PORT}.yaml}"
 
@@ -218,7 +236,8 @@ gym_runner_lock "$RESULTS_DIR" || exit 1
 gym_runner_clear_shadowing_env_yaml || exit 1
 
 for entry in "${SELECTED[@]}"; do
-    IFS='|' read -r key slug base_url model token_var _hp _pl _ph <<< "$entry"
+    IFS='|' read -r key slug base_url model token_var _hp _pl _ph model_concurrency <<< "$entry"
+    concurrency="${CONCURRENCY:-$model_concurrency}"
     # The Qwen SGLang deployment rejects the `developer` role with "Unexpected message
     # role."; see BASELINE-VALIDATION.md. Every other endpoint takes the default.
     system_role="developer"
@@ -233,7 +252,7 @@ for entry in "${SELECTED[@]}"; do
         write_env_yaml "$base_url" "$model" "$token_var" "$defense" "$system_role"
         gym_runner_stop_servers
         start_servers "${slug}.${defense}" || continue
-        run_cell "$slug" "$defense" "$CONCURRENCY"
+        run_cell "$slug" "$defense" "$concurrency"
     done
 done
 
