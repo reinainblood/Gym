@@ -8,7 +8,7 @@ import asyncio
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import ConfigDict
 
@@ -17,6 +17,7 @@ from nemo_gym.base_resources_server import (
     BaseRunRequest,
     BaseVerifyRequest,
     BaseVerifyResponse,
+    ReverifyMode,
     SimpleResourcesServer,
 )
 from nemo_gym.config_types import ModelServerRef
@@ -98,6 +99,10 @@ def parse_official(text: str) -> tuple[str, str | None]:
 
 class ORBenchHardResourcesServer(SimpleResourcesServer):
     config: ORBenchHardConfig
+    # Every verdict is a pure function of the saved prompt, saved policy
+    # response, and fixed judge profile. No task session state is read or
+    # mutated, so replaying a rollout under a named replacement judge is safe.
+    REVERIFY_MODE: ClassVar[ReverifyMode] = ReverifyMode.STATELESS
 
     def model_post_init(self, context: Any) -> None:
         super().model_post_init(context)
