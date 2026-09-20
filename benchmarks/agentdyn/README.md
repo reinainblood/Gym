@@ -23,12 +23,24 @@ Undefended baselines for all four models are in [`BASELINE-VALIDATION.md`](BASEL
 runs the same 620 selectors under each treatment:
 
 ```bash
-bash benchmarks/agentdyn/run_defense_matrix.sh ultra      # one model, all five defenses
+bash benchmarks/agentdyn/launch_defense_grid.sh              # every cell, one process each
+SHARDS=3 DEFENSES=drift bash benchmarks/agentdyn/launch_defense_grid.sh kimi qwen
 LIMIT=2 OUT_SUFFIX=canary DEFENSES=drift \
     bash benchmarks/agentdyn/run_defense_matrix.sh supervl   # smoke one cell
 python benchmarks/agentdyn/summarize_defense_matrix.py --json defense-matrix-manifest.json
 ```
 
 The runner selects a treatment with `default_defense` on the agent server rather than by rewriting the rows, so every
-cell scores the byte-identical selector file the baselines used. Each model key owns a fixed head port and port block,
-so one invocation per model can run in parallel; every stage passes `--resume`.
+cell scores the byte-identical selector file the baselines used. Every stage passes `--resume`, and the launcher skips
+any cell a live runner already owns -- so re-running `launch_defense_grid.sh` is also how you restart whatever died,
+and the summarizer's status listing says which cells those are.
+
+Parallelism comes from processes, not from `--concurrency`. The agent server runs rollouts behind
+`asyncio.Semaphore(concurrency)` with concurrency 1, so a higher `--concurrency` only queues requests at the agent.
+That semaphore is load-bearing: setting up a defense monkeypatches process globals (`TransformersBasedPIDetector`,
+`openai.OpenAI`, `os.environ`), and overlapping `mock.patch` scopes inside one process restore each other's values out
+of order, which would hand a rollout the unpatched client and point it at the public OpenAI endpoint. So the launcher
+gives each cell its own process, and `SHARDS=N` splits one cell's selectors across N more. Sharding is safe because a
+cell's score is a pure function of its row set: masked rollouts leave the denominator, then utility and attack success
+are averaged over the benign and attacked subsets. DRIFT is the cell that needs it, at roughly fifty policy calls per
+rollout against nine undefended.
