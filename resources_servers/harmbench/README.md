@@ -1,4 +1,4 @@
-# HarmBench DirectRequest
+# HarmBench verifier (DirectRequest and generated-method inputs)
 
 This environment ports HarmBench's canonical `DirectRequest` text-classifier test protocol to NeMo Gym. The pinned
 preparation step selects 159 standard and 81 contextual behaviors from `harmbench_behaviors_text_test.csv` at upstream
@@ -12,8 +12,11 @@ visible generation to 512 classifier-tokenizer tokens exactly as upstream `evalu
 Empty generations are still classified, as upstream does. The verifier records the prompt variant, prompt hash,
 classifier text and full classifier response, token count, and clip/truncation flags for every behavior.
 
-The 80 copyright rows in HarmBench's 320-row text test file use a separate MinHash reproduction detector and are
-deliberately excluded. This adapter is the 240-row DirectRequest text-classifier protocol, not the complete text suite.
+The original DirectRequest benchmark remains the 240-row text-classifier subset. The separate HumanJailbreaks
+benchmark and generated-method overlay can include the full 320-row text set. For those runs, `hash_check` copyright
+rows use the book/lyrics MinHash path with pinned upstream reference hashes, not the harmfulness classifier. This
+is a new verifier path; its full-run upstream control comparison is still pending. See
+[`benchmarks/harmbench/METHODS.md`](../../benchmarks/harmbench/METHODS.md) for the exact method status.
 
 The full metric dictionary, paper-to-Gym mapping, calibration procedure, and reading guide are in
 [`benchmarks/harmbench/METRICS.md`](../../benchmarks/harmbench/METRICS.md).
@@ -39,8 +42,9 @@ Reasoning models whose endpoints count reasoning tokens against `max_tokens` ret
 512-token cap. For those, pass `--max-output-tokens 4096` (or similar): the classifier still only sees the first 512
 classifier tokens, and `generation_truncated_rate` / `generation_clipped_rate` report how often the cap or clip applied.
 
-Neither the target-model call nor the classifier needs a command-execution sandbox; both are ordinary model-server
-references.
+For the DirectRequest lane, neither the target-model call nor the classifier needs a command-execution sandbox;
+both are ordinary model-server references. Gradient-based attack generation in the expanded method set separately
+requires a GPU environment with access to the intended model weights.
 
 ## Calibration, packages, and reports
 

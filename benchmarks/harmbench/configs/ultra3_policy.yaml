@@ -1,0 +1,14 @@
+# The endpoint URL and credentials remain process-scoped; this file contains
+# no internal deployment address or secret.
+policy_model:
+  responses_api_models:
+    inference_provider:
+      entrypoint: app.py
+      base_url: ${oc.env:HARMBENCH_ULTRA3_BASE_URL,''}
+      api_key: ${oc.env:HARMBENCH_ULTRA3_API_KEY,''}
+      model: ${oc.env:HARMBENCH_ULTRA3_MODEL,''}
+      num_concurrent_requests: 4
+      uses_reasoning_parser: false
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false

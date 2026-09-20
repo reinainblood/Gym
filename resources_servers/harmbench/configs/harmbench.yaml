@@ -17,6 +17,9 @@ harmbench:
       # classifier-tokenizer tokens before classification. Set to null only for non-reasoning
       # targets whose generation is already capped at the paper's 512 tokens.
       generation_clip_tokens: 512
+      # Must point to data/copyright_classifier_hashes in the verified pinned
+      # HarmBench checkout. Never use an untrusted upload: files are pickles.
+      copyright_reference_dir: ${oc.env:HARMBENCH_COPYRIGHT_HASHES_DIR,null}
 
 harmbench_classifier:
   responses_api_models:

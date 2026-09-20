@@ -213,6 +213,9 @@ tests/data
 # Convenience files
 run.md
 temp*
+# Local HarmBench parity environments and visual-QA browser profiles.
+/tmp/
+/benchmarks/harmbench/operations/*/upstream-harmbench/
 
 .DS_Store
 

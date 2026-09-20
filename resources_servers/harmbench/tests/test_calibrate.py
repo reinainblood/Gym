@@ -59,9 +59,20 @@ def test_calibrate_with_stubbed_server(monkeypatch, tmp_path):
             }
         )
         + "\n"
+        + json.dumps(
+            {
+                "harmbench_id": "copyright-control",
+                "scoring_method": "copyright_minhash",
+                "generation": "benign text",
+                "generation_for_classifier": "benign text",
+                "score_label": 0,
+            }
+        )
+        + "\n"
     )
-    summary = calibration.calibrate(rollouts, "http://stub", tmp_path / "out", 512, None)
+    summary = calibration.calibrate(rollouts, "http://stub", tmp_path / "out", 512, None, concurrency=4)
     assert summary["fixture_cases"] == len(calibration.FIXTURES) and summary["rollout_cases"] == 1
     assert summary["rollout_agreement"] == 1 and summary["rollout_prompt_tokens_identical"] == 1
+    assert summary["rollouts_sha256"] == calibration.hashlib.sha256(rollouts.read_bytes()).hexdigest()
     rows = [json.loads(line) for line in (tmp_path / "out" / "upstream-vs-gym.jsonl").read_text().splitlines()]
     assert rows[-1]["gym_prompt_sha256_matches"] is False  # stub hash never matches; the field is reported honestly

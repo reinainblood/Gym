@@ -4,11 +4,14 @@
 import asyncio
 import hashlib
 import json
-from unittest.mock import AsyncMock, MagicMock
+import sys
+import types
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from huggingface_hub import try_to_load_from_cache
 
+from nemo_gym.base_resources_server import ReverifyMode
 from nemo_gym.openai_utils import NeMoGymResponse
 from nemo_gym.server_utils import ServerClient
 from nemo_gym.verifier_fixture import exercise_verifier_fixture
@@ -20,10 +23,12 @@ from resources_servers.harmbench.app import (
     HarmBenchConfig,
     HarmBenchResourcesServer,
     HarmBenchVerifyRequest,
+    _FastClassifierTokenizer,
     _label,
     _SentencePieceTokenizer,
     clip_generation,
 )
+from resources_servers.harmbench.copyright import CopyrightScore
 
 
 def _model_response(text: str, *, incomplete: bool = False) -> NeMoGymResponse:
@@ -80,9 +85,11 @@ def _server(classifier_text: str, *, clip: int | None = None) -> tuple[HarmBench
         classifier_responses_create_params={"input": [], "temperature": 0.0, "max_output_tokens": 1},
         generation_clip_tokens=clip,
     )
-    server = HarmBenchResourcesServer(config=config, server_client=client)
     if clip is not None:
-        server._tokenizer = _CharTokenizer()
+        with patch.object(HarmBenchResourcesServer, "_load_tokenizer", lambda self: _CharTokenizer()):
+            server = HarmBenchResourcesServer(config=config, server_client=client)
+    else:
+        server = HarmBenchResourcesServer(config=config, server_client=client)
     return server, client.post
 
 
@@ -175,6 +182,27 @@ def test_clip_generation_matches_upstream_truncate_then_decode():
     assert clip_generation(tokenizer, "hello", 6) == ("hello", 6, False)
 
 
+def test_fast_tokenizer_uses_hf_decode_and_right_truncation(monkeypatch):
+    class FakeFast:
+        is_fast = True
+        truncation_side = "left"
+
+        def encode(self, text):
+            return [1, *[ord(character) for character in text]]
+
+        def decode(self, ids, skip_special_tokens):
+            assert skip_special_tokens is True
+            return "".join(chr(value) for value in ids if value != 1)
+
+    fake = FakeFast()
+    module = types.ModuleType("transformers")
+    module.AutoTokenizer = types.SimpleNamespace(from_pretrained=lambda repo, revision, use_fast: fake)
+    monkeypatch.setitem(sys.modules, "transformers", module)
+    tokenizer = _FastClassifierTokenizer("repo", "revision")
+    assert fake.truncation_side == "right"
+    assert clip_generation(tokenizer, "abcdef", 4) == ("abc", 7, True)
+
+
 def test_tokenizer_is_loaded_eagerly_when_clipping_is_enabled(monkeypatch):
     monkeypatch.setattr(HarmBenchResourcesServer, "_load_tokenizer", lambda self: _CharTokenizer())
     config = HarmBenchConfig(
@@ -188,6 +216,11 @@ def test_tokenizer_is_loaded_eagerly_when_clipping_is_enabled(monkeypatch):
     server = HarmBenchResourcesServer(config=config, server_client=MagicMock(spec=ServerClient))
     assert isinstance(server._tokenizer, _CharTokenizer)
     assert server.config.generation_clip_tokens == 512
+
+
+async def test_verifier_advertises_stateless_reverification():
+    server, _ = _server("no")
+    assert await server.get_reverify_mode() == ReverifyMode.STATELESS
 
 
 _CACHED_TOKENIZER = try_to_load_from_cache(
@@ -243,6 +276,40 @@ def test_metrics_use_upstream_denominator_and_report_slices():
         "classifier_valid_rate",
     }
     assert server.compute_metrics([]) == {}
+
+
+async def test_copyright_uses_minhash_instead_of_classifier(monkeypatch):
+    server, post = _server("yes")
+    monkeypatch.setattr(
+        HarmBenchResourcesServer,
+        "_score_copyright",
+        lambda self, behavior_id, generation, tags: CopyrightScore(0, 0.125, "reference-sha256"),
+    )
+    request = _request("a short benign response")
+    request.harmbench_id = "copyright-id"
+    request.tags = ["book", "hash_check"]
+    request.functional_category = "copyright"
+    result = await server.verify(request)
+    assert post.await_count == 0
+    assert result.scoring_method == "copyright_minhash"
+    assert result.score_label == 0 and result.reward == 1.0
+    assert result.classifier_label is None and result.classifier_response is None
+    assert result.copyright_max_similarity == 0.125
+    assert result.copyright_reference_sha256 == "reference-sha256"
+
+
+def test_multiple_attacks_are_averaged_per_behavior_like_upstream():
+    server, _ = _server("no")
+    metrics = server.compute_metrics(
+        [
+            [{"harmbench_id": "one", "score_label": 1, "functional_category": "standard"}],
+            [{"harmbench_id": "one", "score_label": 0, "functional_category": "standard"}],
+            [{"harmbench_id": "two", "score_label": 1, "functional_category": "standard"}],
+        ]
+    )
+    assert metrics["num_behaviors"] == 2
+    assert metrics["attack_success_rate"] == 0.75
+    assert metrics["attack_success_rate_per_test_case"] == pytest.approx(2 / 3)
 
 
 def test_verifier_fixture_contract():

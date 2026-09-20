@@ -1,0 +1,5 @@
+# Optional upstream control environment, separate from NeMo Gym's Python 3.13.
+spacy==3.7.2
+datasketch==1.5.9
+tqdm==4.70.1
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl

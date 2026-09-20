@@ -1,0 +1,14 @@
+# Private endpoint URL, served model ID, and bearer key are process-scoped env
+# values. Never put an EA checkpoint credential or internal endpoint in Git.
+policy_model:
+  responses_api_models:
+    inference_provider:
+      entrypoint: app.py
+      base_url: ${oc.env:HARMBENCH_SUPER_VL_BASE_URL,''}
+      api_key: ${oc.env:HARMBENCH_SUPER_VL_API_KEY,''}
+      model: ${oc.env:HARMBENCH_SUPER_VL_MODEL,''}
+      num_concurrent_requests: 4
+      uses_reasoning_parser: false
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
