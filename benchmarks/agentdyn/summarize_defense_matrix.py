@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,8 @@ from typing import Any
 BENCHMARK_DIR = Path(__file__).resolve().parent
 BASELINE_MANIFEST = BENCHMARK_DIR / "baseline-manifest-20260919.json"
 EXPECTED_ROWS = 620
+# Shard head ports reserved per cell by launch_defense_grid.sh; caps SHARDS at this value.
+SHARD_HEAD_PORTS_PER_CELL = 4
 # Display order: cheap detectors, then the code/policy defenses, then DRIFT. Matches the
 # execution order in run_defense_matrix.sh.
 DEFENSE_ORDER = (
@@ -128,8 +131,16 @@ def collect(results_dir: Path) -> dict[str, dict[str, dict[str, Any]]]:
     for slug in MODEL_SLUGS:
         for defense in DEFENSE_ORDER:
             whole = results_dir / slug / f"{defense}.jsonl"
+            # Anchored, because `{defense}-shard*of*.jsonl` also matches the sidecars Gym
+            # writes beside each rollouts file -- `-shard0of3_materialized_inputs.jsonl` holds
+            # one line per selector, so counting it reported an empty cell as complete.
+            shard_name = re.compile(rf"^{re.escape(defense)}-shard\d+of\d+\.jsonl$")
             shards = (
-                sorted((results_dir / slug).glob(f"{defense}-shard*of*.jsonl"))
+                sorted(
+                    path
+                    for path in (results_dir / slug).glob(f"{defense}-shard*.jsonl")
+                    if shard_name.match(path.name)
+                )
                 if (results_dir / slug).is_dir()
                 else []
             )
@@ -155,14 +166,34 @@ def runner_state(results_dir: Path, slug: str, defense: str) -> str:
         defense_index = CELL_PORT_DEFENSE_ORDER.index(defense)
     except ValueError:
         return "unknown"
-    lock = results_dir / f".runner.{11820 + model_index * 10 + defense_index}.lock"
-    if not lock.is_file():
+    cell_index = model_index * 5 + defense_index
+
+    def live(head_port: int) -> bool | None:
+        lock = results_dir / f".runner.{head_port}.lock"
+        if not lock.is_file():
+            return None
+        try:
+            os.kill(int(lock.read_text().strip()), 0)
+        except (OSError, ValueError):
+            return False
+        return True
+
+    # A sharded cell has one lock per shard, on the shard head ports the launcher assigns.
+    # It reserves exactly SHARD_HEAD_PORTS_PER_CELL of them, so scanning further would read
+    # the next cell's shards as this one's.
+    shard_states = [
+        state
+        for shard in range(SHARD_HEAD_PORTS_PER_CELL)
+        if (state := live(11900 + cell_index * SHARD_HEAD_PORTS_PER_CELL + shard)) is not None
+    ]
+    if shard_states:
+        running = sum(shard_states)
+        return f"running ({running}/{len(shard_states)} shards)" if running else "DIED (relaunch)"
+
+    whole = live(11820 + model_index * 10 + defense_index)
+    if whole is None:
         return "not running"
-    try:
-        os.kill(int(lock.read_text().strip()), 0)
-    except (OSError, ValueError):
-        return "DIED (relaunch)"
-    return "running"
+    return "running" if whole else "DIED (relaunch)"
 
 
 def baselines() -> dict[str, dict[str, Any]]:

@@ -37,6 +37,12 @@ INPUT="${INPUT:-benchmarks/agentdyn/data/agentdyn_v1_2_2.jsonl}"
 # recombining them scores identically to one process doing all 620. Worth it for DRIFT,
 # which at ~50 policy calls per rollout projects past forty hours as a single process.
 SHARDS="${SHARDS:-1}"
+# Each cell reserves four shard head ports; more shards would take the next cell's, and the
+# summarizer would then report another cell's shards as this one's.
+if [ "$SHARDS" -gt 4 ]; then
+    echo "ERROR: SHARDS=${SHARDS} exceeds the four head ports reserved per cell." >&2
+    exit 1
+fi
 mkdir -p "$RESULTS_DIR" "$LOG_DIR" "$SHARD_DIR"
 
 # Model index fixes the port neighbourhood; see run_defense_matrix.sh for the block registry.
