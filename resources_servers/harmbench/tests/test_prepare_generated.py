@@ -13,9 +13,11 @@ from benchmarks.harmbench.generate_human_jailbreaks import generate
 from benchmarks.harmbench.methods import METHODS, get_method
 from benchmarks.harmbench.prepare import UPSTREAM_REVISION
 from benchmarks.harmbench.prepare_generated import materialize, sha256
+from benchmarks.harmbench.prepare_human_jailbreaks import BEHAVIORS_SHA256, _require_upstream
 from benchmarks.harmbench.prepare_multimodal_direct import _image
 from benchmarks.harmbench.prepare_multimodal_source import corrected_rows
 from benchmarks.harmbench.select_copyright_canary import select
+from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
 REQUESTED_METHODS = {
@@ -43,6 +45,7 @@ REQUESTED_METHODS = {
     "MultiModalPGDPatch",
     "MultiModalPGDBlankImage",
 }
+UPSTREAM = harmbench_upstream()
 
 
 def test_generated_overlay_preserves_metrics_when_dataset_changes(tmp_path, monkeypatch):
@@ -244,6 +247,17 @@ def test_human_jailbreak_selection_reproduces_upstream_in_place_shuffles():
     random_generator.shuffle(expected_templates)
     second = [f"{template}\n\ncontext\n\n---\n\nsecond" for template in expected_templates[:5]]
     assert generate(behaviors, templates) == {"one": first, "two": second}
+
+
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")
+def test_human_jailbreak_full_source_is_all_400_public_text_behaviors():
+    import hashlib
+
+    _, behaviors = _require_upstream(UPSTREAM)
+    assert behaviors.name == "harmbench_behaviors_text_all.csv"
+    assert hashlib.sha256(behaviors.read_bytes()).hexdigest() == BEHAVIORS_SHA256
+    with behaviors.open(newline="", encoding="utf-8") as stream:
+        assert len(list(csv.DictReader(stream))) == 400
 
 
 def test_multimodal_source_extension_correction_is_explicit_and_hash_bound(tmp_path):

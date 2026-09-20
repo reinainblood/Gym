@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import csv
 import json
 import subprocess
 from pathlib import Path
@@ -14,6 +15,8 @@ from benchmarks.harmbench.ultra_whitebox import (
     MODEL_KEY,
     MODEL_REVISION,
     MODEL_TOTAL_BYTES,
+    PUBLIC_FULL_TEXT_BEHAVIORS,
+    PUBLIC_FULL_TEXT_DATASET,
     WHITEBOX_METHODS,
     build_generate_command,
     validate_checkpoint_manifest,
@@ -39,6 +42,15 @@ def test_whitebox_catalog_is_complete_and_preserves_public_repetitions():
     }
     assert WHITEBOX_METHODS["GCG-Multi"].run_ids == ("0", "1", "2", "3", "4")
     assert sum(spec.cases_per_behavior for spec in WHITEBOX_METHODS.values()) == 20
+    assert PUBLIC_FULL_TEXT_DATASET == "harmbench_behaviors_text_all.csv"
+    assert PUBLIC_FULL_TEXT_BEHAVIORS == 400
+
+
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")
+def test_public_full_text_dataset_has_locked_cardinality():
+    path = UPSTREAM / "data/behavior_datasets" / PUBLIC_FULL_TEXT_DATASET
+    with path.open(newline="", encoding="utf-8") as stream:
+        assert len(list(csv.DictReader(stream))) == PUBLIC_FULL_TEXT_BEHAVIORS
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")

@@ -35,7 +35,7 @@ def calibrate(*, upstream: Path, rollouts: Path, output: Path) -> dict:
         ["git", "-C", str(upstream), "diff", "--quiet", "HEAD", "--", "data/copyright_classifier_hashes"],
         check=True,
     )
-    source = upstream / "data/behavior_datasets/harmbench_behaviors_text_test.csv"
+    source = upstream / "data/behavior_datasets/harmbench_behaviors_text_all.csv"
     with source.open(newline="", encoding="utf-8") as handle:
         behaviors = {row["BehaviorID"]: row for row in csv.DictReader(handle)}
     scored = [

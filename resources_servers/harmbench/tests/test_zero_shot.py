@@ -17,6 +17,8 @@ from benchmarks.harmbench.zero_shot import (
     CASES_PER_BEHAVIOR,
     CONTEXT_PREFIX,
     CONTEXT_QUERY,
+    FULL_TEXT_BEHAVIORS,
+    FULL_TEXT_BEHAVIORS_SHA256,
     STANDARD_PREFIX,
     STANDARD_QUERY,
     cases,
@@ -27,6 +29,14 @@ from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstre
 
 
 UPSTREAM = harmbench_upstream()
+
+
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")
+def test_full_zero_shot_source_is_the_400_row_public_corpus():
+    source = UPSTREAM / "data/behavior_datasets/harmbench_behaviors_text_all.csv"
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == FULL_TEXT_BEHAVIORS_SHA256
+    with source.open(newline="", encoding="utf-8") as stream:
+        assert len(list(csv.DictReader(stream))) == FULL_TEXT_BEHAVIORS == 400
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")

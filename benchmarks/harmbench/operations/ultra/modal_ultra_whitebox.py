@@ -216,6 +216,8 @@ def run_attack(
     sys.path.insert(0, "/app/Gym")
     from benchmarks.harmbench.ultra_whitebox import (
         MODEL_KEY,
+        PUBLIC_FULL_TEXT_BEHAVIORS,
+        PUBLIC_FULL_TEXT_DATASET,
         WHITEBOX_METHODS,
         _validate_cases,
         sha256,
@@ -244,7 +246,15 @@ def run_attack(
     model_receipt = validate_checkpoint_manifest(checkpoint_manifest, checkpoint)
     models_config, method_configs = write_runtime_configs(upstream, output_root / "runtime-config", checkpoint)
 
-    canonical_behaviors = upstream / "data/behavior_datasets/harmbench_behaviors_text_test.csv"
+    canonical_behaviors = upstream / "data/behavior_datasets" / PUBLIC_FULL_TEXT_DATASET
+    with canonical_behaviors.open(newline="", encoding="utf-8") as stream:
+        import csv
+
+        canonical_rows = list(csv.DictReader(stream))
+    if len(canonical_rows) != PUBLIC_FULL_TEXT_BEHAVIORS:
+        raise ValueError(
+            f"expected {PUBLIC_FULL_TEXT_BEHAVIORS} public full-corpus text behaviors, found {len(canonical_rows)}"
+        )
     behaviors = canonical_behaviors
     selected_ids = [value for value in behavior_ids.split(",") if value]
     if selected_ids:
@@ -255,7 +265,7 @@ def run_attack(
             rows = [row for row in reader if row["BehaviorID"] in set(selected_ids)]
             fieldnames = reader.fieldnames
         if len(rows) != len(set(selected_ids)):
-            raise ValueError("one or more requested behavior IDs are absent from the canonical text test set")
+            raise ValueError("one or more requested behavior IDs are absent from the canonical full text corpus")
         behaviors = output_root / "selected-behaviors.csv"
         with behaviors.open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=fieldnames)
@@ -310,7 +320,7 @@ def run_attack(
     receipt = {
         "schema_version": 1,
         "status": "completed",
-        "scope": "bounded_canary" if selected_ids else "full_public_text_test",
+        "scope": "bounded_canary" if selected_ids else "full_public_text_corpus",
         "behavior_ids": selected_ids or None,
         "artifact_id": artifact_id,
         "method": method_name,

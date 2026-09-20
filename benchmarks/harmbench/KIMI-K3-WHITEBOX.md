@@ -16,27 +16,31 @@ models, calibration prompts, reduced algorithms, or synthetic benchmark cases.
   `98c4642076606cf1dd3f83706c901f867288febed93f45719c21982514b2ba2b`
 
 K3 is a native image-and-text model (`KimiK3ForConditionalGeneration`) with a
-27-layer MoonViT tower. Accordingly, all ten applicable public white-box
+27-layer MoonViT tower. Accordingly, all eleven applicable public white-box
 methods are in scope; no multimodal method is excluded.
 
 ## Public methods and full case counts
 
 | Public method | Public class | Full cases |
 | --- | --- | ---: |
-| GCG | `GCG` | 320 |
-| GCG-Multi | `EnsembleGCG`, public run IDs 0-4 | 1,600 |
-| AutoPrompt | `AutoPrompt` | 320 |
-| GBDA | `GBDA` | 1,600 |
-| PEZ | `PEZ` | 1,600 |
-| UAT | `UAT` | 320 |
-| AutoDAN | `AutoDAN` | 320 |
-| FewShot | `FewShot` | 320 |
+| GCG | `GCG` | 400 |
+| GCG-Multi | `EnsembleGCG`, public run IDs 0-4 | 2,000 |
+| AutoPrompt | `AutoPrompt` | 400 |
+| GBDA | `GBDA` | 2,000 |
+| PEZ | `PEZ` | 2,000 |
+| UAT | `UAT` | 400 |
+| AutoDAN | `AutoDAN` | 400 |
+| FewShot | `FewShot` | 400 |
 | MultiModalPGD | `MultiModalPGD` | 110 |
 | MultiModalPGDPatch | `MultiModalPGDPatch` | 110 |
+| MultiModalPGDBlankImage | `MultiModalPGD` | 110 |
 
-The total full workload is 6,620 generated cases. Method YAMLs, hashes,
-published step counts, search widths, repetitions, target files, and behavior
-files are checked by `kimi_k3_whitebox.py` before dispatch.
+The total full workload is 8,330 generated cases: 8,000 cases over upstream's
+default 400-row full text corpus plus 330 cases over the 110-row multimodal
+set. The text corpus includes the 320-row held-out test split and the 80-row
+validation split; a test-only campaign is not labeled full. Method YAMLs,
+hashes, published step counts, search widths, repetitions, target files, and
+behavior files are checked before dispatch.
 
 ## Runtime
 

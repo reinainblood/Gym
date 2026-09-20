@@ -25,6 +25,7 @@ MODEL_REVISION = "9f62e4e9fffbd0a83ddd60e1c209d828994b3569"
 MODEL_TOTAL_BYTES = 1_560_998_984_390
 MODEL_FILE_COUNT = 118
 MODEL_KEY = "kimi_k3_served_9f62e4e9"
+PUBLIC_FULL_TEXT_BEHAVIORS = 400
 SOURCE_VOLUME = "endpoint-ep-WD4gnzaeXMyM7DfrzTDYjW"
 SNAPSHOT_PATH = (
     "/checkpoint/huggingface/hub/models--moonshotai--Kimi-K3/snapshots/9f62e4e9fffbd0a83ddd60e1c209d828994b3569"
@@ -158,6 +159,6 @@ def write_runtime_configs(upstream: Path, output: Path, checkpoint: Path) -> tup
 
 def expected_full_cases() -> dict[str, int]:
     return {
-        name: spec.cases_per_behavior * (110 if name in VISION_WHITEBOX_METHODS else 320)
+        name: spec.cases_per_behavior * (110 if name in VISION_WHITEBOX_METHODS else PUBLIC_FULL_TEXT_BEHAVIORS)
         for name, spec in WHITEBOX_METHODS.items()
     }

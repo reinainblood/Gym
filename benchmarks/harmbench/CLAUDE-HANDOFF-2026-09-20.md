@@ -59,7 +59,7 @@ Primary code:
 - `benchmarks/harmbench/operations/`: checkpoint and full white-box FDR
   workflows copied into the repository by this handoff.
 
-## Completed and validated: do not blindly rerun
+## Completed held-out test runs: validated, but not the full 400-row corpus
 
 ### Ultra ZeroShot
 
@@ -98,6 +98,12 @@ was untracked. Rerun only for a named different target/checkpoint or a declared
 profile change. ZeroShot and PAP-top5 are attacker-model/fixed-case methods;
 they do not require target gradients.
 
+The receipts above are complete for HarmBench's 320-row held-out text test
+split. They are not complete executions of upstream's default 400-row
+`harmbench_behaviors_text_all.csv` corpus. To satisfy the full-benchmark scope,
+generate, target-complete, score, and reconcile the missing 80 validation rows
+for each method without changing or discarding the 320-row evidence.
+
 There is no method named `PAPSmear`, `PAP-Smear`, or `PAP smear` in the pinned
 HarmBench repository. Resolve that phrase to an exact public source/config
 before spending compute. It may be shorthand for PAP-top5 or a behavior about
@@ -113,7 +119,7 @@ an online smear campaign.
   step reduced loss from 5.5970458984375 to 5.502708911895752.
 - Modal Volume: `harmbench-ultra-whitebox-results`.
 - The directory named `ultra-gcg-full-20260918a` is not full. It contains only
-  four individual behavior artifacts versus 320 required GCG cases.
+  four individual behavior artifacts versus 400 required GCG cases.
 - GCG must be resumed/recovered, then target-completed, canonically scored,
   reconciled, and reported. GCG-Multi, AutoPrompt, GBDA, PEZ, UAT, AutoDAN,
   and FewShot have no completed full Ultra campaign.
@@ -133,8 +139,15 @@ an online smear campaign.
 - Run ID: `qwen35-122b-harmbench-whitebox-20260919`.
 - MultiModalPGD attack generation: 110/110 complete, 110 unique behaviors,
   nonempty target generations, exact indexes 0-109. Combined receipt-set hash
-  over canonical sorted JSON objects:
+  over canonical sorted JSON objects (portable canonical-content algorithm):
   `98c971691d7109ae5bc057a71cb5defd5403a161a39c1278fc5da0fe0ac2db70`.
+- The earlier audit recorded
+  `2c58f30795612defc5ee9514869ceb2bc8bb5194aa4d6487d5214a4cd8d26299`
+  by hashing `shasum` output containing temporary absolute paths. That value is
+  retained as a historical, path-dependent receipt; it is not expected to
+  reproduce on another checkout. The canonical hash above supersedes it for
+  portable verification. Both algorithms and values are committed in
+  `evidence/qwen-whitebox-pgd/receipt-set-hash-migration.json`.
 - MultiModalPGDPatch: 9/110 complete at the reconciliation snapshot.
 - MultiModalPGDBlankImage: 0/110 complete at the audit snapshot.
 - Four Qwen worker tasks were active at the snapshot. Recheck FDR before any
@@ -222,7 +235,7 @@ were committed branch content.
 3. Finish Qwen attack generation, then run the canonical HarmBench classifier
    and copyright scorer, reconcile exact denominators, and build BLADE evidence.
 4. Resume Ultra GCG from compatible individual behavior artifacts. Complete
-   and reconcile all 320 cases before moving through the remaining seven text
+   and reconcile all 400 cases before moving through the remaining seven text
    white-box methods.
 5. Keep Kimi blocked unless a scientifically valid differentiable runtime
    becomes available. Retain the failed attempt outside model-quality
@@ -237,7 +250,7 @@ were committed branch content.
 
 ## Validation commands
 
-Focused adapter tests:
+Complete HarmBench adapter and reporting suite:
 
 ```bash
 uv sync --extra dev
@@ -248,19 +261,7 @@ uv sync --extra dev
 export HARMBENCH_UPSTREAM_DIR=/absolute/path/to/HarmBench
 test "$(git -C "$HARMBENCH_UPSTREAM_DIR" rev-parse HEAD)" = \
   8e1604d1171fe8a48d8febecd22f600e462bdcdd
-.venv/bin/pytest -q \
-  resources_servers/harmbench/tests/test_app.py \
-  resources_servers/harmbench/tests/test_calibrate.py \
-  resources_servers/harmbench/tests/test_copyright.py \
-  resources_servers/harmbench/tests/test_direct_full.py \
-  resources_servers/harmbench/tests/test_prepare_generated.py \
-  resources_servers/harmbench/tests/test_zero_shot.py \
-  resources_servers/harmbench/tests/test_pap.py \
-  resources_servers/harmbench/tests/test_blade_analysis.py \
-  resources_servers/harmbench/tests/test_report_method_run.py \
-  resources_servers/harmbench/tests/test_run_upstream_generation.py \
-  resources_servers/harmbench/tests/test_ultra_whitebox.py \
-  resources_servers/harmbench/tests/test_kimi_k3_whitebox.py
+.venv/bin/pytest -q resources_servers/harmbench/tests
 .venv/bin/ruff check benchmarks/harmbench resources_servers/harmbench
 .venv/bin/ruff format --check benchmarks/harmbench resources_servers/harmbench
 git diff --check

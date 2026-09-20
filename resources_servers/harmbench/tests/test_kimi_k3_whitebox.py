@@ -8,11 +8,18 @@ import yaml
 
 from benchmarks.harmbench.kimi_k3_whitebox import (
     MODEL_KEY,
+    PUBLIC_FULL_TEXT_BEHAVIORS,
     VISION_WHITEBOX_METHODS,
     WHITEBOX_METHODS,
     expected_full_cases,
     validate_upstream,
     write_runtime_configs,
+)
+from benchmarks.harmbench.operations.kimi.kimi_k3_harmbench_text_runner import (
+    PUBLIC_FULL_TEXT_BEHAVIORS as RUNNER_FULL_TEXT_BEHAVIORS,
+)
+from benchmarks.harmbench.operations.kimi.kimi_k3_harmbench_text_runner import (
+    PUBLIC_FULL_TEXT_DATASET,
 )
 from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
@@ -39,7 +46,21 @@ def test_kimi_k3_whitebox_catalog_covers_text_and_vision():
         "MultiModalPGDPatch",
         "MultiModalPGDBlankImage",
     }
-    assert sum(expected_full_cases().values()) == 6_730
+    assert sum(expected_full_cases().values()) == 8_330
+
+
+def test_kimi_k3_text_runner_uses_public_full_corpus():
+    assert PUBLIC_FULL_TEXT_DATASET == "harmbench_behaviors_text_all.csv"
+    assert RUNNER_FULL_TEXT_BEHAVIORS == PUBLIC_FULL_TEXT_BEHAVIORS == 400
+
+
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")
+def test_kimi_k3_full_text_dataset_has_locked_cardinality():
+    import csv
+
+    path = UPSTREAM / "data/behavior_datasets" / PUBLIC_FULL_TEXT_DATASET
+    with path.open(newline="", encoding="utf-8") as stream:
+        assert len(list(csv.DictReader(stream))) == PUBLIC_FULL_TEXT_BEHAVIORS
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")

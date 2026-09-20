@@ -4,8 +4,8 @@
 
 Set HARMBENCH_UPSTREAM_DIR to a checkout of the pinned HarmBench commit and
 HARMBENCH_COPYRIGHT_HASHES_DIR to its data/copyright_classifier_hashes folder.
-The latter is required because this full 320-behavior text test set includes
-80 copyright cases, which use MinHash rather than the Llama classifier.
+The latter is required because the full 400-behavior text corpus includes
+100 copyright cases, which use MinHash rather than the Llama classifier.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from benchmarks.harmbench.prepare_generated import materialize
 OUTPUT = DATA_DIR / "human_jailbreaks_random_subset_5.jsonl"
 TEST_CASES = DATA_DIR / "human_jailbreaks_random_subset_5" / "test_cases.json"
 TEMPLATE_SHA256 = "62e53558de1da3e67d1aec15c0dff59c848c0b374fd262ffad8f723fda0cd099"
-BEHAVIORS_SHA256 = "75d257b3e7428c52eb7b0154318f455af3e01b09a3794b5e2f3d36054f3c0e29"
+BEHAVIORS_SHA256 = "8d81accedd38eaaf8b760618622bb888417d1fd0c86eba65c427a16f1cbb4afc"
 
 
 def _require_upstream(upstream: Path) -> tuple[Path, Path]:
@@ -33,7 +33,7 @@ def _require_upstream(upstream: Path) -> tuple[Path, Path]:
     if head != UPSTREAM_REVISION:
         raise ValueError(f"HarmBench checkout is {head}, expected {UPSTREAM_REVISION}")
     templates = upstream / "baselines/human_jailbreaks/jailbreaks.py"
-    behaviors = upstream / "data/behavior_datasets/harmbench_behaviors_text_test.csv"
+    behaviors = upstream / "data/behavior_datasets/harmbench_behaviors_text_all.csv"
     for path, expected in ((templates, TEMPLATE_SHA256), (behaviors, BEHAVIORS_SHA256)):
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if actual != expected:
@@ -53,8 +53,8 @@ def prepare(upstream_dir: str | None = None) -> Path:
         raise ValueError("set HARMBENCH_COPYRIGHT_HASHES_DIR to the pinned checkout's copyright_classifier_hashes")
     with behaviors_path.open(newline="", encoding="utf-8") as source:
         behaviors = list(csv.DictReader(source))
-    if len(behaviors) != 320:
-        raise ValueError(f"expected 320 text test behaviors, found {len(behaviors)}")
+    if len(behaviors) != 400:
+        raise ValueError(f"expected 400 full-corpus text behaviors, found {len(behaviors)}")
     for row in behaviors:
         if "hash_check" in row["Tags"].split(", ") and not (references / f"{row['BehaviorID']}.pkl").is_file():
             raise FileNotFoundError(f"missing copyright reference for {row['BehaviorID']}")
@@ -85,8 +85,8 @@ def prepare(upstream_dir: str | None = None) -> Path:
         target_type="text_api",
         generation_receipt=receipt,
     )
-    if len(rows) != 1600:
-        raise ValueError(f"expected 1,600 attack cases, found {len(rows)}")
+    if len(rows) != 2000:
+        raise ValueError(f"expected 2,000 attack cases, found {len(rows)}")
     OUTPUT.write_text(
         "".join(json.dumps(row, ensure_ascii=True, sort_keys=True) + "\n" for row in rows), encoding="utf-8"
     )

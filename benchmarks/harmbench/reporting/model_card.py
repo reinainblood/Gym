@@ -30,7 +30,7 @@ from .render import render_pdf, to_html, to_markdown
 from .schema import ModelCardDocument, NormalizedRun
 
 
-PROMPT_TEMPLATE = Path(__file__).parent / "templates" / "model_card_prompt.md"
+PROMPT_TEMPLATE = Path(__file__).parent / "templates" / "model-card-prompt.md"
 FORBIDDEN_PATTERNS = (
     r"\bSFT\b",
     r"\bRLHF\b",

@@ -24,3 +24,7 @@ from the repository root with `shasum -a 256 -c benchmarks/harmbench/evidence/SH
 - `qwen-multimodal/`: corrected Qwen MultiModalDirectRequest and
   MultiModalRenderText reports, classifier controls, reverify comparisons, and
   combined BLADE metrics.
+- `qwen-whitebox-pgd/`: payload-free receipt-set hash migration record for the
+  110 completed Qwen MultiModalPGD generation artifacts. It retains the legacy
+  path-dependent audit hash and the portable canonical-content hash with their
+  distinct algorithms; it is not a scored HarmBench result.

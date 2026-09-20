@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-09-20",
+  "run_id": "qwen35-122b-harmbench-whitebox-20260919",
+  "method": "MultiModalPGD",
+  "artifact_kind": "attack_generation_receipts",
+  "receipt_count": 110,
+  "legacy_hash": {
+    "sha256": "2c58f30795612defc5ee9514869ceb2bc8bb5194aa4d6487d5214a4cd8d26299",
+    "algorithm": "SHA-256 of sorted per-file shasum output containing temporary absolute paths",
+    "portable": false,
+    "status": "historical_audit_receipt"
+  },
+  "canonical_hash": {
+    "sha256": "98c971691d7109ae5bc057a71cb5defd5403a161a39c1278fc5da0fe0ac2db70",
+    "algorithm": "SHA-256 of newline-delimited compact JSON with recursively sorted object keys, ordered by integer index 0 through 109",
+    "portable": true,
+    "status": "current_verification_receipt"
+  },
+  "relationship": "The canonical hash supersedes the legacy hash for portable verification; both bind the same 110 observed receipt objects under different aggregation algorithms.",
+  "result_boundary": "These are attack-generation artifacts, not target-completed or canonically scored HarmBench results."
+}

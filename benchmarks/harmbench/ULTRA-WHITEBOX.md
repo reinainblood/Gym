@@ -35,10 +35,13 @@ into Gym with `benchmarks/harmbench/run_upstream_generation.py` and
 `benchmarks/harmbench/prepare_generated.py`, then evaluated with the ordinary
 HarmBench target and classifier paths.
 
-The public text test set has 320 behaviors. Expected generated rows are 320 for
-GCG, 1,600 for the five GCG-Multi repetitions, 320 for AutoPrompt, 1,600 for
-GBDA, 1,600 for PEZ, 320 for UAT, 320 for AutoDAN, and 320 for FewShot: 6,400
-white-box attack cases before target completion and classification.
+The full public text corpus has 400 behaviors (the 320-row held-out test split
+plus the 80-row validation split). Expected generated rows are 400 for GCG,
+2,000 for the five GCG-Multi repetitions, 400 for AutoPrompt, 2,000 for GBDA,
+2,000 for PEZ, 400 for UAT, 400 for AutoDAN, and 400 for FewShot: 8,000
+white-box attack cases before target completion and classification. The runtime
+uses upstream's default `harmbench_behaviors_text_all.csv`; a 320-row test-only
+campaign must not be labeled the full benchmark.
 
 The Modal execution shape uses one eight-B200 node. Seven devices are available
 to the target checkpoint; FewShot runs its unchanged public Mixtral 8x7B

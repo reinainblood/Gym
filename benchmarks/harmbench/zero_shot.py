@@ -14,6 +14,8 @@ from typing import Any
 
 ATTACKER_MODEL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
 ATTACKER_REVISION = "eba92302a2861cdc0098cc54bc9f17cb2c47eb61"
+FULL_TEXT_BEHAVIORS = 400
+FULL_TEXT_BEHAVIORS_SHA256 = "8d81accedd38eaaf8b760618622bb888417d1fd0c86eba65c427a16f1cbb4afc"
 EXPERIMENT = "mixtral_attacker_llm"
 CASES_PER_BEHAVIOR = 5
 SAMPLING = {

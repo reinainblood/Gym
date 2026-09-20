@@ -9,10 +9,10 @@ method keys in the paper's pipeline.
 
 | Requested method | Generator / client requirement | Verified state in this branch |
 |---|---|---|
-| DirectRequest | Single-turn text request | **Validated full Ultra 3 text run:** pinned upstream `default` experiment over all 320 behaviors (159 standard, 81 contextual, 80 copyright), 320/320 healthy rollouts, 27 successful cases, 8.4375% behavior-averaged ASR, 240/240 raw-classifier and 80/80 copyright scorer agreement. The default 240-row benchmark remains unchanged; the legacy Kimi K3 lane is separate. |
-| HumanJailbreaks | Pinned human templates, random subset 5 | **Validated full Ultra 3 text run:** 1,600/1,600 healthy rollouts across all 320 text-test behaviors; 73 successful cases (4.5625% behavior-averaged ASR), 315 truncated and 355 classifier-clipped. The saved Ultra responses were reverified with the pinned fast tokenizer; generation, classifier, and copyright controls passed in full. |
-| ZeroShot | Upstream Mixtral attacker model | **Validated with explicit classifier-batching caveat:** FDR Mixtral/Triton generated all 1,600 attacks across 320 text behaviors; upstream generation replay matched 320/320. Ultra scored 1,600/1,600 healthy cases with 9.625% behavior-averaged ASR and 154 successful cases. Copyright parity passed 400/400. Raw classifier replay matched 1,199/1,200; the sole mismatch had identical prompt token IDs and clipping and was proven to flip with vLLM batch concurrency (serial Yes, 2-/4-/8-way No in both raw and chat paths). No score was overridden; reverify preserved all target responses and labels. |
-| PAP-top5 | Upstream Mixtral attack model, pinned five-technique taxonomy | **Validated full Ultra 3 text run:** the corrected FDR attacker retained all 1,600 raw generations, and the pinned upstream PAP method body reproduced 1,600/1,600 cases. After a one-label stateless reverify, the saved target responses yielded 1,600/1,600 healthy rollouts, 90 successful cases and 5.625% behavior-averaged ASR. Raw classifier and copyright controls matched 1,200/1,200 and 400/400 respectively. The 512-token target cap was reached on 1,262 cases. |
+| DirectRequest | Single-turn text request | **Validated held-out-test Ultra 3 run:** pinned upstream `default` experiment over all 320 test behaviors (159 standard, 81 contextual, 80 copyright), 320/320 healthy rollouts, 27 successful cases, 8.4375% behavior-averaged ASR, 240/240 raw-classifier and 80/80 copyright scorer agreement. The opt-in full generator now targets upstream's default 400-row corpus; the existing score does not include the 80 validation rows. |
+| HumanJailbreaks | Pinned human templates, random subset 5 | **Validated held-out-test Ultra 3 run:** 1,600/1,600 healthy rollouts across all 320 text-test behaviors; 73 successful cases (4.5625% behavior-averaged ASR), 315 truncated and 355 classifier-clipped. The full generator now targets 400 behaviors / 2,000 cases; the existing score remains a 320-row test result. |
+| ZeroShot | Upstream Mixtral attacker model | **Validated held-out-test result with explicit classifier-batching caveat:** FDR Mixtral/Triton generated all 1,600 attacks across 320 text behaviors; upstream generation replay matched 320/320. Ultra scored 1,600/1,600 healthy cases with 9.625% behavior-averaged ASR and 154 successful cases. Copyright parity passed 400/400. Raw classifier replay matched 1,199/1,200; the sole mismatch had identical prompt token IDs and clipping and was proven to flip with vLLM batch concurrency (serial Yes, 2-/4-/8-way No in both raw and chat paths). No score was overridden; reverify preserved all target responses and labels. The missing 80 validation behaviors still require generation and scoring for a full-corpus result. |
+| PAP-top5 | Upstream Mixtral attack model, pinned five-technique taxonomy | **Validated held-out-test Ultra 3 run:** the corrected FDR attacker retained all 1,600 raw generations, and the pinned upstream PAP method body reproduced 1,600/1,600 cases. After a one-label stateless reverify, the saved target responses yielded 1,600/1,600 healthy rollouts, 90 successful cases and 5.625% behavior-averaged ASR. Raw classifier and copyright controls matched 1,200/1,200 and 400/400 respectively. The 512-token target cap was reached on 1,262 cases. The generator now requires the full 400-row source; the missing 80 validation behaviors remain unrun. |
 | TAP-Transfer | Fixed upstream transfer experiment | Bridge and source-experiment receipt only; no generator run or model rollout. |
 | MultiModalDirectRequest | Image-bearing target | **Validated full run:** 110/110 healthy Super 3.5 VL Gym rollouts, zero sidecar failures, 54 classifier successes (49.1% ASR), 3 truncated/clipped. All 110 images are pixel-identical to upstream Torchvision, and raw-vs-Gym classifier labels, prompt tokens/hashes, and clip text/count agree 110/110. |
 | MultiModalRenderText | Image-bearing target | **Validated full Super VL run:** 110/110 healthy rollouts, zero failures, 11 classifier successes (10.0% ASR), one truncated/clipped. Upstream render functions reproduce 110/110 image pixels and instructions when bound to the declared DejaVu Sans font; classifier controls match 110/110. The fixed font replaces upstream's host-dependent first-system-font lookup. |
@@ -35,7 +35,7 @@ method keys in the paper's pipeline.
 
 ## Current reproducible paths
 
-- `gym eval prepare --benchmark harmbench` remains DirectRequest-only. Opt in to the 1,600-case HumanJailbreaks
+- `gym eval prepare --benchmark harmbench` remains the legacy 240-row held-out-test DirectRequest-only lane. Opt in to the 2,000-case full-corpus HumanJailbreaks
   set with `gym eval prepare --benchmark harmbench_human_jailbreaks`. HumanJailbreaks requires
   `HARMBENCH_UPSTREAM_DIR` at the pinned commit and `HARMBENCH_COPYRIGHT_HASHES_DIR` pointing to that checkout's
   `data/copyright_classifier_hashes`; preparation fails if either source drifts or a copyright reference is missing.
@@ -46,7 +46,7 @@ method keys in the paper's pipeline.
   one 1/255 signed step. Run `super-vl-grad-canary-20260918d` passed; its receipt SHA-256 is
   `94369571a70ed7675d39d6aae0dfa17351fa96d1e71a14d51ecd77a5ddaf2892`. The peak allocated memory was
   61,888,249,856 bytes per rank. This proves the runtime prerequisite; it is not a completed PGD benchmark run.
-- `generate_direct_full.py` executes the SHA-pinned upstream DirectRequest method over all 320 text-test behaviors,
+- `generate_direct_full.py` executes the SHA-pinned upstream DirectRequest method over all 400 public text behaviors,
   checks its output against the independent context-prefix formula, and emits attack cases, a source receipt, and
   a payload-free generation control. Import its `test_cases.json` through `prepare_generated.py` with
   `--method DirectRequest --experiment default` (the pinned upstream experiment); do not silently replace the
@@ -58,7 +58,8 @@ method keys in the paper's pipeline.
   `harmbench_generated` is the Gym benchmark overlay for a verified generated JSONL.
 - `modal_zero_shot.py` and `modal_pap.py` generate the two pinned Mixtral methods in ephemeral **FDR** apps using
   one H200, eager vLLM, and the Triton MoE backend (the auto-selected FlashInfer CUTLASS path stalled in bounded
-  canaries). Set `HARMBENCH_SOURCE_CSV` to the pinned text-test CSV; PAP additionally requires
+  canaries). Set `HARMBENCH_SOURCE_CSV` to the pinned 400-row `harmbench_behaviors_text_all.csv`; both launchers
+  reject any other source hash or cardinality. PAP additionally requires
   `HARMBENCH_PAP_TEMPLATES` at the pinned `baselines/pap/templates.py`. Each run writes a source-hash-bound
   `generation-receipt.json` and `test_cases.json` to its dedicated FDR Volume. PAP also stores private
   `raw_attacker_generations.json` because its quote/whitespace post-processing cannot be reversed reliably from
@@ -82,7 +83,7 @@ method keys in the paper's pipeline.
 - `render_nvidia_method_report.py` produces one payload-free report per validated run. The campaign-level
   `render_nvidia_campaign_report.py` requires the exact four Ultra text manifests and two Super VL vision
   manifests, verifies all 5,340 rollouts are healthy, rejects any missing or mismatched target model, and renders
-  a two-page coverage map. It never pools ASR across different methods or modalities and explicitly lists the
+  a two-page held-out-test coverage map. It never pools ASR across different methods or modalities and explicitly lists the
   sixteen methods still awaiting full execution.
 - `prepare_multimodal_source.py` found and recorded seven CSV filename-extension errors in the pinned 110-row
   multimodal set (`.jpeg`/`.jpg` in the CSV versus existing `.png` assets). It rewrites only those filenames into
@@ -91,10 +92,10 @@ method keys in the paper's pipeline.
   instead of misusing the harmfulness classifier. It loads reference pickles only from the verified pinned checkout.
   The old reference hashes are explicitly evaluated with their legacy permutation scheme under pinned
   `datasketch==2.0.0`; the verifier pins spaCy and its English model as well. A real benign-reference check and a
-  synthetic positive/negative check pass. The full Ultra 3 HumanJailbreaks run also passed 400/400 case-level
+  synthetic positive/negative check pass. The 320-row held-out-test Ultra 3 HumanJailbreaks run also passed 400/400 case-level
   parity against the original HarmBench scorer.
 - `harmbench_canary` is a separate two-row book/lyrics overlay so a verifier smoke cannot accidentally launch the
-  1,600-row HumanJailbreaks set. The September 17 Kimi K3 smoke produced 2/2 healthy Gym rollouts with
+  2,000-row full-corpus HumanJailbreaks set. The September 17 Kimi K3 smoke produced 2/2 healthy Gym rollouts with
   `scoring_method=copyright_minhash`, no classifier calls, and zero sidecar failures. This is transport/scorer
   evidence, **not** a full ASR estimate.
 - `harmbench_multimodal_direct` is a separate 110-row vision overlay. Its September 17 Super 3.5 VL full run

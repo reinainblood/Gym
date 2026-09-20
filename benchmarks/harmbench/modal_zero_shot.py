@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Ephemeral FDR Mixtral generator for HarmBench ZeroShot test cases.
+"""Ephemeral FDR Mixtral generator for HarmBench ZeroShot cases.
 
-Set HARMBENCH_SOURCE_CSV to the pinned text-test CSV before `modal run
+Set HARMBENCH_SOURCE_CSV to the pinned 400-row full text CSV before `modal run
 --env=FDR`. This app is not deployed or kept warm; a single generation call
 uses 1×H200, commits its output to a dedicated FDR Volume, then exits. No
 attack prompts, model generations, or credentials are printed to Modal logs.
@@ -67,6 +67,8 @@ def generate(run_id: str, behavior_id: str = "") -> dict:
         ATTACKER_REVISION,
         CASES_PER_BEHAVIOR,
         EXPERIMENT,
+        FULL_TEXT_BEHAVIORS,
+        FULL_TEXT_BEHAVIORS_SHA256,
         SAMPLING,
         cases,
         mixtral_chat_template,
@@ -79,11 +81,16 @@ def generate(run_id: str, behavior_id: str = "") -> dict:
     output_path = output_dir / "test_cases.json"
     if output_path.exists():
         raise FileExistsError("ZeroShot output already exists; choose a new run ID")
-    with Path("/app/behaviors.csv").open(newline="", encoding="utf-8") as handle:
+    behavior_source = Path("/app/behaviors.csv")
+    if hashlib.sha256(behavior_source.read_bytes()).hexdigest() != FULL_TEXT_BEHAVIORS_SHA256:
+        raise ValueError("behavior source is not the pinned public full text corpus")
+    with behavior_source.open(newline="", encoding="utf-8") as handle:
         all_behaviors = list(csv.DictReader(handle))
+    if len(all_behaviors) != FULL_TEXT_BEHAVIORS:
+        raise ValueError(f"expected {FULL_TEXT_BEHAVIORS} full-corpus behaviors, found {len(all_behaviors)}")
     selected = [row for row in all_behaviors if row["BehaviorID"] == behavior_id] if behavior_id else all_behaviors
     if not selected or (behavior_id and len(selected) != 1):
-        raise ValueError("requested behavior is absent from the pinned text-test CSV")
+        raise ValueError("requested behavior is absent from the pinned full text corpus")
     tokenizer = AutoTokenizer.from_pretrained(ATTACKER_MODEL, revision=ATTACKER_REVISION)
     chat_template = mixtral_chat_template(tokenizer)
     prompts = queries(selected, chat_template)
@@ -120,7 +127,7 @@ def generate(run_id: str, behavior_id: str = "") -> dict:
         "moe_backend": "triton",
         "sampling": SAMPLING,
         "chat_template_sha256": hashlib.sha256(chat_template.encode()).hexdigest(),
-        "behaviors_sha256": hashlib.sha256(Path("/app/behaviors.csv").read_bytes()).hexdigest(),
+        "behaviors_sha256": FULL_TEXT_BEHAVIORS_SHA256,
         "test_cases_sha256": hashlib.sha256(output_path.read_bytes()).hexdigest(),
         "behaviors": len(selected),
         "cases": len(selected) * CASES_PER_BEHAVIOR,

@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Generate the full 320-behavior DirectRequest set from pinned upstream code.
+"""Generate the full 400-behavior DirectRequest set from pinned upstream code.
 
 The existing `harmbench` benchmark stays at its original 240 non-copyright
-rows. This opt-in generated-method path includes all 80 copyright behaviors
-and relies on the separately validated MinHash scorer.
+held-out-test rows. This opt-in generated-method path uses upstream's default
+full text corpus, including the 80-row validation split and all 100 copyright
+behaviors, and relies on the separately validated MinHash scorer.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from benchmarks.harmbench.prepare import UPSTREAM_REVISION
 
 
 SOURCE_SHA256 = "277b6edea5b6aa77b962183dba8a4cace150d85448983e3496222f864d70995d"
-EXPECTED_COUNTS = {"standard": 159, "contextual": 81, "copyright": 80}
+EXPECTED_COUNTS = {"standard": 200, "contextual": 100, "copyright": 100}
 EXPERIMENT = "default"
 
 
@@ -60,7 +61,7 @@ def generate(*, upstream: Path, run_id: str, output_dir: Path) -> dict[str, Any]
     if head != UPSTREAM_REVISION:
         raise ValueError("HarmBench checkout is not at the pinned revision")
     source_relative = "baselines/direct_request/direct_request.py"
-    behavior_relative = "data/behavior_datasets/harmbench_behaviors_text_test.csv"
+    behavior_relative = "data/behavior_datasets/harmbench_behaviors_text_all.csv"
     subprocess.run(
         ["git", "-C", str(upstream), "diff", "--quiet", "HEAD", "--", source_relative, behavior_relative],
         check=True,
@@ -71,7 +72,7 @@ def generate(*, upstream: Path, run_id: str, output_dir: Path) -> dict[str, Any]
         behaviors = list(csv.DictReader(source))
     counts = Counter(row["FunctionalCategory"] for row in behaviors)
     if counts != EXPECTED_COUNTS or len({row["BehaviorID"] for row in behaviors}) != len(behaviors):
-        raise ValueError("DirectRequest behavior cohort or IDs differ from the pinned 320-row protocol")
+        raise ValueError("DirectRequest behavior cohort or IDs differ from the pinned 400-row full corpus")
     cases = upstream_cases(source_path, behaviors)
     mismatches = [
         row["BehaviorID"]

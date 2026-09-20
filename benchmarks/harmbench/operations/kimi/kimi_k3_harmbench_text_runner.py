@@ -21,6 +21,8 @@ import yaml
 UPSTREAM_REVISION = "8e1604d1171fe8a48d8febecd22f600e462bdcdd"
 MODEL_ID = "moonshotai/Kimi-K3"
 MODEL_REVISION = "9f62e4e9fffbd0a83ddd60e1c209d828994b3569"
+PUBLIC_FULL_TEXT_DATASET = "harmbench_behaviors_text_all.csv"
+PUBLIC_FULL_TEXT_BEHAVIORS = 400
 METHODS = {
     "GCG": (
         "GCG",
@@ -211,9 +213,13 @@ def run(
     method_class = get_method_class(class_name)
     output_dir = output_root / method_name / (run_id or "default")
     output_dir.mkdir(parents=True, exist_ok=True)
-    behaviors_path = upstream / "data/behavior_datasets/harmbench_behaviors_text_all.csv"
+    behaviors_path = upstream / "data/behavior_datasets" / PUBLIC_FULL_TEXT_DATASET
     with behaviors_path.open(newline="", encoding="utf-8") as stream:
         behaviors = list(csv.DictReader(stream))
+    if len(behaviors) != PUBLIC_FULL_TEXT_BEHAVIORS:
+        raise ValueError(
+            f"expected {PUBLIC_FULL_TEXT_BEHAVIORS} public full-corpus text behaviors, found {len(behaviors)}"
+        )
     started = time.time()
     method = init_method(method_class, method_config)
 

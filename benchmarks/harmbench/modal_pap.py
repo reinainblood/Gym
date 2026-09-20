@@ -65,7 +65,13 @@ def generate(run_id: str, behavior_id: str = "") -> dict:
 
     sys.path.insert(0, "/app")
     from pap import CASES_PER_BEHAVIOR, EXPERIMENT, SAMPLING, TEMPLATE_SHA256, cases, load_templates, queries
-    from zero_shot import ATTACKER_MODEL, ATTACKER_REVISION, mixtral_chat_template
+    from zero_shot import (
+        ATTACKER_MODEL,
+        ATTACKER_REVISION,
+        FULL_TEXT_BEHAVIORS,
+        FULL_TEXT_BEHAVIORS_SHA256,
+        mixtral_chat_template,
+    )
 
     if not re.fullmatch(r"[a-z0-9-]+", run_id):
         raise ValueError("run_id must be lowercase letters, digits, or hyphens")
@@ -74,11 +80,15 @@ def generate(run_id: str, behavior_id: str = "") -> dict:
     if output_path.exists():
         raise FileExistsError("PAP output already exists; choose a new run ID")
     source_path = Path("/app/behaviors.csv")
+    if hashlib.sha256(source_path.read_bytes()).hexdigest() != FULL_TEXT_BEHAVIORS_SHA256:
+        raise ValueError("behavior source is not the pinned public full text corpus")
     with source_path.open(newline="", encoding="utf-8") as handle:
         all_behaviors = list(csv.DictReader(handle))
+    if len(all_behaviors) != FULL_TEXT_BEHAVIORS:
+        raise ValueError(f"expected {FULL_TEXT_BEHAVIORS} full-corpus behaviors, found {len(all_behaviors)}")
     selected = [row for row in all_behaviors if row["BehaviorID"] == behavior_id] if behavior_id else all_behaviors
     if not selected or (behavior_id and len(selected) != 1):
-        raise ValueError("requested behavior is absent from the pinned text-test CSV")
+        raise ValueError("requested behavior is absent from the pinned full text corpus")
     templates = load_templates(Path("/app/templates.py"))
     tokenizer = AutoTokenizer.from_pretrained(ATTACKER_MODEL, revision=ATTACKER_REVISION)
     chat_template = mixtral_chat_template(tokenizer)
@@ -119,7 +129,7 @@ def generate(run_id: str, behavior_id: str = "") -> dict:
         "sampling": SAMPLING,
         "chat_template_sha256": hashlib.sha256(chat_template.encode()).hexdigest(),
         "templates_sha256": TEMPLATE_SHA256,
-        "behaviors_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
+        "behaviors_sha256": FULL_TEXT_BEHAVIORS_SHA256,
         "test_cases_sha256": hashlib.sha256(output_path.read_bytes()).hexdigest(),
         "raw_attacker_generations_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
         "behaviors": len(selected),

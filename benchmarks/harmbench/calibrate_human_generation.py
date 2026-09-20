@@ -30,11 +30,11 @@ def calibrate(*, upstream: Path, generated: Path, output: Path) -> dict:
         raise ValueError(f"HarmBench checkout is {head}, expected {UPSTREAM_REVISION}")
     source = upstream / "baselines/human_jailbreaks/human_jailbreaks.py"
     templates_path = upstream / "baselines/human_jailbreaks/jailbreaks.py"
-    behaviors_path = upstream / "data/behavior_datasets/harmbench_behaviors_text_test.csv"
+    behaviors_path = upstream / "data/behavior_datasets/harmbench_behaviors_text_all.csv"
     if hashlib.sha256(templates_path.read_bytes()).hexdigest() != TEMPLATE_SHA256:
         raise ValueError("upstream human jailbreak templates changed")
     if hashlib.sha256(behaviors_path.read_bytes()).hexdigest() != BEHAVIORS_SHA256:
-        raise ValueError("upstream text test behaviors changed")
+        raise ValueError("upstream full text corpus changed")
     tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
     upstream_class = next(
         node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "HumanJailbreaks"
