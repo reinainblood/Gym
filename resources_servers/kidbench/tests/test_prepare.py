@@ -212,3 +212,56 @@ def test_shipped_config_matches_the_upstream_actor_settings() -> None:
     assert agent["num_turns"] == MULTI_TURN_NUM_TURNS
     assert agent["actor_responses_create_params"]["temperature"] == MULTI_TURN_ACTOR_TEMPERATURE
     assert agent["actor_responses_create_params"]["max_output_tokens"] == MULTI_TURN_ACTOR_MAX_OUTPUT_TOKENS
+
+
+def test_actor_checkpoints_are_pinned_and_described() -> None:
+    """The actor decides how hard the model under test is pushed, so it must be pinned.
+
+    A floating tag would let the weights change under a rerun and silently make two runs
+    incomparable, and an actor swapped in without its fidelity cost recorded is how a
+    benchmark quietly starts flattering everything it measures.
+    """
+    from benchmarks.kidbench.upstream_spec import (
+        ACTOR_ABLITERATED,
+        ACTOR_CHECKPOINTS,
+        ACTOR_STOCK_OPENROUTER,
+        DEFAULT_ACTOR,
+    )
+
+    # The self-hosted actor is pinned to a full commit hash, not a branch.
+    assert len(ACTOR_ABLITERATED.revision or "") == 40
+    assert ACTOR_ABLITERATED.model_id == "wangzhang/gemma-4-31B-it-abliterated"
+
+    # The hosted fallback is deliberately unpinned — a provider serves what it serves.
+    assert ACTOR_STOCK_OPENROUTER.revision is None
+
+    # Both must state what using them costs, and both must be reachable by key.
+    for checkpoint in ACTOR_CHECKPOINTS.values():
+        assert checkpoint.fidelity and checkpoint.notes
+        assert ACTOR_CHECKPOINTS[checkpoint.key] is checkpoint
+
+    assert DEFAULT_ACTOR is ACTOR_ABLITERATED
+
+
+def test_shipped_actor_config_matches_the_pinned_default() -> None:
+    """The YAML is what runs, so it is what must agree with the pinned checkpoint."""
+    import yaml
+
+    from benchmarks.kidbench.prepare import REPO_ROOT
+    from benchmarks.kidbench.upstream_spec import DEFAULT_ACTOR
+
+    example = yaml.safe_load(
+        (REPO_ROOT / "benchmarks" / "kidbench" / "configs" / "env.yaml.example").read_text(encoding="utf-8")
+    )
+    actor = example["kidbench_actor_model"]["responses_api_models"]["inference_provider"]
+    assert actor["model"] == DEFAULT_ACTOR.model_id
+
+
+def test_deploy_script_pins_the_same_revision_as_the_spec() -> None:
+    """Two places name the checkpoint; they must not drift apart."""
+    from benchmarks.kidbench.prepare import REPO_ROOT
+    from benchmarks.kidbench.upstream_spec import ACTOR_ABLITERATED
+
+    source = (REPO_ROOT / "benchmarks" / "kidbench" / "deploy" / "modal_actor.py").read_text(encoding="utf-8")
+    assert f'MODEL_ID = "{ACTOR_ABLITERATED.model_id}"' in source
+    assert f'MODEL_REVISION = "{ACTOR_ABLITERATED.revision}"' in source

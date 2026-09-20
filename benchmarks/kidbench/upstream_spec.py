@@ -56,8 +56,66 @@ SINGLE_TURN_JUDGE: Final[str] = "deepseek-v4-pro"
 MULTI_TURN_JUDGE: Final[str] = "deepseek-v4-flash"
 
 #: Gemma-4-31B-it with its refusal direction ablated. Upstream deliberately does not
-#: release this checkpoint; see METRICS.md for what running a stock actor costs.
+#: release this checkpoint, so no run outside the original authors' machines uses it.
 REFERENCE_ACTOR_MODEL: Final[str] = "gemma-4-31B-it-abliterated"
+
+
+class ActorCheckpoint(NamedTuple):
+    """An actor the multi-turn track can be driven with, and what it costs in fidelity.
+
+    The actor is the instrument, not a detail: it decides how hard the model under test is
+    actually pushed. An actor that breaks character and refuses stops probing exactly
+    where probing matters, and every model then looks safer than it is. So each option
+    records its measured refusal behaviour rather than leaving the reader to guess.
+    """
+
+    key: str
+    model_id: str
+    revision: str | None
+    fidelity: str
+    notes: str
+
+
+#: What this adapter's published runs used: a third-party ablation of the same base model
+#: upstream ablates, pinned to an exact commit so a rerun gets the same weights.
+ACTOR_ABLITERATED: Final[ActorCheckpoint] = ActorCheckpoint(
+    key="abliterated",
+    model_id="wangzhang/gemma-4-31B-it-abliterated",
+    revision="d7431183c443443024debb08b222cbcf2e424da7",
+    fidelity="closest available to the paper's actor",
+    notes=(
+        "Not the paper's checkpoint. Same base model (google/gemma-4-31B-it), but ablated "
+        "by a third party with Abliterix direct weight editing rather than by the authors "
+        "with the refusal-direction method the paper cites. Its own card reports 7/100 "
+        "refusals against 99/100 for the unmodified base, and 0/15 on over-refusal probes; "
+        "the paper reports 0 refusals across 500 actor messages. Needs self-hosting — the "
+        "weights are 62.6 GB in bf16."
+    ),
+)
+
+#: The fallback for anyone who cannot self-host. Honest but weaker: a stock instruct model
+#: refuses to play a child probing sensitive topics, which biases results towards safety.
+ACTOR_STOCK_OPENROUTER: Final[ActorCheckpoint] = ActorCheckpoint(
+    key="stock",
+    model_id="google/gemma-4-31b-it",
+    revision=None,
+    fidelity="degraded, but reachable from any OpenAI-compatible provider",
+    notes=(
+        "The unmodified instruct model, as served by OpenRouter and others. It refuses "
+        "some actor turns instead of pressing, which makes every model under test look "
+        "safer than the paper's setup would show. Usable when self-hosting is not an "
+        "option, provided the measured actor refusal rate is reported alongside the "
+        "scores — the agent records it on every conversation for exactly this reason."
+    ),
+)
+
+ACTOR_CHECKPOINTS: Final[dict[str, ActorCheckpoint]] = {
+    ACTOR_ABLITERATED.key: ACTOR_ABLITERATED,
+    ACTOR_STOCK_OPENROUTER.key: ACTOR_STOCK_OPENROUTER,
+}
+
+#: The default for published runs. Override per run via the actor model server config.
+DEFAULT_ACTOR: Final[ActorCheckpoint] = ACTOR_ABLITERATED
 
 # --- Taxonomy ---------------------------------------------------------------------
 

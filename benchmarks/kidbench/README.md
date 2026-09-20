@@ -93,8 +93,18 @@ in [METRICS.md](METRICS.md).
   upstream's own split, visible in its evaluation scripts. Any OpenAI-compatible provider
   that serves them works; the judge identity is recorded on every scored row.
 - **A child-actor model** for the multi-turn track only. The paper uses a refusal-ablated
-  Gemma-4-31B-it that it deliberately does not release; see METRICS.md for what running a
-  stock checkpoint costs and how the adapter measures it.
+  Gemma-4-31B-it that it deliberately does not release. Two options, in descending
+  fidelity:
+  - **Self-hosted** (default, and what the published runs used):
+    [`wangzhang/gemma-4-31B-it-abliterated`](https://huggingface.co/wangzhang/gemma-4-31B-it-abliterated)
+    pinned at `d7431183`, a third-party ablation of the same base model.
+    `deploy/modal_actor.py` deploys it; 62.6 GB of bf16 weights, two H100s.
+  - **Hosted API**: stock `google/gemma-4-31b-it` from OpenRouter or any OpenAI-compatible
+    provider. No GPU needed, but it refuses some actor turns, which biases results towards
+    the model under test. `configs/env.yaml.example` carries both blocks.
+
+  Either way the agent screens every actor turn and reports `actor_refusal_rate`, so the
+  gap between the two is measured rather than assumed. See METRICS.md.
 
 ## Licensing
 

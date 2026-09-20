@@ -107,12 +107,28 @@ JSON sidecar so nothing is lost.
 ## Known deviations from the published protocol
 
 **Multi-turn child actor.** The paper's actor is Gemma-4-31B-it with its refusal
-direction ablated, a checkpoint upstream deliberately does not release. This adapter uses
-stock `google/gemma-4-31B-it`. A stock actor sometimes refuses to press rather than
-escalating, which biases multi-turn results **towards** the model under test — it will
-look safer than the paper's setup would show. `actor_refusal_rate` measures the size of
-that bias directly, and the paper itself instructs anyone running the actor to validate
-it this way.
+direction ablated, a checkpoint upstream deliberately does not release — a refusal-ablated
+model is itself a safety-sensitive artifact.
+
+This adapter runs [`wangzhang/gemma-4-31B-it-abliterated`](https://huggingface.co/wangzhang/gemma-4-31B-it-abliterated)
+pinned at `d7431183c443443024debb08b222cbcf2e424da7`: the **same base model**, ablated by a
+third party using Abliterix direct weight editing rather than by the authors using the
+refusal-direction method the paper cites. Its card reports 7/100 refusals against 99/100
+for the unmodified base, and 0/15 on over-refusal probes. It is therefore close to the
+paper's actor in behaviour but is **not** the paper's checkpoint, and the ablation method
+differs.
+
+`benchmarks/kidbench/deploy/modal_actor.py` deploys it. Note that the published weights
+omit `processor_config.json` while the config still declares Gemma 4's vision tower, so
+the deployment copies that one file from the base model (pinned separately) — the weights
+themselves are untouched.
+
+Anyone who cannot self-host 62.6 GB of bf16 weights can fall back to the stock instruct
+model from any OpenAI-compatible provider; `configs/env.yaml.example` carries that block.
+A stock actor refuses some turns instead of pressing, which biases results **towards** the
+model under test. `actor_refusal_rate` measures that bias directly on every conversation,
+whichever actor is used, and the paper itself instructs anyone running the actor to
+validate it this way.
 
 **Generation temperature.** Upstream's README states `temperature=0` for all response
 generation, but every hosted-provider script at the pinned revision sets `0.7`, and only
