@@ -28,8 +28,16 @@ cd "$ROOT_DIR"
 
 RESULTS_DIR="${RESULTS_DIR:-results/agentdyn-defense-matrix}"
 LOG_DIR="${LOG_DIR:-${RESULTS_DIR}/logs}"
+SHARD_DIR="${SHARD_DIR:-${RESULTS_DIR}/shards}"
 DEFENSES="${DEFENSES:-prompt_guard_2_detector camel progent piguard_detector drift}"
-mkdir -p "$RESULTS_DIR" "$LOG_DIR"
+INPUT="${INPUT:-benchmarks/agentdyn/data/agentdyn_v1_2_2.jsonl}"
+# SHARDS splits one cell's 620 selectors across that many processes. A cell's score is a
+# pure function of its row set -- masked rows leave the denominator, then utility and attack
+# success are averaged over the benign and attacked subsets -- so splitting the rows and
+# recombining them scores identically to one process doing all 620. Worth it for DRIFT,
+# which at ~50 policy calls per rollout projects past forty hours as a single process.
+SHARDS="${SHARDS:-1}"
+mkdir -p "$RESULTS_DIR" "$LOG_DIR" "$SHARD_DIR"
 
 # Model index fixes the port neighbourhood; see run_defense_matrix.sh for the block registry.
 MODEL_KEYS=(ultra kimi qwen supervl)
@@ -66,12 +74,53 @@ for key in "${WANTED[@]}"; do
             continue
         fi
 
-        echo "launch ${key}/${defense}  head=${head_port} ports=${port_low}-${port_high}  -> ${log}"
-        HEAD_PORT="$head_port" PORT_LOW="$port_low" PORT_HIGH="$port_high" \
-        ENV_YAML="${RESULTS_DIR}/env.${head_port}.yaml" \
-        DEFENSES="$defense" \
-        nohup bash benchmarks/agentdyn/run_defense_matrix.sh "$key" > "$log" 2>&1 &
-        sleep 2
+        if [ "$SHARDS" -le 1 ]; then
+            echo "launch ${key}/${defense}  head=${head_port} ports=${port_low}-${port_high}  -> ${log}"
+            HEAD_PORT="$head_port" PORT_LOW="$port_low" PORT_HIGH="$port_high" \
+            ENV_YAML="${RESULTS_DIR}/env.${head_port}.yaml" \
+            DEFENSES="$defense" \
+            nohup bash benchmarks/agentdyn/run_defense_matrix.sh "$key" > "$log" 2>&1 &
+            sleep 2
+            continue
+        fi
+
+        cell_index=$(( model_index * 5 + defense_index ))
+        for shard in $(seq 0 $(( SHARDS - 1 ))); do
+            shard_input="${SHARD_DIR}/$(basename "${INPUT%.jsonl}").shard${shard}of${SHARDS}.jsonl"
+            # Contiguous split, written once and reused, so a relaunch resumes the same rows.
+            if [ ! -s "$shard_input" ]; then
+                .venv/bin/python - "$INPUT" "$shard_input" "$shard" "$SHARDS" <<'SPLIT'
+import sys
+from pathlib import Path
+
+source, target, index, count = Path(sys.argv[1]), Path(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+rows = source.read_text(encoding="utf-8").splitlines(keepends=True)
+size, remainder = divmod(len(rows), count)
+start = index * size + min(index, remainder)
+stop = start + size + (1 if index < remainder else 0)
+target.write_text("".join(rows[start:stop]), encoding="utf-8")
+print(f"{target} rows={stop - start}")
+SPLIT
+            fi
+            shard_rows=$(wc -l < "$shard_input" | tr -d ' ')
+            shard_head=$(( 11900 + cell_index * 4 + shard ))
+            shard_low=$(( 50001 + cell_index * 200 + shard * 50 ))
+            shard_log="${LOG_DIR}/${key}.${defense}.shard${shard}.cell.log"
+
+            if [ -f "${RESULTS_DIR}/.runner.${shard_head}.lock" ] \
+               && kill -0 "$(cat "${RESULTS_DIR}/.runner.${shard_head}.lock" 2>/dev/null)" 2>/dev/null; then
+                echo "skip ${key}/${defense} shard ${shard}: already running on head port ${shard_head}"
+                continue
+            fi
+
+            echo "launch ${key}/${defense} shard ${shard}/${SHARDS} (${shard_rows} rows)  head=${shard_head}"
+            HEAD_PORT="$shard_head" PORT_LOW="$shard_low" PORT_HIGH="$(( shard_low + 49 ))" \
+            ENV_YAML="${RESULTS_DIR}/env.${shard_head}.yaml" \
+            DEFENSES="$defense" INPUT="$shard_input" OUT_SUFFIX="shard${shard}of${SHARDS}" \
+            EXPECTED="$shard_rows" \
+            nohup bash benchmarks/agentdyn/run_defense_matrix.sh "$key" > "$shard_log" 2>&1 &
+            sleep 2
+        done
     done
 done
 
