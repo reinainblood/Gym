@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from pathlib import Path
 
 import pytest
 
 from benchmarks.harmbench.generate_direct_full import upstream_cases
+from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
-UPSTREAM = Path(__file__).resolve().parents[5] / "reference/HarmBench"
+UPSTREAM = harmbench_upstream()
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")

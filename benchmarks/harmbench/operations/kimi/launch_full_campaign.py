@@ -24,7 +24,7 @@ TEXT_CALLS = [
     ("GCG-Multi", "3"),
     ("GCG-Multi", "4"),
 ]
-VISION_CALLS = ["MultiModalPGD", "MultiModalPGDPatch"]
+VISION_CALLS = ["MultiModalPGD", "MultiModalPGDPatch", "MultiModalPGDBlankImage"]
 
 
 def main() -> None:

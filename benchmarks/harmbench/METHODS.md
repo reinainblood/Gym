@@ -31,6 +31,7 @@ method keys in the paper's pipeline.
 | Fresh TAP against the client model | Client-model queries inside the TAP tree search | Cataloged, but **not runnable yet**: a verified live client-target binding and attack-loop adapter are required. |
 | MultiModalPGD | Local multimodal weights and image gradients | **Gradient runtime canary passed:** the verified Super 3.5 VL BF16 checkpoint loaded with Transformers FSDP2 across 8×H200, all parameters were frozen, and a finite nonzero raw-pixel gradient lowered a safe target loss on every rank after one 1/255 signed step. The full HarmBench PGD wrapper and method run remain to execute. |
 | MultiModalPGDPatch | Local multimodal weights and image gradients | The same verified Super VL gradient runtime now satisfies the checkpoint/autograd prerequisite. The patch-specific mask, 2,000-step protocol, save/reload image parity, and full method run remain to execute. |
+| MultiModalPGDBlankImage | Local multimodal weights and image gradients | Cataloged from the pinned public repository with its 1,000-step configuration. No complete scored model run exists. Treat the pinned pipeline's `MultiModalPGD` class mapping as a source behavior to preserve and audit, not permission to rename another method. |
 
 ## Current reproducible paths
 
@@ -126,7 +127,7 @@ method keys in the paper's pipeline.
   revalidated its exact served ID as `nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16`; one image-bearing
   110-case full runs for each of MultiModalDirectRequest and MultiModalRenderText also succeeded. An inference
   API alone does not establish gradient access for
-  `MultiModalPGD` or `MultiModalPGDPatch`.
+  `MultiModalPGD`, `MultiModalPGDPatch`, or `MultiModalPGDBlankImage`.
 
 ## Non-negotiable completion evidence
 

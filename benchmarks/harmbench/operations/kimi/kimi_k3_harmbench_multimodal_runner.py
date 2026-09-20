@@ -36,6 +36,11 @@ METHODS = {
         "MultiModalPGDPatch_config.yaml",
         "ae8e45a178c72e81643911eb1fed3b6a38a932292a0fa3d1c034885f5974426a",
     ),
+    "MultiModalPGDBlankImage": (
+        "MultiModalPGD",
+        "MultiModalPGDBlankImage_config.yaml",
+        "21d93608cfc047999599dccd8fbd456508cd915c71550de09d49a09ad8cebbad",
+    ),
 }
 
 

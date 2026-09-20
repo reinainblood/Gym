@@ -80,7 +80,11 @@ TEXT_GRADIENT_METHODS = {
     "AutoDAN",
     "FewShot",
 }
-MULTIMODAL_GRADIENT_METHODS = {"MultiModalPGD", "MultiModalPGDPatch"}
+MULTIMODAL_GRADIENT_METHODS = {
+    "MultiModalPGD",
+    "MultiModalPGDPatch",
+    "MultiModalPGDBlankImage",
+}
 ATTACK_FAMILIES = {
     "DirectRequest": "direct_request",
     "HumanJailbreaks": "human_jailbreak",
@@ -104,6 +108,7 @@ ATTACK_FAMILIES = {
     "MultiModalRenderText": "multimodal_rendered_text",
     "MultiModalPGD": "multimodal_optimization",
     "MultiModalPGDPatch": "multimodal_optimization",
+    "MultiModalPGDBlankImage": "multimodal_optimization",
 }
 
 

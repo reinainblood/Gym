@@ -3,6 +3,7 @@
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from benchmarks.harmbench.kimi_k3_whitebox import (
@@ -13,9 +14,10 @@ from benchmarks.harmbench.kimi_k3_whitebox import (
     validate_upstream,
     write_runtime_configs,
 )
+from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
-UPSTREAM = Path(__file__).resolve().parents[5] / "reference/HarmBench"
+UPSTREAM = harmbench_upstream()
 
 
 def test_kimi_k3_whitebox_catalog_covers_text_and_vision():
@@ -30,18 +32,26 @@ def test_kimi_k3_whitebox_catalog_covers_text_and_vision():
         "FewShot",
         "MultiModalPGD",
         "MultiModalPGDPatch",
+        "MultiModalPGDBlankImage",
     }
-    assert set(VISION_WHITEBOX_METHODS) == {"MultiModalPGD", "MultiModalPGDPatch"}
-    assert sum(expected_full_cases().values()) == 6_620
+    assert set(VISION_WHITEBOX_METHODS) == {
+        "MultiModalPGD",
+        "MultiModalPGDPatch",
+        "MultiModalPGDBlankImage",
+    }
+    assert sum(expected_full_cases().values()) == 6_730
 
 
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")
 def test_kimi_k3_public_sources_are_hash_locked():
     receipt = validate_upstream(UPSTREAM)
     assert set(receipt["methods"]) == set(WHITEBOX_METHODS)
     assert receipt["methods"]["MultiModalPGD"]["default_hyperparameters"]["num_steps"] == 10
     assert receipt["methods"]["MultiModalPGDPatch"]["default_hyperparameters"]["num_steps"] == 2000
+    assert receipt["methods"]["MultiModalPGDBlankImage"]["default_hyperparameters"]["num_steps"] == 1000
 
 
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")
 def test_kimi_k3_target_specific_configs_preserve_public_defaults(tmp_path):
     models, methods = write_runtime_configs(UPSTREAM, tmp_path, Path("/checkpoint/snapshot"))
     model = yaml.safe_load(models.read_text())[MODEL_KEY]

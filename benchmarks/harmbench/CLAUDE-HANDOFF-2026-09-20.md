@@ -20,7 +20,9 @@ are separate gates throughout this document.
 
 After checkout, use `git rev-parse HEAD` and `git status --short` as the
 authoritative branch and cleanliness check. Generated result corpora remain
-ignored and are not embedded in this Git commit.
+ignored. Small payload-free reports, manifests, and calibration receipts needed
+to verify headline claims are committed under `benchmarks/harmbench/evidence/`;
+they do not replace the external case-level artifacts bound by their hashes.
 
 ## Implemented method surface
 
@@ -29,13 +31,15 @@ The local package covers or binds the following public methods:
 - API/fixed attacks: DirectRequest, HumanJailbreaks, ZeroShot, PAP-top5,
   MultiModalDirectRequest, MultiModalRenderText.
 - Local-weight white-box attacks: GCG, GCG-Multi, AutoPrompt, GBDA, PEZ, UAT,
-  AutoDAN, FewShot, MultiModalPGD, MultiModalPGDPatch.
+  AutoDAN, FewShot, MultiModalPGD, MultiModalPGDPatch, and
+  MultiModalPGDBlankImage.
 - Transfer/iterative catalog and input bridge: TAP-Transfer, GCG-Transfer,
   PAIR, TAP, Fresh PAIR, and Fresh TAP.
-- The pinned public repository also contains `MultiModalPGDBlankImage`. The
-  Qwen operational runner includes it. The Kimi catalog/launcher currently
-  does not; treat that as an explicit remaining scope defect, not an implicit
-  exclusion.
+- The pinned public repository's `MultiModalPGDBlankImage` entry is represented
+  in the shared catalog and the Qwen/Kimi operational launchers. Its pinned
+  pipeline maps to the `MultiModalPGD` class with a separate 1,000-step config;
+  preserve and audit that source behavior rather than silently substituting a
+  different implementation.
 
 Primary code:
 
@@ -66,10 +70,10 @@ Primary code:
 - Status: `validated_with_caveat`. The one raw replay disagreement is a
   measured vLLM batch-sensitive classifier case with identical prompt tokens
   and clipping. No label was manually overridden.
-- Local report:
-  `results/zeroshot-full-20260917/capture-repaired-v2/evidence/report.md`.
-- Local manifest:
-  `results/zeroshot-full-20260917/capture-repaired-v2/evidence/run-manifest.json`.
+- Portable payload-free report:
+  `benchmarks/harmbench/evidence/ultra-zeroshot/report.md`.
+- Portable run manifest and control receipts:
+  `benchmarks/harmbench/evidence/ultra-zeroshot/`.
 - Observed rollout SHA-256:
   `339dfcc15260e5adbb98de60ab7bc8b785bbf0883d0bd30b3fc43f4a570f2b35`.
 
@@ -82,10 +86,10 @@ Primary code:
   400/400; pinned upstream PAP mapping passed 1,600/1,600.
 - Status: `validated` after stateless re-verification of unchanged target
   responses.
-- Local report:
-  `results/pap-full-raw-20260917/reverified-observed/evidence/report.md`.
-- Local manifest:
-  `results/pap-full-raw-20260917/reverified-observed/evidence/run-manifest.json`.
+- Portable payload-free report:
+  `benchmarks/harmbench/evidence/ultra-pap-top5/report.md`.
+- Portable run manifest and control receipts:
+  `benchmarks/harmbench/evidence/ultra-pap-top5/`.
 - Reconciled rollout SHA-256:
   `8c5226f5b0e61562a17d9c76c103459efc97105c4ee4853ef78ee691472d31ba`.
 
@@ -129,9 +133,9 @@ an online smear campaign.
 - Run ID: `qwen35-122b-harmbench-whitebox-20260919`.
 - MultiModalPGD attack generation: 110/110 complete, 110 unique behaviors,
   nonempty target generations, exact indexes 0-109. Combined receipt-set hash
-  observed during audit:
-  `2c58f30795612defc5ee9514869ceb2bc8bb5194aa4d6487d5214a4cd8d26299`.
-- MultiModalPGDPatch: 5/110 complete at the audit snapshot.
+  over canonical sorted JSON objects:
+  `98c971691d7109ae5bc057a71cb5defd5403a161a39c1278fc5da0fe0ac2db70`.
+- MultiModalPGDPatch: 9/110 complete at the reconciliation snapshot.
 - MultiModalPGDBlankImage: 0/110 complete at the audit snapshot.
 - Four Qwen worker tasks were active at the snapshot. Recheck FDR before any
   restart; long methods commit one case at a time and resume by skipping
@@ -169,16 +173,17 @@ or `.jpg` files while the released assets are `.png`.
   straight-through estimator, or reduced attack and call it Kimi K3. Clearing
   this blocker requires an official differentiable Kimi checkpoint or a
   packed-kernel autograd implementation faithful to the public method.
-- Add MultiModalPGDBlankImage to the Kimi public-method roster if/when the
-  differentiability blocker is cleared.
+- `MultiModalPGDBlankImage` is now cataloged and launchable, but remains
+  unexecuted behind the same differentiability blocker.
 
 ### Super 3.5 VL
 
 - Eight-H200 raw-pixel gradient receipt passed for model version
   `hf-ea-0e636f7`: finite/nonzero gradient and loss 8.278218269348145 ->
   7.962818622589111 on every rank.
-- The full 110-case MultiModalPGD and 110-case MultiModalPGDPatch campaigns
-  have not been executed. A gradient receipt is not a completed benchmark.
+- The full 110-case MultiModalPGD, 110-case MultiModalPGDPatch, and 110-case
+  MultiModalPGDBlankImage campaigns have not been executed. A gradient receipt
+  is not a completed benchmark.
 
 ## Already completed black-box multimodal Qwen results
 
@@ -188,8 +193,16 @@ These are separate from white-box PGD and should not be rerun accidentally:
   46/110 = 41.82%, zero excluded rows.
 - `MultiModalRenderText`: 110/110 healthy, canonical reverified ASR
   35/110 = 31.82%, zero excluded rows.
-- Combined BLADE artifacts are under
-  `results/qwen3-5-122b-a10b-fp8-multimodal-20260919/blade-reverified/`.
+- Portable payload-free reports, manifests, classifier controls, reverify
+  comparisons, and combined BLADE metrics are under
+  `benchmarks/harmbench/evidence/qwen-multimodal/`.
+
+On the original execution host, the complete ignored run packages are under
+`/Users/kruge/Documents/ChatGPT/nvidia/worktrees/harmbench/results/`. A fresh
+clone will not contain those large case-level artifacts. If that absolute path
+is unavailable, use the committed hashes and named Modal Volumes/delivery
+packages to recover them; do not describe an absent ignored directory as if it
+were committed branch content.
 
 ## Safe continuation order
 
@@ -228,7 +241,14 @@ Focused adapter tests:
 
 ```bash
 uv sync --extra dev
-pytest -q \
+(
+  cd resources_servers/harmbench
+  uv pip install --python ../../.venv/bin/python -r requirements.txt
+)
+export HARMBENCH_UPSTREAM_DIR=/absolute/path/to/HarmBench
+test "$(git -C "$HARMBENCH_UPSTREAM_DIR" rev-parse HEAD)" = \
+  8e1604d1171fe8a48d8febecd22f600e462bdcdd
+.venv/bin/pytest -q \
   resources_servers/harmbench/tests/test_app.py \
   resources_servers/harmbench/tests/test_calibrate.py \
   resources_servers/harmbench/tests/test_copyright.py \
@@ -241,10 +261,14 @@ pytest -q \
   resources_servers/harmbench/tests/test_run_upstream_generation.py \
   resources_servers/harmbench/tests/test_ultra_whitebox.py \
   resources_servers/harmbench/tests/test_kimi_k3_whitebox.py
-ruff check benchmarks/harmbench resources_servers/harmbench
-ruff format --check benchmarks/harmbench resources_servers/harmbench
+.venv/bin/ruff check benchmarks/harmbench resources_servers/harmbench
+.venv/bin/ruff format --check benchmarks/harmbench resources_servers/harmbench
 git diff --check
 ```
+
+Without `HARMBENCH_UPSTREAM_DIR`, source-parity tests skip consistently from
+any checkout layout. With the pinned checkout configured, they must execute and
+pass; a checkout-depth-specific path is never assumed.
 
 Repository policy additionally requires scoped pre-commit and a DCO-signed
 commit before PR review. This handoff creates no PR.

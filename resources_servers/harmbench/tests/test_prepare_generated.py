@@ -41,6 +41,7 @@ REQUESTED_METHODS = {
     "Fresh TAP against the client model",
     "MultiModalPGD",
     "MultiModalPGDPatch",
+    "MultiModalPGDBlankImage",
 }
 
 
@@ -118,6 +119,7 @@ def test_catalog_is_exactly_the_requested_method_set():
     assert get_method("Fresh TAP against the client model").generation == "client_fresh"
     assert get_method("GCG").target_types == ("text_weights",)
     assert get_method("MultiModalPGD").target_types == ("vision_weights",)
+    assert get_method("MultiModalPGDBlankImage").target_types == ("vision_weights",)
 
 
 def test_materializes_multiple_text_cases_with_source_receipts(tmp_path):

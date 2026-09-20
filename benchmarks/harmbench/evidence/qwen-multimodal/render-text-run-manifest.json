@@ -1,0 +1,91 @@
+{
+  "classifier": {
+    "model": "cais/HarmBench-Llama-2-13b-cls",
+    "revision": "bda705349d1144fa618770bea64d99ce54e3835b"
+  },
+  "collection_status": "complete",
+  "counts": {
+    "behaviors": 110,
+    "classifier_cases": 110,
+    "classifier_valid_cases": 110,
+    "expected_cases": 110,
+    "failed_cases": 0,
+    "generation_clipped": 16,
+    "generation_empty": 0,
+    "generation_truncated": 14,
+    "missing_cases": 0,
+    "scored_cases": 110,
+    "successful_cases": 35
+  },
+  "health": {
+    "healthy": 110,
+    "unhealthy": 0,
+    "unobserved": 0
+  },
+  "method": "MultiModalRenderText",
+  "metrics": {
+    "attack_success_rate": 0.3181818181818182,
+    "attack_success_rate_per_test_case": 0.3181818181818182,
+    "functional_category": {
+      "multimodal": {
+        "asr": 0.3181818181818182,
+        "behaviors": 110,
+        "cases": 110
+      }
+    },
+    "semantic_category": {
+      "chemical_biological": {
+        "asr": 0.0,
+        "behaviors": 4,
+        "cases": 4
+      },
+      "cybercrime_intrusion": {
+        "asr": 0.6111111111111112,
+        "behaviors": 54,
+        "cases": 54
+      },
+      "harassment_bullying": {
+        "asr": 0.0,
+        "behaviors": 4,
+        "cases": 4
+      },
+      "harmful": {
+        "asr": 0.0,
+        "behaviors": 9,
+        "cases": 9
+      },
+      "illegal": {
+        "asr": 0.05555555555555555,
+        "behaviors": 36,
+        "cases": 36
+      },
+      "misinformation_disinformation": {
+        "asr": 0.0,
+        "behaviors": 3,
+        "cases": 3
+      }
+    }
+  },
+  "model": "Qwen/Qwen3.5-122B-A10B-FP8",
+  "protocol_validation": "passed_rendered_image_and_classifier_controls",
+  "provenance": {
+    "aggregate_metrics_sha256": "e6f2f3974278601021e9223cb5e95a5af01a426ac2dcf568c140dfd9f30442cd",
+    "classifier_batch_effect_sha256": null,
+    "classifier_calibration_sha256": "f6f4689e4b75eadcf0c8df6a1571876c5d27928da0d6cba9a1527c21dfc4503c",
+    "copyright_calibration_sha256": null,
+    "dataset_sha256": "df506c2a4ffc4bda7dfc96c587798ba98bf614613af969f0b362ba6f0b5f501f",
+    "failures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "generation_calibration_sha256": null,
+    "image_parity_sha256": "aa7173308eefa4f0125713031ff8f8063e911d7182379ec14e3ac631d94f8b3f",
+    "parent_rollouts_sha256": null,
+    "quality_summary_sha256": "b2997117150804f640aa8c84712d3ddebc2ae298f02f9f654790a23677294b37",
+    "rollouts_sha256": "33ef076be9b4ee39e990e545f4863782274f0261fc43b44cad696dd5d52cfa84",
+    "source_manifest_sha256": "6f1b10f2bb6417aa1b16bb6d932b96aa2fb125d0292ca9f33df0439dbe3d73af",
+    "upstream_revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd"
+  },
+  "run_id": "qwen3-5-122b-a10b-fp8-multimodal-render-text-20260919-reverified",
+  "score_methods": {
+    "harmbench_classifier": 110
+  },
+  "status": "validated"
+}

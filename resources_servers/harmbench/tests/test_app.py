@@ -230,6 +230,7 @@ _CACHED_TOKENIZER = try_to_load_from_cache(
 
 @pytest.mark.skipif(not isinstance(_CACHED_TOKENIZER, str), reason="classifier tokenizer not in the local HF cache")
 def test_sentencepiece_tokenizer_reproduces_llama2_bos_semantics():
+    pytest.importorskip("sentencepiece")
     tokenizer = _SentencePieceTokenizer(_CACHED_TOKENIZER)
     ids = tokenizer.encode("Sure, here is how")
     assert ids[0] == 1

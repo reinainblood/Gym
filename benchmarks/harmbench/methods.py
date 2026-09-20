@@ -49,6 +49,7 @@ METHODS: dict[str, Method] = {
         Method("Fresh TAP against the client model", "TAP", ("text_api", "text_weights"), "client_fresh"),
         Method("MultiModalPGD", "MultiModalPGD", ("vision_weights",)),
         Method("MultiModalPGDPatch", "MultiModalPGDPatch", ("vision_weights",)),
+        Method("MultiModalPGDBlankImage", "MultiModalPGDBlankImage", ("vision_weights",)),
     )
 }
 

@@ -15,14 +15,15 @@ from benchmarks.harmbench.run_upstream_generation import (
     build_generate_command,
     run,
 )
+from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
-UPSTREAM = Path(__file__).resolve().parents[5] / "reference/HarmBench"
+UPSTREAM = harmbench_upstream()
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")
 def test_every_requested_method_matches_pinned_upstream_pipeline(tmp_path):
-    assert audit_method_catalog(UPSTREAM) == 22
+    assert audit_method_catalog(UPSTREAM) == 23
     pipeline = yaml.safe_load((UPSTREAM / "configs/pipeline_configs/run_pipeline.yaml").read_text())
     behaviors = UPSTREAM / "data/behavior_datasets/harmbench_behaviors_text_test.csv"
     for method in METHODS.values():

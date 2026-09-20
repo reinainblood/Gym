@@ -6,7 +6,6 @@ import csv
 import hashlib
 import json
 from copy import deepcopy
-from pathlib import Path
 
 import pytest
 
@@ -22,9 +21,10 @@ from benchmarks.harmbench.pap import (
 )
 from benchmarks.harmbench.prepare import UPSTREAM_REVISION
 from benchmarks.harmbench.zero_shot import ATTACKER_MODEL, ATTACKER_REVISION
+from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
-UPSTREAM = Path(__file__).resolve().parents[5] / "reference/HarmBench"
+UPSTREAM = harmbench_upstream()
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")

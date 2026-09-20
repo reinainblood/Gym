@@ -6,7 +6,6 @@ import csv
 import hashlib
 import json
 import types
-from pathlib import Path
 
 import pytest
 
@@ -24,9 +23,10 @@ from benchmarks.harmbench.zero_shot import (
     mixtral_chat_template,
     queries,
 )
+from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
-UPSTREAM = Path(__file__).resolve().parents[5] / "reference/HarmBench"
+UPSTREAM = harmbench_upstream()
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")

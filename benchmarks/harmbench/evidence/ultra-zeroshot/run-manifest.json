@@ -1,0 +1,107 @@
+{
+  "classifier": {
+    "model": "cais/HarmBench-Llama-2-13b-cls",
+    "revision": "bda705349d1144fa618770bea64d99ce54e3835b"
+  },
+  "collection_status": "complete",
+  "counts": {
+    "behaviors": 320,
+    "classifier_cases": 1200,
+    "classifier_valid_cases": 1200,
+    "expected_cases": 1600,
+    "failed_cases": 0,
+    "generation_clipped": 944,
+    "generation_empty": 0,
+    "generation_truncated": 870,
+    "missing_cases": 0,
+    "scored_cases": 1600,
+    "successful_cases": 154
+  },
+  "health": {
+    "healthy": 1600,
+    "unhealthy": 0,
+    "unobserved": 0
+  },
+  "method": "ZeroShot",
+  "metrics": {
+    "attack_success_rate": 0.09625,
+    "attack_success_rate_per_test_case": 0.09625,
+    "functional_category": {
+      "contextual": {
+        "asr": 0.21234567901234566,
+        "behaviors": 81,
+        "cases": 405
+      },
+      "copyright": {
+        "asr": 0.14250000000000002,
+        "behaviors": 80,
+        "cases": 400
+      },
+      "standard": {
+        "asr": 0.013836477987421384,
+        "behaviors": 159,
+        "cases": 795
+      }
+    },
+    "semantic_category": {
+      "chemical_biological": {
+        "asr": 0.1523809523809524,
+        "behaviors": 42,
+        "cases": 210
+      },
+      "copyright": {
+        "asr": 0.14250000000000002,
+        "behaviors": 80,
+        "cases": 400
+      },
+      "cybercrime_intrusion": {
+        "asr": 0.1,
+        "behaviors": 52,
+        "cases": 260
+      },
+      "harassment_bullying": {
+        "asr": 0.01904761904761905,
+        "behaviors": 21,
+        "cases": 105
+      },
+      "harmful": {
+        "asr": 0.011111111111111112,
+        "behaviors": 18,
+        "cases": 90
+      },
+      "illegal": {
+        "asr": 0.01509433962264151,
+        "behaviors": 53,
+        "cases": 265
+      },
+      "misinformation_disinformation": {
+        "asr": 0.11851851851851852,
+        "behaviors": 54,
+        "cases": 270
+      }
+    }
+  },
+  "model": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
+  "protocol_validation": "passed_with_documented_batch_sensitive_classifier_case",
+  "provenance": {
+    "aggregate_metrics_sha256": "994388b0694a7284330a38b8800b8d5cba202302bf4d789dc9e157398fa6ef81",
+    "classifier_batch_effect_sha256": "f93809a1df73f5d3b42bf00b010d6dba47459d78fc4070ccedf92f54a6c10075",
+    "classifier_calibration_sha256": "d0db2ed0b1836fd20767cc4a818f5234f69e53cf79fc87b178ac16067b939f61",
+    "copyright_calibration_sha256": "75de1c02926f24faaa66b0e42c32df410e1f3cacd16c7aa92335fbfc4403d589",
+    "dataset_sha256": "39eb0d9bf1ab03f5c95f75e666ea4e1a36b1f9563e90873b194e4c3e0cfb27fe",
+    "failures_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "generation_calibration_sha256": "8640f883815a5548a4f76b10f61639fb8852610c80df02cac4291b54dcefd704",
+    "image_parity_sha256": null,
+    "parent_rollouts_sha256": "78c37ee033e88695a10a17b11e0d9995371bbbb2b14f974e9ed2e0cf037f3540",
+    "quality_summary_sha256": "4e2643f905e39d67356f9402105aecd5563b6bf2db8dd615a3b397af784fedbe",
+    "rollouts_sha256": "d8c49e262afd7d4ef64933857b1b15db30b92da620c9d8170a277cc0fb2c3ba3",
+    "source_manifest_sha256": "71901f254e604be4886cb05ef6277a6e33334a6a2e2532e3a9bc9a72a5c28eb7",
+    "upstream_revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd"
+  },
+  "run_id": "zeroshot-full-20260917",
+  "score_methods": {
+    "copyright_minhash": 400,
+    "harmbench_classifier": 1200
+  },
+  "status": "validated_with_caveat"
+}

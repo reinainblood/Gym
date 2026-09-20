@@ -20,9 +20,10 @@ from benchmarks.harmbench.ultra_whitebox import (
     validate_upstream,
     write_runtime_configs,
 )
+from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
-UPSTREAM = Path(__file__).resolve().parents[5] / "reference/HarmBench"
+UPSTREAM = harmbench_upstream()
 
 
 def test_whitebox_catalog_is_complete_and_preserves_public_repetitions():

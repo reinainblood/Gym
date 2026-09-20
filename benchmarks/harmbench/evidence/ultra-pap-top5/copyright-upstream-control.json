@@ -1,0 +1,15 @@
+{
+  "agreement": 400,
+  "behaviors_sha256": "75d257b3e7428c52eb7b0154318f455af3e01b09a3794b5e2f3d36054f3c0e29",
+  "checked": 400,
+  "mismatches": [],
+  "rollouts_sha256": "8c5226f5b0e61562a17d9c76c103459efc97105c4ee4853ef78ee691472d31ba",
+  "runtime": {
+    "datasketch": "1.5.9",
+    "english_model": "3.7.1",
+    "python": "3.10.21",
+    "spacy": "3.7.2"
+  },
+  "upstream_code": "eval_utils.compute_results_hashing",
+  "upstream_revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd"
+}
