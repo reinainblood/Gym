@@ -46,6 +46,22 @@ CELL_PORT_DEFENSE_ORDER = (
     "piguard_detector",
     "drift",
 )
+# Launcher model keys, by slug. The grid scripts take the key; everything else uses the slug.
+MODEL_KEYS = {
+    "nemotron-3-ultra": "ultra",
+    "kimi-k3": "kimi",
+    "qwen-3-5-122b-a10b": "qwen",
+    "nemotron-3-5-super-vl": "supervl",
+}
+# Rough policy calls per rollout, from the canaries. Only used to start the most expensive
+# cells first, so an interrupted grid is left with the cheap work rather than the long tail.
+DEFENSE_COST = {
+    "drift": 55,
+    "progent": 16,
+    "piguard_detector": 14,
+    "prompt_guard_2_detector": 10,
+    "camel": 4,
+}
 MODEL_SLUGS = {
     "nemotron-3-ultra": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4",
     "kimi-k3": "moonshotai/Kimi-K3",
@@ -244,9 +260,30 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results", type=Path, default=Path("results/agentdyn-defense-matrix"))
     parser.add_argument("--json", type=Path, default=None, help="Write the provenance manifest here.")
+    parser.add_argument(
+        "--next",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Print up to N outstanding cells with no live runner, costliest first, as '<model_key> <defense>'.",
+    )
     args = parser.parse_args()
 
     matrix = collect(args.results)
+
+    if args.next is not None:
+        # Machine-readable, for tend_defense_grid.sh; nothing else is printed.
+        candidates = [
+            (DEFENSE_COST.get(defense, 0), MODEL_KEYS[slug], defense)
+            for slug in MODEL_SLUGS
+            for defense in DEFENSE_ORDER
+            if not (matrix.get(slug, {}).get(defense) or {}).get("complete")
+            and runner_state(args.results, slug, defense) == "not running"
+        ]
+        for _, key, defense in sorted(candidates, reverse=True)[: args.next]:
+            print(f"{key} {defense}")
+        return
+
     print(render(matrix))
 
     completed = sum(1 for cells in matrix.values() for cell in cells.values() if cell["complete"])
