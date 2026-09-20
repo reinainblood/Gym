@@ -78,7 +78,16 @@ class QwenCompletion:
         return self.runtime
 
     @modal.method()
-    def complete_shard(self, run_id: str, method: str, shard_index: int, num_shards: int) -> str:
+    def complete_shard(
+        self,
+        run_id: str,
+        method: str,
+        shard_index: int,
+        num_shards: int,
+        replicate: str | None = None,
+        limit: int | None = None,
+    ) -> str:
+        """Complete one shard. ``replicate`` writes to a sibling directory for determinism checks."""
         from qwen_completion_worker import COMPLETIONS_DIRNAME
 
         if not re.fullmatch(r"[a-z0-9-]+", run_id):
@@ -87,14 +96,22 @@ class QwenCompletion:
             raise ValueError(f"unknown public method: {method}")
         if not 0 <= shard_index < num_shards <= 16:
             raise ValueError("invalid shard selection")
+        if replicate is not None and not re.fullmatch(r"[a-z0-9-]+", replicate):
+            raise ValueError("invalid replicate label")
 
         method_dir = Path("/results") / run_id / method
         case_dir = method_dir / "cases"
         if not case_dir.is_dir():
             raise FileNotFoundError(f"no completed attack cases for {method}")
-        output_dir = method_dir / COMPLETIONS_DIRNAME
+        # A replicate never touches the canonical directory, so the protocol result cannot be
+        # overwritten by a diagnostic re-run.
+        output_dir = method_dir / (
+            f"{COMPLETIONS_DIRNAME}-replicate-{replicate}" if replicate else COMPLETIONS_DIRNAME
+        )
 
         cases = sorted(case_dir.glob("*.json"))
+        if limit is not None:
+            cases = cases[:limit]
         runtime = self.ensure_runtime()
         completed = []
         for case_path in cases[shard_index::num_shards]:
@@ -106,6 +123,7 @@ class QwenCompletion:
                 "method": method,
                 "shard": shard_index,
                 "num_shards": num_shards,
+                "replicate": replicate,
                 "observed_cases": len(cases),
                 "results": completed,
             },
@@ -118,11 +136,13 @@ def main(
     run_id: str = "qwen35-122b-harmbench-whitebox-20260919",
     method: str = "MultiModalPGD",
     num_shards: int = 4,
+    replicate: str = "",
+    limit: int = 0,
 ) -> None:
     """Spawn completion shards for one method; attack optimization is never touched."""
     runtime = QwenCompletion()
     launched = []
     for shard in range(num_shards):
-        call = runtime.complete_shard.spawn(run_id, method, shard, num_shards)
+        call = runtime.complete_shard.spawn(run_id, method, shard, num_shards, replicate or None, limit or None)
         launched.append({"method": method, "shard": shard, "function_call_id": call.object_id})
     print(json.dumps({"run_id": run_id, "method": method, "launched": launched}, indent=2, sort_keys=True))
