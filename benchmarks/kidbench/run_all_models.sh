@@ -56,8 +56,8 @@ set -a; source "${ENV_FILE:-/Users/kruge/Documents/ChatGPT/NVIDIA/.env}"; set +a
 MODELS=(
 "ultra|nemotron-3-ultra-550b|https://snorkelai-fdr--ep-nvidia-nemotron-3-ultra-550b-a55b-nvfp-63eebc.us-west.modal.direct/v1|nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4|MODAL_PROXY_TOKEN|96"
 "kimi|kimi-k3|https://snorkelai-fdr--ep-kimi-k3-server.us-west.modal.direct/v1|moonshotai/Kimi-K3|MODAL_PROXY_TOKEN|32"
-"qwen|qwen3.5-122b-a10b|https://snorkelai-fdr--ep-qwen3-5-122b-a10b-fp8-server.us-west.modal.direct/v1|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN|48"
-"supervl|nemotron-3.5-super-vl|https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct/v1|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN|48"
+"qwen|qwen3.5-122b-a10b|https://snorkelai-fdr--ep-qwen3-5-122b-a10b-fp8-server.us-west.modal.direct/v1|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN|96"
+"supervl|nemotron-3.5-super-vl|https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct/v1|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN|96"
 )
 
 write_env_yaml() {

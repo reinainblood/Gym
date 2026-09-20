@@ -37,12 +37,14 @@ The same 500 questions, three ways: asked plainly, asked in a child's own words,
 
 A child actor probes each model for five turns. Degradation slope is quality lost per turn (higher is worse); peak drop is the largest fall below the model's own turn-1 score — the number that distinguishes *never had the boundary* from *had it and gave it up*.
 
-| Model | Degradation slope | Peak drop | Conversations |
-|---|---|---|---|
-| Kimi K3 | 0.03 | 0.24 | 200 |
-| Qwen3.5 122B-A10B | 0.04 | 0.32 | 200 |
-| Nemotron 3.5 Super VL | -0.01 | 0.17 | 200 |
-| Nemotron 3 Ultra 550B | 0.05 | 0.35 | 200 |
+| Model | Unsafe at any turn | Degradation slope | Peak drop | Conversations |
+|---|---|---|---|---|
+| Kimi K3 | 10.1% | 0.01 | 0.24 | 200 |
+| Qwen3.5 122B-A10B | 10.0% | 0.05 | 0.28 | 200 |
+| Nemotron 3.5 Super VL | 7.5% | 0.01 | 0.12 | 200 |
+| Nemotron 3 Ultra 550B | 24.0% | 0.07 | 0.41 | 200 |
+
+Rank on the first column. Slope and peak drop measure *change*, which says nothing about safety without the level — a conversation held at 2.4 for all five turns scores a slope of zero and reads as stable, while one falling from 5.0 to 3.0 never becomes unsafe at all. Both patterns are in this data.
 
 ## Where each model actually fails
 
@@ -50,10 +52,10 @@ Failure families are built from the judge's own tags, grouped by meaning. Percen
 
 | Model | Wrong developmental register | No trusted-adult referral | Bare refusal, no way forward | Emotionally cold or shaming | Missing or inverted moral guidance | Adult-explicit content |
 |---|---|---|---|---|---|---|
-| Nemotron 3 Ultra 550B | 36.7% | 19.4% | 13.6% | 8.0% | 3.1% | 2.7% |
-| Kimi K3 | 32.0% | 24.4% | 10.2% | 4.7% | 6.2% | 1.9% |
-| Qwen3.5 122B-A10B | 31.7% | 24.4% | 13.1% | 6.1% | 3.8% | 1.0% |
-| Nemotron 3.5 Super VL | 28.5% | 23.2% | 15.3% | 6.8% | 4.8% | 1.8% |
+| Nemotron 3 Ultra 550B | 36.5% | 19.2% | 13.6% | 7.6% | 3.1% | 2.8% |
+| Kimi K3 | 32.5% | 24.5% | 10.4% | 4.8% | 5.8% | 1.7% |
+| Qwen3.5 122B-A10B | 32.0% | 24.1% | 13.2% | 6.1% | 3.8% | 1.0% |
+| Nemotron 3.5 Super VL | 28.5% | 23.0% | 15.5% | 6.9% | 4.6% | 1.8% |
 
 - **Wrong developmental register** — Abstract, clinical, or adult-pitched language a 7-11 year old cannot use. Piaget's concrete-operational stage is the rubric's grounding: the child is left with words instead of an answer.
 - **No trusted-adult referral** — A high-stakes disclosure is handled entirely inside the chat. The child is left alone with it, and the assistant has quietly become the confidant that the rubric says a trusted adult should be.
@@ -79,9 +81,9 @@ BLADE's root-cause letters are defined for benchmarks where a task passes or fai
 
 | Model | Single-turn rows | Multi-turn rows | Judge failures |
 |---|---|---|---|
-| Kimi K3 | 5,000 | 200 | 0.67% |
+| Kimi K3 | 5,000 | 200 | 0.71% |
 | Qwen3.5 122B-A10B | 5,000 | 200 | 0.27% |
-| Nemotron 3.5 Super VL | 5,000 | 200 | 0.42% |
-| Nemotron 3 Ultra 550B | 5,000 | 200 | 0.54% |
+| Nemotron 3.5 Super VL | 5,000 | 200 | 0.40% |
+| Nemotron 3 Ultra 550B | 5,000 | 200 | 0.50% |
 
 Two deviations from the published protocol apply to every model equally, so cross-model comparison is unaffected: the multi-turn child actor is stock `google/gemma-4-31B-it` rather than the paper's unreleased refusal-ablated checkpoint (which makes every model look slightly safer in multi-turn), and generation runs at `temperature=0.7` per upstream's runner scripts rather than the `0` its README states. Per-model reports carry the detail.

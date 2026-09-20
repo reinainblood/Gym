@@ -45,6 +45,21 @@ def _load_multi_only(results_dir: Path, slug: str, name: str) -> ModelResults:
     return model
 
 
+def _mean_quality(model: ModelResults) -> Optional[float]:
+    """Mean total quality score over a model's scored conversations.
+
+    ``multi_turn_summary`` reports quality per responder setting rather than pooled, so
+    this pools it. Reading the per-setting value as if it were the overall one is how the
+    column silently came out empty the first time.
+    """
+    scores = [
+        row["total_quality_score"]
+        for row in model.multi_rows
+        if isinstance(row.get("total_quality_score"), (int, float))
+    ]
+    return fmean(scores) if scores else None
+
+
 def _delta(current: Optional[float], baseline: Optional[float]) -> Optional[float]:
     if current is None or baseline is None:
         return None
@@ -80,8 +95,10 @@ def compare(results_dir: Path, baseline_dir: Path, models: list[tuple[str, str]]
                 "peak_change": _relative(now.get("peak_quality_drop"), before.get("peak_quality_drop")),
                 "baseline_turn_curve": before.get("turn_curve"),
                 "turn_curve": now.get("turn_curve"),
-                "baseline_total_quality_score": before.get("total_quality_score"),
-                "total_quality_score": now.get("total_quality_score"),
+                "baseline_total_quality_score": _mean_quality(baseline),
+                "total_quality_score": _mean_quality(current),
+                "baseline_ever_unsafe": baseline.unsafe_conversation_rates()["ever_unsafe"],
+                "ever_unsafe": current.unsafe_conversation_rates()["ever_unsafe"],
             }
         )
     return rows
@@ -118,21 +135,47 @@ def render(rows: list[dict[str, Any]], *, current_label: str, baseline_label: st
     )
     add("")
 
-    slope_changes = [row["slope_change"] for row in rows if row["slope_change"] is not None]
-    if slope_changes:
-        add(
-            f"Degradation slope moves {fmean(slope_changes):+.0%} on average. The direction is the "
-            f"finding: a harder actor does not make models look uniformly worse, it makes them "
-            f"degrade *faster*."
-        )
-        add("")
-
-    add("## Why this is a result and not a caveat")
+    steeper = sum(
+        1
+        for row in rows
+        if row["degradation_slope"] is not None
+        and row["baseline_degradation_slope"] is not None
+        and row["degradation_slope"] > row["baseline_degradation_slope"]
+    )
+    deeper = sum(
+        1
+        for row in rows
+        if row["peak_quality_drop"] is not None
+        and row["baseline_peak_quality_drop"] is not None
+        and row["peak_quality_drop"] > row["baseline_peak_quality_drop"]
+    )
+    add(
+        f"Degradation steepened for **{steeper} of {len(rows)}** models and peak drop deepened for "
+        f"**{deeper} of {len(rows)}**. The effect is real but it is *not* uniform, and no single "
+        f"direction should be quoted as the result — the per-model rows above are the finding."
+    )
     add("")
     add(
-        "The turn curves show it. Where the first turn scores **higher** under the harder actor "
-        "while the last turn lands in the same place, the model was never more fragile than it is "
-        "now — the weaker actor simply stopped pressing before the boundary gave way."
+        "No average is given for the percentage changes. One model's baseline slope crosses zero, "
+        "and a percentage change across a sign flip is arithmetic rather than meaning."
+    )
+    add("")
+
+    add("## What does hold across every model")
+    add("")
+    add(
+        "Two things are uniform. Actor refusals go to zero, and **every model's first turn scores "
+        "higher** under the harder actor — its opening questions are better formed, so the model "
+        "has more to work with. What happens after turn one is model-specific: some hold the line "
+        "better under sustained pressure than the weaker actor ever revealed, and at least one "
+        "degrades markedly faster once genuinely pressed."
+    )
+    add("")
+    add(
+        "That non-uniformity is the practical result. If the actor moved every model the same way "
+        "it could be corrected for. Because it does not, a multi-turn number is only meaningful "
+        "next to the actor that produced it, and two runs cannot be compared unless their actors "
+        "pressed equally hard."
     )
     add("")
     add(
@@ -156,17 +199,18 @@ def render(rows: list[dict[str, Any]], *, current_label: str, baseline_label: st
         "why every conversation carries `actor_refusal_rate` regardless of which actor ran it."
     )
     add("")
-    add("## Mean quality, for completeness")
+    add("## The metrics the leaderboard actually ranks on")
     add("")
     add(
         _table(
-            ["Model", baseline_label, current_label, "Δ"],
+            ["Model", f"Mean quality — {baseline_label}", f"— {current_label}", "Δ", "Ever unsafe"],
             [
                 [
                     row["model"],
                     fmt(row["baseline_total_quality_score"]),
                     fmt(row["total_quality_score"]),
                     signed(_delta(row["total_quality_score"], row["baseline_total_quality_score"])),
+                    f"{pct(row['baseline_ever_unsafe'])} → {pct(row['ever_unsafe'])}",
                 ]
                 for row in rows
             ],
@@ -174,9 +218,10 @@ def render(rows: list[dict[str, Any]], *, current_label: str, baseline_label: st
     )
     add("")
     add(
-        "Mean quality is the wrong place to look for this effect and is reported only so the "
-        "comparison is complete. It averages over turns, so a steeper decline from a higher start "
-        "can leave it flat or even raise it. The degradation metrics are the ones the actor moves."
+        "Mean quality moves least, because it averages over turns: a steeper decline from a higher "
+        "start can leave it flat or even raise it. That is precisely why the leaderboard ranks on "
+        "quality and ever-unsafe rather than on degradation — the metrics the actor moves most are "
+        "the ones least safe to rank on."
     )
     add("")
     return "\n".join(out)
