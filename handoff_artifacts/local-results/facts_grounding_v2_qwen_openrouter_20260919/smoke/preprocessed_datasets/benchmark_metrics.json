@@ -1,0 +1,86 @@
+{
+    "name": "facts_grounding_v2",
+    "type": {
+        "unique_count": 10,
+        "total_count": 856
+    },
+    "jsonl_fpath": "benchmarks/facts_grounding_v2/data/facts_grounding_v2_public.jsonl",
+    "prepare_script": "benchmarks/facts_grounding_v2/prepare.py",
+    "prompt_config": null,
+    "num_repeats": 1,
+    "Number of examples": 856,
+    "Number of tools": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "Json-dumped number of words (proxy for token count)": {
+        "Total # non-null values": 856,
+        "Average": 1674.83,
+        "Min": 107.0,
+        "Max": 20045.0,
+        "Standard deviation": 2700.35
+    },
+    "Number of turns": {
+        "Total # non-null values": 856,
+        "Average": 1.0,
+        "Min": 1.0,
+        "Max": 1.0,
+        "Standard deviation": 0.0
+    },
+    "Temperature": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "context_document": {
+        "unique_count": 856,
+        "total_count": 856
+    },
+    "context_document_chars": {
+        "Total # non-null values": 856,
+        "Average": 11077.94,
+        "Min": 561.0,
+        "Max": 153329.0,
+        "Standard deviation": 19006.02
+    },
+    "domain": {
+        "unique_count": 6,
+        "total_count": 856
+    },
+    "full_prompt": {
+        "unique_count": 856,
+        "total_count": 856
+    },
+    "full_prompt_chars": {
+        "Total # non-null values": 856,
+        "Average": 11434.43,
+        "Min": 764.0,
+        "Max": 153470.0,
+        "Standard deviation": 18979.71
+    },
+    "high_level_type": {
+        "unique_count": 2,
+        "total_count": 856
+    },
+    "id": {
+        "unique_count": 856,
+        "total_count": 856
+    },
+    "row_sha256": {
+        "unique_count": 856,
+        "total_count": 856
+    },
+    "system_instruction": {
+        "unique_count": 502,
+        "total_count": 856
+    },
+    "user_request": {
+        "unique_count": 856,
+        "total_count": 856
+    }
+}

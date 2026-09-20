@@ -1,0 +1,61 @@
+{
+    "name": "agentdyn",
+    "type": "benchmark",
+    "jsonl_fpath": "benchmarks/agentdyn/data/agentdyn_v1_2_2.jsonl",
+    "prepare_script": "benchmarks/agentdyn/prepare.py",
+    "prompt_config": null,
+    "num_repeats": 1,
+    "Number of examples": 620,
+    "Number of tools": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "Json-dumped number of words (proxy for token count)": {
+        "Total # non-null values": 620,
+        "Average": 17.0,
+        "Min": 17.0,
+        "Max": 17.0,
+        "Standard deviation": 0.0
+    },
+    "Number of turns": {
+        "Total # non-null values": 620,
+        "Average": 1.0,
+        "Min": 1.0,
+        "Max": 1.0,
+        "Standard deviation": 0.0
+    },
+    "Temperature": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "benchmark_version": {
+        "unique_count": 1,
+        "total_count": 620
+    },
+    "condition": {
+        "unique_count": 2,
+        "total_count": 620
+    },
+    "suite": {
+        "unique_count": 3,
+        "total_count": 620
+    },
+    "user_task_id": {
+        "unique_count": 20,
+        "total_count": 620
+    },
+    "attack": {
+        "unique_count": 1,
+        "total_count": 560
+    },
+    "injection_task_id": {
+        "unique_count": 10,
+        "total_count": 560
+    }
+}
