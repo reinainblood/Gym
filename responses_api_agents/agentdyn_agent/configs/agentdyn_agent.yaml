@@ -19,6 +19,11 @@ agentdyn_agent:
       prompt_guard_2_model_name: project-free-llama/Llama-Prompt-Guard-2-86M
       prompt_guard_2_model_revision: 43882965632dcb7b20299530f6436ac759d07fd9 # pragma: allowlist secret
       prompt_guard_2_local_path: null
+      # PIGuard ships custom modeling code that upstream loads with trust_remote_code=True,
+      # so the revision is pinned rather than resolved from a moving Hub main.
+      piguard_model_name: leolee99/PIGuard
+      piguard_model_revision: dd78b24e330193a22d2293ac66922dd4f982f563 # pragma: allowlist secret
+      piguard_local_path: null
       metric_prefix: agentdyn
       default_defense: null
       system_message: null

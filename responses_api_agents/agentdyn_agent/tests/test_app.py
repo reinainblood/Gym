@@ -14,6 +14,7 @@ from responses_api_agents.agentdojo_family.app import AgentDojoFamilyAgent
 from responses_api_agents.agentdyn_agent.app import (
     AGENTDYN_DEFENSES,
     AGENTDYN_SUITES,
+    PIGUARD_UPSTREAM_MODEL,
     PROMPT_GUARD_2_UPSTREAM_MODEL,
     AgentDynAgent,
     AgentDynAgentConfig,
@@ -114,6 +115,48 @@ def test_prompt_guard_local_cache_replaces_only_upstream_detector() -> None:
         assert agent._run_agentdojo(body, MagicMock(), "v1.2.2") == (True, True)
 
     assert constructed_model_names == ["/tmp/prompt-guard-2"]
+
+
+def test_piguard_detector_source_is_pinned_and_recorded() -> None:
+    agent = _agent(default_defense="piguard_detector")
+    agent.config.piguard_model_name = "leolee99/PIGuard"
+    agent.config.piguard_model_revision = "dd78b24"
+    agent.config.piguard_local_path = "/tmp/piguard"
+    body = _request().model_copy(update={"defense": "piguard_detector"})
+    constructed_model_names: list[str] = []
+
+    class FakeDetector:
+        def __init__(self, *args, **kwargs):
+            constructed_model_names.append(kwargs["model_name"])
+
+    def exercise_detector(*args, **kwargs):
+        agentdyn_pipeline.TransformersBasedPIDetector(
+            model_name=PIGUARD_UPSTREAM_MODEL,
+            safe_label="benign",
+        )
+        return True, True
+
+    with (
+        patch.object(agentdyn_pipeline, "TransformersBasedPIDetector", FakeDetector),
+        patch.object(AgentDojoFamilyAgent, "_run_agentdojo", side_effect=exercise_detector),
+    ):
+        assert agent._run_agentdojo(body, MagicMock(), "v1.2.2") == (True, True)
+
+    # The pinned local snapshot replaces upstream's moving-main repo id, and the rollout
+    # records which revision actually classified the tool outputs.
+    assert constructed_model_names == ["/tmp/piguard"]
+    assert agent.config.detector_source("piguard_detector") == ("leolee99/PIGuard", "dd78b24", "/tmp/piguard")
+
+
+async def test_piguard_revision_is_recorded_on_rollout() -> None:
+    agent = _agent(default_defense="piguard_detector")
+    agent.config.piguard_model_revision = "dd78b24"
+    agent._run_agentdojo = MagicMock(return_value=(True, True))
+
+    result = await agent.run(_request())
+
+    assert result.detector_model_name == "leolee99/PIGuard"
+    assert result.detector_model_revision == "dd78b24"
 
 
 def test_agentdyn_metrics_use_separate_namespace() -> None:

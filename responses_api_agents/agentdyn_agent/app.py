@@ -34,6 +34,16 @@ AGENTDYN_DEFENSES = (
     "drift",
 )
 PROMPT_GUARD_2_UPSTREAM_MODEL = "meta-llama/Llama-Prompt-Guard-2-86M"
+PIGUARD_UPSTREAM_MODEL = "leolee99/PIGuard"
+# Detector defenses hard-code their classifier upstream and resolve moving Hub `main` at
+# construction time. Both are pinned here instead, so a published treatment names the exact
+# weights it scored with. PIGuard additionally ships custom modeling code that upstream loads
+# with `trust_remote_code=True`, which makes the pin a supply-chain control, not just provenance.
+DETECTOR_UPSTREAM_MODELS = {
+    "prompt_guard_2_detector": PROMPT_GUARD_2_UPSTREAM_MODEL,
+    "piguard_detector": PIGUARD_UPSTREAM_MODEL,
+}
+ROUTED_DEFENSES = frozenset({"camel", "progent", "drift"})
 
 
 class AgentDynAgentConfig(AgentDojoFamilyAgentConfig):
@@ -42,6 +52,19 @@ class AgentDynAgentConfig(AgentDojoFamilyAgentConfig):
     prompt_guard_2_model_name: str = PROMPT_GUARD_2_UPSTREAM_MODEL
     prompt_guard_2_model_revision: str | None = None
     prompt_guard_2_local_path: str | None = None
+    piguard_model_name: str = PIGUARD_UPSTREAM_MODEL
+    piguard_model_revision: str | None = None
+    piguard_local_path: str | None = None
+
+    def detector_source(self, defense: str) -> tuple[str, str | None, str | None]:
+        """Return the (repository, revision, local cache override) backing a detector defense."""
+        if defense == "prompt_guard_2_detector":
+            return (
+                self.prompt_guard_2_model_name,
+                self.prompt_guard_2_model_revision,
+                self.prompt_guard_2_local_path,
+            )
+        return (self.piguard_model_name, self.piguard_model_revision, self.piguard_local_path)
 
 
 class AgentDynRunRequest(AgentDojoFamilyRunRequest):
@@ -68,7 +91,7 @@ class AgentDynAgent(AgentDojoFamilyAgent):
 
     async def run(self, body: AgentDynRunRequest = Body()) -> AgentDojoFamilyVerifyResponse:
         defense = body.defense or self.config.default_defense
-        if defense in {"camel", "progent", "drift"}:
+        if defense in ROUTED_DEFENSES:
             body = body.model_copy(
                 update={
                     "external_model_base_url": self.resolve_model_base_url(
@@ -77,31 +100,31 @@ class AgentDynAgent(AgentDojoFamilyAgent):
                     )
                 }
             )
-        elif defense == "prompt_guard_2_detector":
+        elif defense in DETECTOR_UPSTREAM_MODELS:
+            detector_model_name, detector_model_revision, _ = self.config.detector_source(defense)
             body = body.model_copy(
                 update={
-                    "detector_model_name": self.config.prompt_guard_2_model_name,
-                    "detector_model_revision": self.config.prompt_guard_2_model_revision,
+                    "detector_model_name": detector_model_name,
+                    "detector_model_revision": detector_model_revision,
                 }
             )
         return await super().run(body)
 
     def _run_agentdojo(self, body, bridge, benchmark_version):
-        if body.defense == "prompt_guard_2_detector":
-            model_path = self.config.prompt_guard_2_local_path or snapshot_download(
-                repo_id=self.config.prompt_guard_2_model_name,
-                revision=self.config.prompt_guard_2_model_revision,
-            )
+        if body.defense in DETECTOR_UPSTREAM_MODELS:
+            upstream_model_name = DETECTOR_UPSTREAM_MODELS[body.defense]
+            repo_id, revision, local_path = self.config.detector_source(body.defense)
+            model_path = local_path or snapshot_download(repo_id=repo_id, revision=revision)
             original_detector = agentdyn_pipeline.TransformersBasedPIDetector
 
-            def build_prompt_guard_detector(*args, **kwargs):
-                if kwargs.get("model_name") == PROMPT_GUARD_2_UPSTREAM_MODEL:
+            def build_pinned_detector(*args, **kwargs):
+                if kwargs.get("model_name") == upstream_model_name:
                     kwargs["model_name"] = model_path
                 return original_detector(*args, **kwargs)
 
-            with patch.object(agentdyn_pipeline, "TransformersBasedPIDetector", build_prompt_guard_detector):
+            with patch.object(agentdyn_pipeline, "TransformersBasedPIDetector", build_pinned_detector):
                 return super()._run_agentdojo(body, bridge, benchmark_version)
-        if body.defense not in {"camel", "progent", "drift"}:
+        if body.defense not in ROUTED_DEFENSES:
             return super()._run_agentdojo(body, bridge, benchmark_version)
         if body.external_model_base_url is None:
             raise RuntimeError(f"{body.defense} requires the routed NeMo model-server URL")
