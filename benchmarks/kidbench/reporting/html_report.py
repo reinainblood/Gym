@@ -192,7 +192,6 @@ def _family_bar(model: dict[str, Any], family_keys: list[str]) -> str:
 def render(data: dict[str, Any]) -> str:
     board = data["leaderboard"]
     models = data["models"]
-    top = board[0] if board else {}
 
     family_totals: dict[str, int] = {}
     for model in models.values():
