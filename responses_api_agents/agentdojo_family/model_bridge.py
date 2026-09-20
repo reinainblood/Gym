@@ -261,8 +261,38 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
                 message.pop("name", None)
         future = asyncio.run_coroutine_threadsafe(self._request_chat(payload), self._event_loop)
         chat_completion = future.result()
+        # Record first: the transcript keeps the reasoning, which the converter lifts into
+        # its own item. Only the copy handed to upstream has the envelope removed.
         self.responses.append(self._chat_to_response(payload, chat_completion))
-        return chat_completion
+        return self._without_reasoning_envelope(chat_completion)
+
+    @staticmethod
+    def _without_reasoning_envelope(chat_completion: NeMoGymChatCompletion) -> NeMoGymChatCompletion:
+        """Hand upstream the model's answer, not Gym's think-tag envelope.
+
+        On the Chat Completions path the model server re-wraps a provider's
+        `reasoning_content` into `<think>...</think>` and prepends it to `content`, because
+        that is how reasoning travels through Gym's Chat schema; the Responses conversion
+        unwraps it again. The defenses that own their OpenAI client -- CaMeL, Progent,
+        DRIFT -- read `content` directly and were written against models that never emit
+        it: Progent runs `json.loads` over the whole string and raises
+        `JSONDecodeError: Expecting value: line 1 column 1 (char 0)` on the leading tag,
+        which masks the rollout. So the envelope comes off before upstream sees it.
+
+        Content with no think tag is returned untouched. Content that is *only* reasoning
+        becomes empty, which is a real model failure and is graded as one rather than
+        being disguised as a parse error.
+        """
+        converter = ResponsesConverter(return_token_id_information=False, uses_reasoning_parser=True)
+        normalized = chat_completion.model_copy(deep=True)
+        for choice in normalized.choices:
+            content = choice.message.content
+            if not isinstance(content, str) or not content:
+                continue
+            reasoning, remaining = converter._extract_reasoning_from_content(content)
+            if reasoning:
+                choice.message.content = remaining.strip()
+        return normalized
 
     def query(
         self,

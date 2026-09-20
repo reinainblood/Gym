@@ -10,7 +10,7 @@ import pytest
 from agentdojo.functions_runtime import FunctionCall
 from agentdojo.types import text_content_block_from_string
 
-from nemo_gym.openai_utils import NeMoGymResponse
+from nemo_gym.openai_utils import NeMoGymChatCompletion, NeMoGymResponse
 from responses_api_agents.agentdojo_agent.model_bridge import (
     NeMoGymAgentDojoLLM,
     agentdojo_messages_to_response_output,
@@ -119,7 +119,7 @@ def test_openai_proxy_strips_legacy_tool_result_name() -> None:
         patch("responses_api_agents.agentdojo_family.model_bridge.asyncio.run_coroutine_threadsafe") as submit,
         patch.object(bridge, "_chat_to_response", return_value=Mock()),
     ):
-        submit.return_value.result.return_value = Mock()
+        submit.return_value.result.return_value = _chat_completion("ok")
         bridge.create_chat_completion(
             model="compatibility-alias",
             messages=[
@@ -151,7 +151,7 @@ def test_system_role_compatibility_rewrites_developer_messages() -> None:
         patch("responses_api_agents.agentdojo_family.model_bridge.asyncio.run_coroutine_threadsafe") as submit,
         patch.object(bridge, "_chat_to_response", return_value=Mock()),
     ):
-        submit.return_value.result.return_value = Mock()
+        submit.return_value.result.return_value = _chat_completion("ok")
         bridge.create_chat_completion(
             model="compatibility-alias",
             messages=[{"role": "developer", "content": "instructions"}],
@@ -192,3 +192,68 @@ def _response_with_arguments(arguments: str) -> NeMoGymResponse:
 def test_invalid_model_tool_arguments_are_rejected(arguments: str) -> None:
     with pytest.raises(ValueError, match="invalid arguments|non-object arguments"):
         response_to_agentdojo_message(_response_with_arguments(arguments))
+
+
+def _chat_completion(content: str) -> NeMoGymChatCompletion:
+    return NeMoGymChatCompletion.model_validate(
+        {
+            "id": "chatcmpl-1",
+            "created": 0,
+            "model": "policy",
+            "object": "chat.completion",
+            "choices": [
+                {
+                    "index": 0,
+                    "finish_reason": "stop",
+                    "message": {"role": "assistant", "content": content},
+                }
+            ],
+        }
+    )
+
+
+def test_defense_client_never_sees_the_think_tag_envelope() -> None:
+    # The model server re-wraps a provider's reasoning_content into <think></think> and
+    # prepends it to content. Upstream's defenses parse content directly -- Progent runs
+    # json.loads over the whole string -- so the envelope has to come off first.
+    policy = '[{"name": "search_product", "args": {}}]'
+    normalized = NeMoGymAgentDojoLLM._without_reasoning_envelope(
+        _chat_completion(f"<think>The user wants a smart watch.</think>\n\n{policy}")
+    )
+
+    assert normalized.choices[0].message.content == policy
+    assert json.loads(normalized.choices[0].message.content) == [{"name": "search_product", "args": {}}]
+
+
+def test_content_without_reasoning_is_left_untouched() -> None:
+    body = "  Yes\n{}  "
+    normalized = NeMoGymAgentDojoLLM._without_reasoning_envelope(_chat_completion(body))
+
+    assert normalized.choices[0].message.content == body
+
+
+def test_reasoning_only_answer_becomes_empty_rather_than_unparseable() -> None:
+    # A model that reasoned and then said nothing is a model failure, and is graded as one.
+    # Leaving the tag on would disguise it as a defense-side parse error instead.
+    normalized = NeMoGymAgentDojoLLM._without_reasoning_envelope(_chat_completion("<think>Still deciding.</think>"))
+
+    assert normalized.choices[0].message.content == ""
+
+
+def test_recorded_transcript_keeps_the_reasoning_the_defense_does_not_see() -> None:
+    bridge = object.__new__(NeMoGymAgentDojoLLM)
+    bridge._event_loop = Mock()
+    bridge._request_chat = Mock()
+    bridge._system_role = "developer"
+    bridge.responses = []
+    raw = _chat_completion("<think>deciding</think>answer")
+
+    with (
+        patch("responses_api_agents.agentdojo_family.model_bridge.asyncio.run_coroutine_threadsafe") as submit,
+        patch.object(bridge, "_chat_to_response", side_effect=lambda payload, completion: completion) as recorder,
+    ):
+        submit.return_value.result.return_value = raw
+        returned = bridge.create_chat_completion(model="compatibility-alias", messages=[])
+
+    assert recorder.call_args.args[1].choices[0].message.content == "<think>deciding</think>answer"
+    assert returned.choices[0].message.content == "answer"
