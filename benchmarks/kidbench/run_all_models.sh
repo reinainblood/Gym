@@ -60,6 +60,21 @@ kidbench_judge_model:
         reasoning:
           enabled: false
 
+# Upstream scores multi-turn with the cheaper flash model; see
+# scripts/evaluation/multi_turn/deepseek.sh at the pinned revision.
+kidbench_multi_turn_judge_model:
+  responses_api_models:
+    inference_provider:
+      entrypoint: app.py
+      base_url: https://openrouter.ai/api/v1
+      api_key: \${oc.env:OPENROUTER_API_KEY_SNORKEL,""}
+      model: deepseek/deepseek-v4-flash
+      uses_reasoning_parser: false
+      num_concurrent_requests: 64
+      extra_body:
+        reasoning:
+          enabled: false
+
 kidbench_actor_model:
   responses_api_models:
     inference_provider:
@@ -86,7 +101,7 @@ start_servers() {
         > "${LOG_DIR}/${slug}.servers.log" 2>&1 &
     for _ in $(seq 1 60); do
         sleep 5
-        if [ "$(.venv/bin/gym env status 2>/dev/null | grep -c '✓')" -ge 6 ]; then
+        if [ "$(.venv/bin/gym env status 2>/dev/null | grep -c '✓')" -ge 7 ]; then
             echo "  servers up"
             return 0
         fi
