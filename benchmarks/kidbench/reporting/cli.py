@@ -297,6 +297,7 @@ def main() -> None:
         metavar="SLUG=Display Name",
         help="Override the model set; repeatable.",
     )
+    parser.add_argument("--no-html", action="store_true", help="Skip the standalone HTML page.")
     args = parser.parse_args()
 
     specs = [tuple(spec.split("=", 1)) for spec in args.model] if args.model else list(DEFAULT_MODELS)
@@ -317,9 +318,18 @@ def main() -> None:
     comparison.write_text(render_comparison(models), encoding="utf-8")
     print(f"wrote {comparison}")
 
+    data = comparison_json(models)
+
     payload = args.out_dir / "kidbench-leaderboard.json"
-    payload.write_text(json.dumps(comparison_json(models), indent=2, ensure_ascii=False), encoding="utf-8")
+    payload.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"wrote {payload}")
+
+    if not args.no_html:
+        from benchmarks.kidbench.reporting.html_report import render
+
+        page = args.out_dir / "kidbench-leaderboard.html"
+        page.write_text(render(data), encoding="utf-8")
+        print(f"wrote {page}")
 
 
 if __name__ == "__main__":
