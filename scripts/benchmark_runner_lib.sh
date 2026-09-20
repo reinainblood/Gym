@@ -37,6 +37,7 @@
 #   PORT_LOW          low end of this invocation's port block
 #   PORT_HIGH         high end of this invocation's port block
 #   ENV_YAML          per-invocation env file, relative to the repo root
+#   HEAD_HOST         optional; head server host, default 127.0.0.1
 #
 # Port blocks in use on the FDR campaign host. Keep new campaigns disjoint from these and
 # from Gym's default range, or the port-scoped cleanup below is back to killing neighbours:
@@ -45,13 +46,28 @@
 #   kidbench       head 11500, ports 30001-34000
 #   xstest         head 11600, ports 34001-38000
 #   over_refusal   head 11700, ports 38001-42000
+#   vera_mh        head 11761, default port range
+#   injecagent     head 11773, default port range
+#   harmbench      head 11784, default port range
+#
+# The last three pin only a head port and leave their child servers in Gym's default range,
+# so a block that overlaps 10001-20000 would sweep them up. Do not take one.
+#
+# Filing note: a bare `runs` on .gitignore:13 matches a directory of that name at any depth,
+# so a driver under `<anything>/runs/` can never be committed from where it sits. Put
+# runner scripts somewhere else (e.g. `run-drivers/`) if they are meant to be tracked.
 
 # Emit the port-pinning block for a generated env file. Callers paste this at the top of
 # their own heredoc so the pinning travels with the config the run actually loads.
+# `host` is written explicitly. Current Gym fills head_server defaults per key, so a config
+# may pin the port alone -- but branches without that commit validate BaseServerConfig as
+# given and fail with `ValidationError: host Field required` on a port-only block. Writing
+# both keys costs nothing and keeps this helper usable from an older checkout.
 gym_runner_ports_yaml() {
     cat <<YAML
 # Ports are pinned so this stack cannot collide with another campaign on this host.
 head_server:
+  host: ${HEAD_HOST:-127.0.0.1}
   port: ${HEAD_PORT}
 port_range_low: ${PORT_LOW}
 port_range_high: ${PORT_HIGH}
