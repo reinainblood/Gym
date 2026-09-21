@@ -84,6 +84,7 @@ if modal.is_local():
     source_csv = Path(os.environ["HARMBENCH_SOURCE_CSV"]).resolve(strict=True)
     image = (
         base_image.add_local_file(HERE / "client_fresh_generate.py", "/app/client_fresh_generate.py")
+        .add_local_file(HERE / "calibrate_client_fresh_generation.py", "/app/calibrate_client_fresh_generation.py")
         .add_local_file(HERE / "evidence" / "super-vl-client-binding.yaml", "/app/client-binding.yaml")
         .add_local_file(source_csv, "/app/behaviors.csv")
     )
@@ -325,6 +326,19 @@ def finalize(method: str, run_id: str, num_shards: int) -> dict:
     }
     receipt_path = root / "generation-receipt.json"
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    import sys
+
+    sys.path.insert(0, "/app")
+    from calibrate_client_fresh_generation import validate
+
+    control_path = root / "generation-upstream-control.json"
+    validate(
+        method=method,
+        artifact_root=root,
+        behaviors=source,
+        generation_receipt=receipt_path,
+        output=control_path,
+    )
     outputs.commit()
     return {
         "method": method,
@@ -334,6 +348,7 @@ def finalize(method: str, run_id: str, num_shards: int) -> dict:
         "cases": len(rows),
         "target_calls": total_calls,
         "test_cases_sha256": receipt["test_cases_sha256"],
+        "generation_control_sha256": _sha256(control_path),
         "output_volume": OUTPUT_VOLUME_NAME,
     }
 

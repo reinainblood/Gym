@@ -11,7 +11,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from benchmarks.harmbench.client_fresh_generate import UPSTREAM_REVISION
+
+try:
+    from benchmarks.harmbench.client_fresh_generate import UPSTREAM_REVISION
+except ModuleNotFoundError:  # Standalone Modal image mounts the module at /app.
+    from client_fresh_generate import UPSTREAM_REVISION
 
 
 TARGET_MODEL = "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16"
