@@ -97,6 +97,7 @@ method keys in the paper's pipeline.
   pinned raw HarmBench classifier without copying generations into its output. `qwen_gcg_blade.py` then checks all model,
   source, classifier, denominator, and case-level hashes before emitting payload-free BLADE rows, native metrics, and a
   deterministic report; invalid or unstable classifier cases remain visible but outside the model-quality denominator.
+  Its evidence manifest binds the classifier-score input and every output hash and is validated through a full readback.
 - For ZeroShot, `repair_capture_race.py` created a derivative that attached one late-but-present target-call
   capture without touching any response or score; a separate Gym health audit then passed 1,600/1,600.
   `restore_reverified_observability.py` keeps the original captured trajectory alongside stateless reverify scores

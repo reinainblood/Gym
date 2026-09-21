@@ -92,4 +92,5 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   function once. It rehashes the 400 private completion receipts and scores every case twice through the pinned serial raw
   HarmBench classifier, writing only payload-free `classifier-scores.json`. Download that single receipt and run
   `qwen_gcg_blade.py`; require 400 reconciled source indexes, exact model/classifier revisions, stable denominator
-  accounting, and successful readback of its JSONL, metrics JSON, and Markdown report before reporting the baseline.
+  accounting, and successful readback of its JSONL, metrics JSON, Markdown report, and `evidence-manifest.json` before
+  reporting the baseline. The manifest binds the classifier-score input and all three rendered outputs by size and SHA-256.

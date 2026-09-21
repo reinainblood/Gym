@@ -16,6 +16,7 @@ from benchmarks.harmbench.operations.qwen.qwen_label_compare import (
     CLASSIFIER_MODEL,
     CLASSIFIER_REVISION,
     UPSTREAM_REVISION,
+    sha256,
 )
 
 
@@ -160,15 +161,77 @@ def write(receipt_path: Path, output_dir: Path) -> dict[str, Any]:
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     rows = build_rows(receipt)
     output_dir.mkdir(parents=True, exist_ok=True)
-    with (output_dir / "harmbench_blade_rows.jsonl").open("w", encoding="utf-8") as stream:
+    rows_path = output_dir / "harmbench_blade_rows.jsonl"
+    metrics_path = output_dir / "harmbench_blade_metrics.json"
+    report_path = output_dir / "harmbench_blade_report.md"
+    with rows_path.open("w", encoding="utf-8") as stream:
         for row in rows:
             stream.write(json.dumps(row, sort_keys=True) + "\n")
     metrics = summarize(rows)
-    (output_dir / "harmbench_blade_metrics.json").write_text(
-        json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    metrics_path.write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    report_path.write_text(render_report(metrics), encoding="utf-8")
+    outputs = [
+        {"name": path.name, "size_bytes": path.stat().st_size, "sha256": sha256(path)}
+        for path in (rows_path, metrics_path, report_path)
+    ]
+    evidence = {
+        "schema_version": 1,
+        "artifact_kind": "harmbench_blade_bundle",
+        "status": "completed",
+        "method": "GCG",
+        "target_model": MODEL_ID,
+        "target_revision": MODEL_REVISION,
+        "classifier_model": CLASSIFIER_MODEL,
+        "classifier_revision": CLASSIFIER_REVISION,
+        "input_classifier_scores_sha256": sha256(receipt_path),
+        "rows": len(rows),
+        "outputs": outputs,
+    }
+    (output_dir / "evidence-manifest.json").write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (output_dir / "harmbench_blade_report.md").write_text(render_report(metrics), encoding="utf-8")
+    validate_bundle(receipt_path, output_dir)
     return metrics
+
+
+def validate_bundle(receipt_path: Path, output_dir: Path) -> dict[str, Any]:
+    """Read back and recompute one Qwen GCG BLADE evidence bundle."""
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    expected_rows = build_rows(receipt)
+    expected_metrics = summarize(expected_rows)
+    expected_report = render_report(expected_metrics)
+    rows_path = output_dir / "harmbench_blade_rows.jsonl"
+    metrics_path = output_dir / "harmbench_blade_metrics.json"
+    report_path = output_dir / "harmbench_blade_report.md"
+    manifest_path = output_dir / "evidence-manifest.json"
+    if not all(path.is_file() for path in (rows_path, metrics_path, report_path, manifest_path)):
+        raise FileNotFoundError("Qwen GCG BLADE bundle is incomplete")
+    observed_rows = [json.loads(line) for line in rows_path.read_text(encoding="utf-8").splitlines() if line]
+    observed_metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    observed_report = report_path.read_text(encoding="utf-8")
+    if observed_rows != expected_rows or observed_metrics != expected_metrics or observed_report != expected_report:
+        raise ValueError("Qwen GCG BLADE bundle readback disagrees with recomputed evidence")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    outputs = [
+        {"name": path.name, "size_bytes": path.stat().st_size, "sha256": sha256(path)}
+        for path in (rows_path, metrics_path, report_path)
+    ]
+    expected_manifest = {
+        "schema_version": 1,
+        "artifact_kind": "harmbench_blade_bundle",
+        "status": "completed",
+        "method": "GCG",
+        "target_model": MODEL_ID,
+        "target_revision": MODEL_REVISION,
+        "classifier_model": CLASSIFIER_MODEL,
+        "classifier_revision": CLASSIFIER_REVISION,
+        "input_classifier_scores_sha256": sha256(receipt_path),
+        "rows": PUBLIC_BEHAVIORS,
+        "outputs": outputs,
+    }
+    if manifest != expected_manifest:
+        raise ValueError("Qwen GCG BLADE evidence manifest disagrees with bundle readback")
+    return manifest
 
 
 def main() -> None:
