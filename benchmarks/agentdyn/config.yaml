@@ -5,6 +5,13 @@ agentdyn_benchmark:
   _inherit_from: agentdyn_agent
   responses_api_agents:
     agentdyn_agent:
+      # Abandon a rollout that will not finish. CaMeL interprets model-generated Python with
+      # no step or time budget of its own, and because the agent serializes rollouts a program
+      # that does not terminate stops the cell for the rest of the campaign rather than
+      # costing one row -- measured locally at 32 minutes on one core with the cell frozen at
+      # 6/620. It belongs here rather than only in the local runner's generated config, so
+      # that every way of launching this benchmark inherits it, containers included.
+      rollout_timeout_seconds: 1200
       datasets:
         - name: agentdyn
           type: benchmark
