@@ -233,3 +233,34 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   capacity. Do not duplicate a shard while its call/container remains live. A behavior is complete only when its private
   upstream test-case artifact and hashed client-call receipt both persist; a full method is complete only after all three
   shard receipts validate and the CPU finalizer writes the canonical 400-behavior generation receipt.
+
+## GCG-Transfer exact-source blocker — 2026-09-21 15:22 CDT
+
+- The pinned pipeline requires the four-model Llama 2 7B Chat / Vicuna 7B v1.5 / Llama 2 13B Chat / Vicuna 13B v1.5
+  ensemble at 1,000 optimization steps, search width 512, and run IDs 0–4. This yields the 2,000 source cases that must then
+  receive fresh Super completions and scoring.
+- The official HarmBench 1.0 Zenodo archive was range-inspected without downloading the 10.4 GB ZIP. Its matching four-model
+  ensemble artifact is bound to 500 steps, not 1,000. Preserve it as historical evidence but never use it to clear the pinned
+  GCG-Transfer denominator.
+- Authenticated Hugging Face metadata resolved the exact current checkpoint revisions. Vicuna 7B v1.5 revision
+  `3321f76e3f527bd14065daf69dad9344000a201d` and Vicuna 13B v1.5 revision
+  `c8327bf999adbd2efe2e75f6509fa01436100dc2` are accessible. Weight preflight for Meta Llama 2 7B Chat revision
+  `f5db02db724555f92da89c216ac04704f23d4590` and Meta Llama 2 13B Chat revision
+  `a2cb7a712bb6e5e736ca7f8cd98167f81a0b5bd8` returns access denied because both repositories are manually gated.
+  No exact checkpoint copy exists in the local cache or FDR Volumes. The existing FDR secret `agentdyn-hf-gated-access` was
+  also tested through CPU-only authenticated safetensors HEAD requests and returned `GatedRepoError` for both exact revisions.
+  Categorize this row as `gated_model`; do not substitute a mirror, another Llama revision, the 500-step release artifact, or
+  a reduced budget.
+
+## Ordinary PAIR full Super milestone — 2026-09-21 15:31 CDT
+
+- The official HarmBench 1.0 `PAIR/mixtral_8x7b` source member is 402,090 bytes with SHA-256
+  `9a85a36ae7aa47fef160eca99746379a1521f75acb2d85749ed083e0aac4af29`. It contains 401 historical behaviors:
+  398 current-corpus rows plus the same three retired IDs present in other release artifacts.
+- FDR repair call `fc-01M32SEPCVZW566NJ8AYZFYNWC` regenerated exactly the two missing current behaviors through the pinned
+  upstream PAIR class, `mixtral_8x7b` experiment, and exact public method/model configs. Its completed receipt binds two
+  repaired behaviors and two cases. Merging official and repaired sources in current source order yielded 400 cases with
+  SHA-256 `1b0da501a209eea988b0d7a1c41c86980f354787a2abadd90ddd0b5024cafdc2`.
+- Fresh Super target collection scored 400/400 healthy cases with zero failures/missing, 21 successes, and 5.25% ASR. Raw
+  classifier replay matched 300/300 and copyright replay matched 100/100. The strict method report and deterministic BLADE
+  readback passed. Ordinary TAP repair call `fc-01M32SEPNMVQFE36D2HDR27JGS` remains live; do not infer completion from PAIR.
