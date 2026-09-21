@@ -158,7 +158,7 @@ def validate_binding_receipt(
     client_revision: str,
 ) -> str:
     """Require an independently persisted deployment binding for the endpoint checkpoint."""
-    receipt = json.loads(path.read_text(encoding="utf-8"))
+    receipt = yaml.safe_load(path.read_text(encoding="utf-8"))
     expected = {
         "model": client_model,
         "revision": client_revision,

@@ -1,0 +1,21 @@
+schema_version: 1
+status: verified
+environment: FDR
+deployment_app_id: ap-Y6sMOWq4rnrM5EU6efe8Zf
+deployment_app_name: nemotron-3-5-super-vl-ea
+observed_at: "2026-09-21T06:48:01Z"
+observed_state: deployed
+observed_tasks: 3
+observed_live_containers: 3
+model_id: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16
+model_revision: hf-ea-0e636f7
+endpoint_base_url: https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct
+endpoint_base_url_sha256: d157f6ef8eb5afcd179dff631ba8b414b20496ed956f02e7c4a57c7cee6dc780  # pragma: allowlist secret
+checkpoint_volume: nemotron-3-5-super-vl-ea-09112026
+checkpoint_manifest_status: verified
+serving_secret_name: nemotron-super-vl-service
+source_evidence:
+  serve_py_sha256: 92d23fd5223349197e2ee456a746669c29d362cd70145c3df34f3e17afdc3929  # pragma: allowlist secret
+  inference_receipt_sha256: b120127e347b215acd3cb3e4ab47b3f67b47e3e56c9e4c1c01026e306bb18fd6  # pragma: allowlist secret
+  concurrency_receipt_sha256: 63570f37f27f8ebd072fe683858e04df96045a5f6a43d1d87ba63349a654fb98  # pragma: allowlist secret
+  prompted_tool_call_receipt_sha256: c00637fd79616dd1a7e6fd98ba1bddb30f5df593342d934b702b909cc97759d7  # pragma: allowlist secret

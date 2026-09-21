@@ -67,7 +67,7 @@ def test_client_target_rejects_wrong_served_identity():
 
 
 def test_client_binding_receipt_binds_app_endpoint_model_and_revision(tmp_path):
-    path = tmp_path / "binding.json"
+    path = tmp_path / "binding.yaml"
     path.write_text(
         json.dumps(
             {
