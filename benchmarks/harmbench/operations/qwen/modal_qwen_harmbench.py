@@ -116,6 +116,37 @@ class QwenWhitebox:
         )
 
 
+@app.function(
+    image=image,
+    cpu=2,
+    memory=8192,
+    timeout=1800,
+    volumes={"/results": results},
+)
+def finalize_method(run_id: str, method: str) -> dict:
+    from qwen_harmbench_worker import CORRECTED_BEHAVIORS, METHODS, finalize_method_artifact
+
+    if not re.fullmatch(r"[a-z0-9-]+", run_id):
+        raise ValueError("invalid run id")
+    if method not in METHODS:
+        raise ValueError("unknown public method")
+    run_root = Path("/results") / run_id
+    manifest = finalize_method_artifact(
+        run_dir=run_root / method,
+        method=method,
+        behaviors_path=CORRECTED_BEHAVIORS,
+        gradient_receipt_path=run_root / "gradient-receipt.json",
+    )
+    results.commit()
+    return {
+        "run_id": run_id,
+        "method": method,
+        "status": manifest["status"],
+        "cases": manifest["cases"],
+        "images": manifest["images"],
+    }
+
+
 @app.local_entrypoint()
 def main(run_id: str = "qwen35-122b-harmbench-whitebox-20260919", launch_full: bool = True) -> None:
     runtime = QwenWhitebox()

@@ -73,6 +73,10 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   receipt/image hashes, BF16 checkpoint and processor identities, prompt hash, deterministic sampling, token cap/count,
   finish reason, and generation hash validate. It writes new completion receipts atomically. Canonical scoring explicitly
   rehashes the sibling parent receipts and rejects any parent/canonical filename or provenance drift before classification.
+- After attack workers drain and the current branch is redeployed, call the white-box app's `finalize_method` for a method
+  only at 110/110. It revalidates all case/image/checkpoint chains plus the gradient/checkpoint receipt and writes
+  `attack-manifest.json`. The separate completion app now refuses to start canonical or replicate completion without
+  rehashing that exact 110-case manifest and its files.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
 

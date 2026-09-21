@@ -1,12 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import csv
 import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
+from benchmarks.harmbench.operations.qwen.qwen_completion_worker import validate_attack_manifest
 from benchmarks.harmbench.operations.qwen.qwen_harmbench_worker import (
     CORRECTED_BEHAVIORS_SHA256,
     CORRECTIONS_SHA256,
@@ -14,14 +16,14 @@ from benchmarks.harmbench.operations.qwen.qwen_harmbench_worker import (
     MODEL_ID,
     MODEL_REVISION,
     UPSTREAM_REVISION,
+    finalize_method_artifact,
     sha256,
     validate_case_receipt,
 )
 
 
-def _case(tmp_path, method="MultiModalPGDBlankImage"):
-    index = 7
-    behavior_id = "synthetic_behavior"
+def _case(tmp_path, method="MultiModalPGDBlankImage", index=7, behavior_id=None):
+    behavior_id = behavior_id or "synthetic_behavior"
     run_dir = tmp_path / method
     image = run_dir / "images" / f"{index:03d}-{behavior_id}.png"
     checkpoint = run_dir / "optimization-checkpoints" / f"{index:03d}-{behavior_id}" / "step-0000.png"
@@ -112,3 +114,62 @@ def test_whitebox_resume_rejects_wrong_method_or_incomplete_checkpoint(tmp_path)
     checkpoint.unlink()
     with pytest.raises(ValueError, match="optimization_checkpoints"):
         validate_case_receipt(case, method="MultiModalPGDBlankImage", index=7, row=row)
+
+
+def test_whitebox_finalizer_reconciles_exact_110_case_campaign(tmp_path):
+    run_root = tmp_path / "run"
+    method = "MultiModalPGDBlankImage"
+    behaviors_path = tmp_path / "behaviors.csv"
+    fieldnames = [
+        "BehaviorID",
+        "Behavior",
+        "ContextString",
+        "FunctionalCategory",
+        "SemanticCategory",
+        "ImageFileName",
+    ]
+    with behaviors_path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        writer.writeheader()
+        for index in range(110):
+            _, row, _ = _case(run_root, method, index=index, behavior_id=f"b{index:03d}")
+            writer.writerow(row)
+    gradient_path = run_root / "gradient-receipt.json"
+    gradient_path.write_text(
+        json.dumps(
+            {
+                "status": "passed",
+                "model_id": MODEL_ID,
+                "model_revision": MODEL_REVISION,
+                "upstream_revision": UPSTREAM_REVISION,
+                "corrected_behaviors_sha256": CORRECTED_BEHAVIORS_SHA256,
+                "filename_corrections_sha256": CORRECTIONS_SHA256,
+                "gradient_finite": True,
+                "gradient_nonzero": True,
+                "loss_decreased": True,
+                "config_sha256": "c" * 64,
+                "index_sha256": "d" * 64,
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = finalize_method_artifact(
+        run_dir=run_root / method,
+        method=method,
+        behaviors_path=behaviors_path,
+        gradient_receipt_path=gradient_path,
+    )
+    assert manifest["status"] == "completed"
+    assert manifest["cases"] == manifest["images"] == 110
+    assert len(manifest["case_receipts"]) == len(manifest["optimized_images"]) == 110
+    assert validate_attack_manifest(run_root / method, method)["status"] == "completed"
+
+    extra = run_root / method / "cases" / "extra.json"
+    extra.write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError, match="exactly the 110 expected case receipts"):
+        finalize_method_artifact(
+            run_dir=run_root / method,
+            method=method,
+            behaviors_path=behaviors_path,
+            gradient_receipt_path=gradient_path,
+        )

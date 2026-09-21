@@ -24,6 +24,7 @@ SNAPSHOT = Path("/weights/snapshot")
 RESULTS = Path("/results")
 PROTOCOL_MAX_NEW_TOKENS = 512
 COMPLETIONS_DIRNAME = "completions-512"
+WHITEBOX_METHODS = {"MultiModalPGD", "MultiModalPGDPatch", "MultiModalPGDBlankImage"}
 
 
 def sha256(path: Path) -> str:
@@ -94,6 +95,54 @@ def validate_completion_receipt(
     if mismatched:
         raise ValueError(f"existing canonical completion failed fields {','.join(sorted(set(mismatched)))}")
     return receipt
+
+
+def validate_attack_manifest(method_dir: Path, method: str) -> dict:
+    """Rehash a finalized 110-case attack campaign before target completion."""
+    if method not in WHITEBOX_METHODS:
+        raise ValueError("unknown Qwen white-box method")
+    manifest_path = method_dir / "attack-manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError("Qwen white-box attack manifest is missing")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    expected = {
+        "schema_version": 1,
+        "artifact_kind": "qwen_whitebox_attack_manifest",
+        "status": "completed",
+        "method": method,
+        "model_id": MODEL_ID,
+        "model_revision": MODEL_REVISION,
+        "behaviors": 110,
+        "cases": 110,
+        "images": 110,
+    }
+    mismatched = [key for key, value in expected.items() if manifest.get(key) != value]
+    cases = manifest.get("case_receipts")
+    images = manifest.get("optimized_images")
+    if not isinstance(cases, list) or len(cases) != 110:
+        mismatched.append("case_receipts")
+    if not isinstance(images, list) or len(images) != 110:
+        mismatched.append("optimized_images")
+    if mismatched:
+        raise ValueError(f"Qwen white-box attack manifest failed fields {','.join(sorted(set(mismatched)))}")
+    canonical_cases = json.dumps(cases, sort_keys=True, separators=(",", ":")).encode()
+    canonical_images = json.dumps(images, sort_keys=True, separators=(",", ":")).encode()
+    if manifest.get("case_receipts_sha256") != hashlib.sha256(canonical_cases).hexdigest():
+        raise ValueError("Qwen white-box attack case manifest hash mismatch")
+    if manifest.get("optimized_images_sha256") != hashlib.sha256(canonical_images).hexdigest():
+        raise ValueError("Qwen white-box attack image manifest hash mismatch")
+    observed_case_names = [path.name for path in sorted((method_dir / "cases").glob("*.json"))]
+    observed_image_names = [path.name for path in sorted((method_dir / "images").glob("*.png"))]
+    if observed_case_names != [row.get("name") for row in cases] or observed_image_names != [
+        row.get("name") for row in images
+    ]:
+        raise ValueError("Qwen white-box attack manifest filenames disagree with the Volume")
+    for directory, rows in ((method_dir / "cases", cases), (method_dir / "images", images)):
+        for row in rows:
+            path = directory / row["name"]
+            if not path.is_file() or sha256(path) != row.get("sha256"):
+                raise ValueError("Qwen white-box attack manifest file readback failed")
+    return manifest
 
 
 class QwenCompletionRuntime:

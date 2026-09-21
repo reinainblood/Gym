@@ -88,7 +88,7 @@ class QwenCompletion:
         limit: int | None = None,
     ) -> str:
         """Complete one shard. ``replicate`` writes to a sibling directory for determinism checks."""
-        from qwen_completion_worker import COMPLETIONS_DIRNAME
+        from qwen_completion_worker import COMPLETIONS_DIRNAME, validate_attack_manifest
 
         if not re.fullmatch(r"[a-z0-9-]+", run_id):
             raise ValueError("invalid run id")
@@ -100,6 +100,7 @@ class QwenCompletion:
             raise ValueError("invalid replicate label")
 
         method_dir = Path("/results") / run_id / method
+        validate_attack_manifest(method_dir, method)
         case_dir = method_dir / "cases"
         if not case_dir.is_dir():
             raise FileNotFoundError(f"no completed attack cases for {method}")

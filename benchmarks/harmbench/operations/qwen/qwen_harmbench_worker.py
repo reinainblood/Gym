@@ -36,6 +36,7 @@ METHODS = {
     "MultiModalPGDPatch": {"num_steps": 2000, "step_size": 0.01, "epsilon": 1.0, "stop_loss": 0.005},
     "MultiModalPGDBlankImage": {"num_steps": 1000, "step_size": 0.01, "epsilon": 1.0, "stop_loss": 0.005},
 }
+PUBLIC_CASES = 110
 
 
 def sha256(path: Path) -> str:
@@ -134,6 +135,83 @@ def validate_case_receipt(case_path: Path, *, method: str, index: int, row: dict
     if mismatched:
         raise ValueError(f"existing {method} case {index} failed fields {','.join(sorted(set(mismatched)))}")
     return receipt
+
+
+def finalize_method_artifact(*, run_dir: Path, method: str, behaviors_path: Path, gradient_receipt_path: Path) -> dict:
+    """Reconcile one complete 110-case Qwen white-box attack campaign."""
+    if method not in METHODS:
+        raise ValueError("unknown public method")
+    with behaviors_path.open(newline="", encoding="utf-8") as stream:
+        behaviors = list(csv.DictReader(stream))
+    if len(behaviors) != PUBLIC_CASES:
+        raise ValueError(f"expected {PUBLIC_CASES} public multimodal behaviors, found {len(behaviors)}")
+    gradient = json.loads(gradient_receipt_path.read_text(encoding="utf-8"))
+    gradient_required = {
+        "status": "passed",
+        "model_id": MODEL_ID,
+        "model_revision": MODEL_REVISION,
+        "upstream_revision": UPSTREAM_REVISION,
+        "corrected_behaviors_sha256": CORRECTED_BEHAVIORS_SHA256,
+        "filename_corrections_sha256": CORRECTIONS_SHA256,
+        "gradient_finite": True,
+        "gradient_nonzero": True,
+        "loss_decreased": True,
+    }
+    gradient_mismatch = [key for key, value in gradient_required.items() if gradient.get(key) != value]
+    for key in ("config_sha256", "index_sha256"):
+        if not isinstance(gradient.get(key), str) or not re.fullmatch(r"[0-9a-f]{64}", gradient[key]):
+            gradient_mismatch.append(key)
+    if gradient_mismatch:
+        raise ValueError(f"white-box gradient receipt failed fields {','.join(sorted(set(gradient_mismatch)))}")
+
+    expected_case_paths = [
+        run_dir / "cases" / f"{index:03d}-{row['BehaviorID']}.json" for index, row in enumerate(behaviors)
+    ]
+    expected_image_paths = [
+        run_dir / "images" / f"{index:03d}-{row['BehaviorID']}.png" for index, row in enumerate(behaviors)
+    ]
+    if sorted((run_dir / "cases").glob("*.json")) != expected_case_paths:
+        raise ValueError("white-box finalizer requires exactly the 110 expected case receipts")
+    if sorted((run_dir / "images").glob("*.png")) != expected_image_paths:
+        raise ValueError("white-box finalizer requires exactly the 110 expected optimized images")
+
+    case_manifest = []
+    image_manifest = []
+    for index, (row, case_path, image_path) in enumerate(
+        zip(behaviors, expected_case_paths, expected_image_paths, strict=True)
+    ):
+        validate_case_receipt(case_path, method=method, index=index, row=row)
+        case_manifest.append({"name": case_path.name, "sha256": sha256(case_path)})
+        image_manifest.append({"name": image_path.name, "sha256": sha256(image_path)})
+    canonical_cases = json.dumps(case_manifest, sort_keys=True, separators=(",", ":")).encode()
+    canonical_images = json.dumps(image_manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest = {
+        "schema_version": 1,
+        "artifact_kind": "qwen_whitebox_attack_manifest",
+        "status": "completed",
+        "method": method,
+        "public_method_class": "MultiModalPGDPatch" if method == "MultiModalPGDPatch" else "MultiModalPGD",
+        "model_id": MODEL_ID,
+        "model_revision": MODEL_REVISION,
+        "upstream_revision": UPSTREAM_REVISION,
+        "behaviors": PUBLIC_CASES,
+        "cases": PUBLIC_CASES,
+        "images": PUBLIC_CASES,
+        "hyperparameters": METHODS[method],
+        "behaviors_sha256": sha256(behaviors_path),
+        "gradient_receipt_sha256": sha256(gradient_receipt_path),
+        "checkpoint_config_sha256": gradient["config_sha256"],
+        "checkpoint_index_sha256": gradient["index_sha256"],
+        "case_receipts": case_manifest,
+        "case_receipts_sha256": hashlib.sha256(canonical_cases).hexdigest(),
+        "optimized_images": image_manifest,
+        "optimized_images_sha256": hashlib.sha256(canonical_images).hexdigest(),
+    }
+    output_path = run_dir / "attack-manifest.json"
+    temporary = output_path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, output_path)
+    return manifest
 
 
 class QwenHarmBenchRuntime:
