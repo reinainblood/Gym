@@ -87,7 +87,7 @@ def test_report_rejects_wrong_model_identity(tmp_path):
         )
 
 
-@pytest.mark.parametrize("method", ["HumanJailbreaks", "TAP-Transfer"])
+@pytest.mark.parametrize("method", ["HumanJailbreaks", "TAP-Transfer", "PAIR"])
 def test_generated_run_requires_all_three_matching_controls(tmp_path, method):
     dataset = tmp_path / "dataset.jsonl"
     rollouts = tmp_path / "rollouts.jsonl"
@@ -188,11 +188,12 @@ def test_generated_run_requires_all_three_matching_controls(tmp_path, method):
     )
     manifest, _ = build(**kwargs)
     assert manifest["status"] == "validated"
-    assert manifest["protocol_validation"] == (
-        "passed_generation_classifier_copyright_controls"
-        if method == "HumanJailbreaks"
-        else "passed_transfer_source_classifier_copyright_controls"
-    )
+    expected_protocol = {
+        "HumanJailbreaks": "passed_generation_classifier_copyright_controls",
+        "TAP-Transfer": "passed_transfer_source_classifier_copyright_controls",
+        "PAIR": "passed_iterative_generation_classifier_copyright_controls",
+    }
+    assert manifest["protocol_validation"] == expected_protocol[method]
     quality.write_text(json.dumps({"run": {"verdicts": {"healthy": 1, "unhealthy": 0, "unobserved": 1}}}))
     manifest_with_gap, _ = build(**kwargs)
     assert manifest_with_gap["status"] == "provisional"
