@@ -277,3 +277,13 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
 - Fresh Super target collection scored 400/400 healthy cases with zero failures/missing, 35 successes, and 8.75% ASR. Raw
   classifier replay matched 300/300 and copyright replay matched 100/100. The strict method report and deterministic BLADE
   readback passed. Ordinary PAIR and TAP are now both validated; do not rerun either source or target result.
+
+## Client-fresh PAIR full Super milestone — 2026-09-21 17:25 CDT
+
+- All three `pair-super-full-400-20260921a` source-order shards completed and reconciled to 400 behaviors with 16,380
+  independently receipted Super target calls. The canonical finalizer produced 400 cases, and the deep validator checked
+  every behavior, test case, call, shard, source index, source CSV hash, model/revision binding, and final source order.
+- Fresh Super target collection scored 400/400 healthy cases with zero failures/missing, 25 successes, and 6.25% ASR.
+  Raw classifier parity matched 300/300, copyright parity matched 100/100, and deterministic BLADE manifest/output
+  readback passed. Fresh PAIR is validated and must not be rerun. The three Fresh TAP shards remain active; do not
+  duplicate, redeploy, or finalize them until all calls are terminal and their receipts validate.

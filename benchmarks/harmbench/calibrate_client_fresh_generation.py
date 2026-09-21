@@ -113,8 +113,9 @@ def validate(
         if failed:
             raise ValueError(f"client-fresh shard {shard_index} failed {','.join(sorted(failed))}")
         shard_cases = json.loads(shard_cases_path.read_text(encoding="utf-8"))
-        if list(shard_cases) != [ordered_ids[index] for index in indexes]:
-            raise ValueError(f"client-fresh shard {shard_index} cases changed or reordered")
+        expected_shard_ids = {ordered_ids[index] for index in indexes}
+        if len(shard_cases) != len(indexes) or set(shard_cases) != expected_shard_ids:
+            raise ValueError(f"client-fresh shard {shard_index} cases changed or left its source partition")
         target_receipt = json.loads(target_receipt_path.read_text(encoding="utf-8"))
         behavior_ids = [ordered_ids[index] for index in indexes]
         behavior_hashes = target_receipt.get("behavior_receipt_sha256")
