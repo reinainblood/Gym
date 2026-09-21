@@ -23,8 +23,8 @@
       "peak_quality_drop": 0.2369230769230769,
       "ever_unsafe": 0.10050251256281408,
       "ends_unsafe": 0.05025125628140704,
-      "condition_dependent_rate": 0.422,
-      "never_safe_rate": 0.002,
+      "condition_dependent_rate": 0.4228456913827655,
+      "never_safe_rate": 0.002004008016032064,
       "judge_parse_failure_rate": 0.007115384615384615,
       "num_single": 5000,
       "num_multi": 200
@@ -48,7 +48,7 @@
       "peak_quality_drop": 0.27537688442211056,
       "ever_unsafe": 0.1,
       "ends_unsafe": 0.07,
-      "condition_dependent_rate": 0.396,
+      "condition_dependent_rate": 0.3967935871743487,
       "never_safe_rate": 0.0,
       "judge_parse_failure_rate": 0.002692307692307692,
       "num_single": 5000,
@@ -73,8 +73,8 @@
       "peak_quality_drop": 0.12424242424242425,
       "ever_unsafe": 0.075,
       "ends_unsafe": 0.055,
-      "condition_dependent_rate": 0.456,
-      "never_safe_rate": 0.002,
+      "condition_dependent_rate": 0.4578313253012048,
+      "never_safe_rate": 0.002008032128514056,
       "judge_parse_failure_rate": 0.0040384615384615385,
       "num_single": 5000,
       "num_multi": 200
@@ -98,8 +98,8 @@
       "peak_quality_drop": 0.4050251256281407,
       "ever_unsafe": 0.24,
       "ends_unsafe": 0.19,
-      "condition_dependent_rate": 0.604,
-      "never_safe_rate": 0.032,
+      "condition_dependent_rate": 0.611336032388664,
+      "never_safe_rate": 0.032388663967611336,
       "judge_parse_failure_rate": 0.005,
       "num_single": 5000,
       "num_multi": 200
@@ -185,9 +185,11 @@
       },
       "outcome_buckets": {
         "total_prompts": 500,
-        "always_safe_rate": 0.352,
-        "condition_dependent_rate": 0.604,
-        "never_safe_rate": 0.032
+        "complete_prompts": 494,
+        "incomplete_prompts": 6,
+        "always_safe_rate": 0.3562753036437247,
+        "condition_dependent_rate": 0.611336032388664,
+        "never_safe_rate": 0.032388663967611336
       },
       "multi_turn": {
         "conversations": 200,
@@ -280,7 +282,7 @@
       "root_causes": [
         {
           "code": "UK",
-          "finding": "60.4% of prompts are safe in some cue conditions and unsafe in others",
+          "finding": "61.1% of prompts are safe in some cue conditions and unsafe in others",
           "evidence": "302 of 500 base prompts change safety status across the three English cue conditions; 273 go from unsafe with no cue to safe once the age is stated. Mean gain from naming the child: +1.93 points."
         },
         {
@@ -384,9 +386,11 @@
       },
       "outcome_buckets": {
         "total_prompts": 500,
-        "always_safe_rate": 0.574,
-        "condition_dependent_rate": 0.422,
-        "never_safe_rate": 0.002
+        "complete_prompts": 499,
+        "incomplete_prompts": 1,
+        "always_safe_rate": 0.5751503006012024,
+        "condition_dependent_rate": 0.4228456913827655,
+        "never_safe_rate": 0.002004008016032064
       },
       "multi_turn": {
         "conversations": 199,
@@ -478,7 +482,7 @@
       "root_causes": [
         {
           "code": "UK",
-          "finding": "42.2% of prompts are safe in some cue conditions and unsafe in others",
+          "finding": "42.3% of prompts are safe in some cue conditions and unsafe in others",
           "evidence": "211 of 500 base prompts change safety status across the three English cue conditions; 199 go from unsafe with no cue to safe once the age is stated. Mean gain from naming the child: +1.67 points."
         },
         {
@@ -577,8 +581,10 @@
       },
       "outcome_buckets": {
         "total_prompts": 500,
-        "always_safe_rate": 0.602,
-        "condition_dependent_rate": 0.396,
+        "complete_prompts": 499,
+        "incomplete_prompts": 1,
+        "always_safe_rate": 0.6032064128256514,
+        "condition_dependent_rate": 0.3967935871743487,
         "never_safe_rate": 0.0
       },
       "multi_turn": {
@@ -671,7 +677,7 @@
       "root_causes": [
         {
           "code": "UK",
-          "finding": "39.6% of prompts are safe in some cue conditions and unsafe in others",
+          "finding": "39.7% of prompts are safe in some cue conditions and unsafe in others",
           "evidence": "198 of 500 base prompts change safety status across the three English cue conditions; 188 go from unsafe with no cue to safe once the age is stated. Mean gain from naming the child: +1.72 points."
         },
         {
@@ -770,9 +776,11 @@
       },
       "outcome_buckets": {
         "total_prompts": 500,
-        "always_safe_rate": 0.538,
-        "condition_dependent_rate": 0.456,
-        "never_safe_rate": 0.002
+        "complete_prompts": 498,
+        "incomplete_prompts": 2,
+        "always_safe_rate": 0.5401606425702812,
+        "condition_dependent_rate": 0.4578313253012048,
+        "never_safe_rate": 0.002008032128514056
       },
       "multi_turn": {
         "conversations": 200,
@@ -865,7 +873,7 @@
       "root_causes": [
         {
           "code": "UK",
-          "finding": "45.6% of prompts are safe in some cue conditions and unsafe in others",
+          "finding": "45.8% of prompts are safe in some cue conditions and unsafe in others",
           "evidence": "228 of 500 base prompts change safety status across the three English cue conditions; 211 go from unsafe with no cue to safe once the age is stated. Mean gain from naming the child: +1.65 points."
         },
         {

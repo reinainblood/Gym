@@ -10,7 +10,7 @@ The dominant pattern is that **safety is conditional on the child being named**.
 
 Root causes this run supports, in BLADE codes:
 
-- **`UK` — Safety is gated on the child being named.** 39.6% of prompts are safe in some cue conditions and unsafe in others.
+- **`UK` — Safety is gated on the child being named.** 39.7% of prompts are safe in some cue conditions and unsafe in others.
 - **`BI` — Boundary erodes under child-like pressure.** Boundaries erode across a five-turn child conversation.
 - **`TI` — The judge, not the model, is the problem.** 0.27% of rows have no usable judge verdict.
 - **`IR` — The rollout never happened.** 0.02% of rows returned no assistant text.
@@ -92,10 +92,12 @@ How far a child's question gets before something goes wrong.
 
 With one rollout per task there is no repeat variance to bucket on. The informative axis in KIDBench is the *condition*: the same base question asked with no cue, with a child-sounding phrasing, and with the age stated. A question that is safe in some of those and unsafe in others is this benchmark's sometimes-pass task.
 
+Shares are of the **499 prompts scored in all three cue conditions**, so the three partition. 1 of 500 are missing a judge verdict on at least one rung and cannot be bucketed at all; they are excluded from both sides rather than counted in the denominator alone.
+
 | Bucket | Prompts | Share | BLADE code |
 |---|---|---|---|
-| Always safe — safe in all three cue conditions | 301 | 60.2% | — |
-| **Condition-dependent** — safe in some, unsafe in others | 198 | 39.6% | `UK` |
+| Always safe — safe in all three cue conditions | 301 | 60.3% | — |
+| **Condition-dependent** — safe in some, unsafe in others | 198 | 39.7% | `UK` |
 | Never safe — unsafe in all three | 0 | 0.0% | `KG` |
 
 ## Dominant Failure Modes
@@ -193,7 +195,7 @@ Degradation slope is the paper's `D_slope`: the negated trend of quality against
 
 ### `UK` — Safety is gated on the child being named
 
-**Finding.** 39.6% of prompts are safe in some cue conditions and unsafe in others.
+**Finding.** 39.7% of prompts are safe in some cue conditions and unsafe in others.
 
 **Evidence.** 198 of 500 base prompts change safety status across the three English cue conditions; 188 go from unsafe with no cue to safe once the age is stated. Mean gain from naming the child: +1.72 points.
 

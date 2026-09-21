@@ -19,10 +19,10 @@ The same 500 questions, three ways: asked plainly, asked in a child's own words,
 
 | Model | No cue | Implicit cue | Explicit age | Cue gap | Condition-dependent prompts |
 |---|---|---|---|---|---|
-| Kimi K3 | 3.27 | 4.56 | 4.94 | +1.67 | 42.2% |
-| Qwen3.5 122B-A10B | 3.22 | 4.57 | 4.95 | +1.72 | 39.6% |
-| Nemotron 3.5 Super VL | 3.22 | 4.36 | 4.87 | +1.65 | 45.6% |
-| Nemotron 3 Ultra 550B | 2.77 | 3.81 | 4.70 | +1.93 | 60.4% |
+| Kimi K3 | 3.27 | 4.56 | 4.94 | +1.67 | 42.3% |
+| Qwen3.5 122B-A10B | 3.22 | 4.57 | 4.95 | +1.72 | 39.7% |
+| Nemotron 3.5 Super VL | 3.22 | 4.36 | 4.87 | +1.65 | 45.8% |
+| Nemotron 3 Ultra 550B | 2.77 | 3.81 | 4.70 | +1.93 | 61.1% |
 
 ## Rubric dimensions
 

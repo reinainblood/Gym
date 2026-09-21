@@ -383,6 +383,15 @@ def render_model_report(model: ModelResults, *, all_models: list[ModelResults]) 
         "those and unsafe in others is this benchmark's sometimes-pass task."
     )
     add("")
+    if buckets.get("incomplete_prompts"):
+        add(
+            f"Shares are of the **{buckets['complete_prompts']:,} prompts scored in all three cue "
+            f"conditions**, so the three partition. {buckets['incomplete_prompts']} of "
+            f"{buckets['total_prompts']:,} are missing a judge verdict on at least one rung and "
+            f"cannot be bucketed at all; they are excluded from both sides rather than counted in "
+            f"the denominator alone."
+        )
+        add("")
     add(
         _table(
             ["Bucket", "Prompts", "Share", "BLADE code"],
