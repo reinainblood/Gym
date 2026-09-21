@@ -50,3 +50,20 @@ math, search width, candidate losses, or global argmin.
 
 Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch completion remain governed by the active Volume
 `harmbench-qwen35-122b-whitebox-results`; never duplicate active shards or overwrite completed receipts.
+
+## Codex takeover update — 2026-09-21 05:02 CDT
+
+- Super canary `super-gcg-canary-20260921c` passed. The original call produced the valid upstream nested
+  one-behavior artifact but the old wrapper counted a flat filename and ended with `GCG shard saved 0/1`.
+  Commits `fc1acb8` and `fe69585` fixed the nested path and added a pre-model-load completeness short-circuit.
+  Repair call `fc-01M31PJBPVP065CRB3ZC02EHS1` reused the existing artifact without rerunning optimization and
+  persisted `shard-receipts/super-00-of-01.json`.
+- Full Super campaign artifact: `super-gcg-full-20260921a`. Exactly two source-order shards are active:
+  shard 0 `fc-01M31PKEVXNAFW3ZG082K5FQ3D`; shard 1 `fc-01M31PKEZX35EG5DF0RDMJGQ76`.
+  Do not launch another campaign or duplicate either shard while its call/container is live. Resume only missing
+  nested behavior artifacts with the same artifact ID and shard indexes after terminal calls and zero attack workers.
+- Qwen MultiModalPGD now has complete 110/110 canonical 512-token scoring and BLADE evidence. The long-running
+  MultiModalPGDBlankImage campaign remains active under app `ap-07zo5VR8b4cd4UHMb6VHBM`; Patch remains incomplete
+  and must not be resumed until active BlankImage workers drain and exact missing indexes are reconciled.
+- The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
+  confused with or scaled down for the separate GCG runtime.
