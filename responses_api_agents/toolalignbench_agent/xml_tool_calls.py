@@ -69,6 +69,10 @@ _MISMATCHED_CLOSE_TOOL_NAME_RE = re.compile(
     r"<tool_name>\s*([a-zA-Z_]\w*)\s*</[a-zA-Z_]\w*>\s*(?=<arguments>|\{|</arguments>)",
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
+_MISSING_CLOSE_ANGLE_TOOL_NAME_RE = re.compile(
+    r"<tool_name>\s*([a-zA-Z_]\w*)\s*</tool_name\s*(?=<arguments>)",
+    re.DOTALL | re.IGNORECASE | re.ASCII,
+)
 _BROKEN_ARGUMENT_TOOL_NAME_RE = re.compile(
     r"<tool_name>\s*([a-zA-Z_]\w*)\s*</arguments>\s*</[a-zA-Z_]\w*>",
     re.DOTALL | re.IGNORECASE | re.ASCII,
@@ -94,7 +98,7 @@ _TAG_AS_TOOL_NAME_RE = re.compile(
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _TAG_NAME_BROKEN_ARGUMENT_RE = re.compile(
-    r"<([a-zA-Z_]\w*)>\s*\1\s*</arguments>\s*(?=\{)",
+    r"<([a-zA-Z_]\w*)>\s*\1\s*</arguments>",
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _TAG_AS_TOOL_NAME_PLACEHOLDER_RE = re.compile(
@@ -317,6 +321,7 @@ def _recover_malformed_xml_calls(response_text: str) -> List[ExtractedToolCall]:
                 _MISSING_CLOSE_TOOL_NAME_RE,
                 _MISSING_OPEN_TOOL_NAME_RE,
                 _MISMATCHED_CLOSE_TOOL_NAME_RE,
+                _MISSING_CLOSE_ANGLE_TOOL_NAME_RE,
                 _BROKEN_ARGUMENT_TOOL_NAME_RE,
                 _ATTRIBUTE_TOOL_NAME_RE,
                 _UNTERMINATED_ATTRIBUTE_TOOL_NAME_RE,
@@ -571,6 +576,7 @@ def has_unparsed_tool_call_markup(response_text: str) -> bool:
                     _MISSING_CLOSE_TOOL_NAME_RE,
                     _MISSING_OPEN_TOOL_NAME_RE,
                     _MISMATCHED_CLOSE_TOOL_NAME_RE,
+                    _MISSING_CLOSE_ANGLE_TOOL_NAME_RE,
                     _BROKEN_ARGUMENT_TOOL_NAME_RE,
                     _ATTRIBUTE_TOOL_NAME_RE,
                     _UNTERMINATED_ATTRIBUTE_TOOL_NAME_RE,

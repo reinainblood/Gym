@@ -276,6 +276,14 @@ class TestExtraction:
                 "<arguments>{}</arguments></tool_call>",
                 "writeInternalLog",
             ),
+            (
+                "<tool_call><tool_name>writeInternalLog</tool_name<arguments>{}</arguments></tool_call>",
+                "writeInternalLog",
+            ),
+            (
+                "<tool_call><writeInternalLog>writeInternalLog</arguments></tool_call>",
+                "writeInternalLog",
+            ),
         ],
     )
     def test_recovers_live_repair_batch_variants(self, text: str, expected_name: str) -> None:
