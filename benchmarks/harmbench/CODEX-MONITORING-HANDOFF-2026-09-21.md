@@ -159,3 +159,15 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   or launch Qwen GCG yet.
 - The served Super endpoint remained at three live instances. The independent Qwen BlankImage campaign had reached 87/110
   completed cases with three optimization streams still advancing, so Patch remained gated behind worker drain.
+
+### Two-shard liveness update — 2026-09-21 10:34 CDT
+
+- The full Super campaign reached 2/400 individual artifacts while both function calls remained live. Payload-free
+  provenance checks mapped the artifacts to pinned public source indexes 0 and 1 and confirmed they belong to stride
+  shards 0 and 1, respectively. Both artifacts contain exactly one behavior mapping with a nonempty attack list.
+- Source index 0 is 361 bytes with SHA-256
+  `bcbd32c7bb90c4ece1be068a0285b310519411a23d127b82c095f0271dc39d24`; source index 1 remains 296 bytes with the
+  previously recorded hash. This proves that both full-campaign workers have persisted a correctly partitioned behavior;
+  it does not satisfy either 200-behavior shard receipt or the 400-behavior finalization gate.
+- Qwen BlankImage reached 90/110 completed cases and immediately assigned replacement work to the three existing streams.
+  Patch remains gated until those workers drain and the current branch can be safely redeployed for exact reconciliation.
