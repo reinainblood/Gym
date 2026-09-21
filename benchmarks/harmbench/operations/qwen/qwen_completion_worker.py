@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -35,6 +36,64 @@ def sha256(path: Path) -> str:
 
 def text_sha256(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+def validate_completion_receipt(
+    output_path: Path,
+    parent_path: Path,
+    *,
+    checkpoint_config_sha256: str,
+    checkpoint_index_sha256: str,
+    processor_file_sha256: dict[str, str],
+    rendered_prompt_sha256: str,
+) -> dict:
+    """Accept an existing canonical completion only when its full hash chain survives readback."""
+    parent = json.loads(parent_path.read_text(encoding="utf-8"))
+    receipt = json.loads(output_path.read_text(encoding="utf-8"))
+    required = {
+        "schema_version": 1,
+        "artifact_kind": "target_completion",
+        "status": "completed",
+        "method": parent.get("method"),
+        "public_method_class": parent.get("public_method_class"),
+        "index": parent.get("index"),
+        "behavior_id": parent.get("behavior_id"),
+        "behavior": parent.get("behavior"),
+        "context": parent.get("context", ""),
+        "functional_category": parent.get("functional_category"),
+        "semantic_category": parent.get("semantic_category"),
+        "model_id": MODEL_ID,
+        "model_revision": MODEL_REVISION,
+        "checkpoint_config_sha256": checkpoint_config_sha256,
+        "checkpoint_index_sha256": checkpoint_index_sha256,
+        "processor_file_sha256": processor_file_sha256,
+        "parent_receipt": parent_path.name,
+        "parent_receipt_sha256": sha256(parent_path),
+        "parent_generation_sha256": parent.get("generation_sha256"),
+        "parent_max_new_tokens": 256,
+        "test_case_image": parent.get("test_case_image"),
+        "test_case_image_sha256": parent.get("test_case_image_sha256"),
+        "rendered_prompt_sha256": rendered_prompt_sha256,
+        "max_new_tokens": PROTOCOL_MAX_NEW_TOKENS,
+        "sampling": {"do_sample": False, "num_beams": 1, "use_cache": False},
+    }
+    mismatched = [key for key, value in required.items() if receipt.get(key) != value]
+    image_path = Path(str(parent.get("test_case_image", "")))
+    if not image_path.is_file() or parent.get("test_case_image_sha256") != sha256(image_path):
+        mismatched.append("test_case_image_sha256")
+    generation = receipt.get("generation")
+    if not isinstance(generation, str) or receipt.get("generation_sha256") != text_sha256(generation):
+        mismatched.append("generation_sha256")
+    token_count = receipt.get("generation_token_count")
+    if not isinstance(token_count, int) or not 0 <= token_count <= PROTOCOL_MAX_NEW_TOKENS:
+        mismatched.append("generation_token_count")
+    elif receipt.get("finish_reason") != ("length" if token_count >= PROTOCOL_MAX_NEW_TOKENS else "stop"):
+        mismatched.append("finish_reason")
+    if not isinstance(receipt.get("prompt_token_count"), int) or receipt["prompt_token_count"] <= 0:
+        mismatched.append("prompt_token_count")
+    if mismatched:
+        raise ValueError(f"existing canonical completion failed fields {','.join(sorted(set(mismatched)))}")
+    return receipt
 
 
 class QwenCompletionRuntime:
@@ -87,6 +146,16 @@ class QwenCompletionRuntime:
 
         output_path = output_dir / parent_path.name
         if output_path.exists():
+            parent = json.loads(parent_path.read_text(encoding="utf-8"))
+            prompt = self.render_prompt(parent["behavior"])
+            validate_completion_receipt(
+                output_path,
+                parent_path,
+                checkpoint_config_sha256=self.config_sha256,
+                checkpoint_index_sha256=self.index_sha256,
+                processor_file_sha256=self.processor_sha256,
+                rendered_prompt_sha256=text_sha256(prompt),
+            )
             return {"case": parent_path.name, "status": "already_complete"}
 
         parent = json.loads(parent_path.read_text())
@@ -153,7 +222,9 @@ class QwenCompletionRuntime:
             ),
         }
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(receipt, indent=2, sort_keys=True))
+        temporary = output_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(temporary, output_path)
         return {
             "case": parent_path.name,
             "status": "completed",

@@ -112,6 +112,7 @@ def score_canonical(run_id: str, method: str) -> dict:
         method=method,
         repeats=2,
         expected_cases=110,
+        parent_dir=method_dir / "cases",
     )
     receipt.update({"run_id": run_id})
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -113,6 +113,7 @@ def score_canonical_receipts(
     method: str,
     repeats: int = 2,
     expected_cases: int = 110,
+    parent_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Score one complete canonical 512-token white-box cohort without retaining payload text."""
     if method not in WHITEBOX_METHODS:
@@ -125,6 +126,9 @@ def score_canonical_receipts(
     canonical = load_receipts(canonical_dir)
     if len(canonical) != expected_cases:
         raise ValueError(f"expected {expected_cases} canonical receipts for {method}, found {len(canonical)}")
+    parents = load_receipts(parent_dir) if parent_dir is not None else {}
+    if parent_dir is not None and set(parents) != set(canonical):
+        raise ValueError("canonical and parent receipt filenames do not match")
 
     case_rows: list[dict[str, Any]] = []
     for name in sorted(canonical):
@@ -135,10 +139,26 @@ def score_canonical_receipts(
             raise ValueError(f"canonical target identity mismatch for {name}")
         if receipt.get("max_new_tokens") != 512:
             raise ValueError(f"canonical token cap mismatch for {name}")
+        generation = receipt.get("generation")
+        if not isinstance(generation, str) or receipt.get("generation_sha256") != text_sha256(generation):
+            raise ValueError(f"canonical generation hash mismatch for {name}")
+        if parent_dir is not None:
+            parent_path, parent = parents[name]
+            expected_parent = {
+                "index": parent.get("index"),
+                "behavior_id": parent.get("behavior_id"),
+                "behavior": parent.get("behavior"),
+                "context": parent.get("context", ""),
+                "method": parent.get("method"),
+                "test_case_image_sha256": parent.get("test_case_image_sha256"),
+                "parent_receipt": parent_path.name,
+                "parent_receipt_sha256": sha256(parent_path),
+            }
+            parent_mismatch = [key for key, value in expected_parent.items() if receipt.get(key) != value]
+            if parent_mismatch:
+                raise ValueError(f"canonical parent provenance mismatch for {name}: {','.join(parent_mismatch)}")
 
-        scores = [
-            score(receipt["behavior"], receipt.get("context", ""), receipt["generation"]) for _ in range(repeats)
-        ]
+        scores = [score(receipt["behavior"], receipt.get("context", ""), generation) for _ in range(repeats)]
         labels = [row["label"] for row in scores]
         case_rows.append(
             {

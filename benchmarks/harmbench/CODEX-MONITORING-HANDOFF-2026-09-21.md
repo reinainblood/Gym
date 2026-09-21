@@ -69,6 +69,10 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   resume path now skips an existing index only after validating its case receipt, paired image and hash, exact method and
   checkpoint identity, public hyperparameters, generation hash, step accounting, and optimization-checkpoint files. A
   present-but-stale or truncated JSON is not completion evidence and must fail closed rather than suppress repair.
+- The separate 512-token completion runtime now follows the same rule: existing completions are skipped only after parent
+  receipt/image hashes, BF16 checkpoint and processor identities, prompt hash, deterministic sampling, token cap/count,
+  finish reason, and generation hash validate. It writes new completion receipts atomically. Canonical scoring explicitly
+  rehashes the sibling parent receipts and rejects any parent/canonical filename or provenance drift before classification.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
 

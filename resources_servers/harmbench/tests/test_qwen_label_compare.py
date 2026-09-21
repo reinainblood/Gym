@@ -1,11 +1,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import hashlib
 import json
 
 import pytest
 
-from benchmarks.harmbench.operations.qwen.qwen_label_compare import score_canonical_receipts, summarize_case_rows
+from benchmarks.harmbench.operations.qwen.qwen_label_compare import (
+    score_canonical_receipts,
+    sha256,
+    summarize_case_rows,
+)
 from resources_servers.harmbench.app import CONTEXTUAL_PROMPT as APP_CONTEXTUAL_PROMPT
 from resources_servers.harmbench.app import STANDARD_PROMPT as APP_STANDARD_PROMPT
 from resources_servers.harmbench.prompts import CONTEXTUAL_PROMPT, STANDARD_PROMPT
@@ -84,7 +89,7 @@ def _write_canonical(path, *, index: int, method: str = "MultiModalPGDBlankImage
                 "model_revision": "dc4d348443bc740c68e2d77492492c11606384d5",  # pragma: allowlist secret
                 "max_new_tokens": 512,
                 "generation": f"synthetic generation {index}",
-                "generation_sha256": f"generation-hash-{index}",
+                "generation_sha256": hashlib.sha256(f"synthetic generation {index}".encode()).hexdigest(),
                 "parent_receipt_sha256": f"parent-hash-{index}",
                 "test_case_image_sha256": f"image-hash-{index}",
                 "functional_category": "standard",
@@ -189,3 +194,46 @@ def test_canonical_scoring_counts_invalid_output_from_either_repeat(tmp_path):
     assert receipt["summary"]["invalid_classifier_outputs"] == 1
     assert receipt["summary"]["repeat_agreement"] == 0
     assert receipt["summary"]["repeat_valid_agreement"] == 0
+
+
+def test_canonical_scoring_rehashes_parent_receipts(tmp_path):
+    canonical = tmp_path / "completions-512"
+    parents = tmp_path / "cases"
+    canonical.mkdir()
+    parents.mkdir()
+    canonical_path = canonical / "000.json"
+    parent_path = parents / "000.json"
+    _write_canonical(canonical_path, index=0)
+    parent = {
+        "status": "completed",
+        "index": 0,
+        "behavior_id": "id-0",
+        "behavior": "synthetic behavior 0",
+        "context": "",
+        "method": "MultiModalPGDBlankImage",
+        "test_case_image_sha256": "image-hash-0",
+    }
+    parent_path.write_text(json.dumps(parent), encoding="utf-8")
+    receipt = json.loads(canonical_path.read_text())
+    receipt["parent_receipt"] = parent_path.name
+    receipt["parent_receipt_sha256"] = sha256(parent_path)
+    canonical_path.write_text(json.dumps(receipt), encoding="utf-8")
+    scored = score_canonical_receipts(
+        canonical_dir=canonical,
+        parent_dir=parents,
+        score=lambda *_: {"label": 0, "generation_clipped": False},
+        method="MultiModalPGDBlankImage",
+        expected_cases=1,
+    )
+    assert scored["summary"]["scored_cases"] == 1
+
+    parent["context"] = "changed"
+    parent_path.write_text(json.dumps(parent), encoding="utf-8")
+    with pytest.raises(ValueError, match="parent provenance mismatch"):
+        score_canonical_receipts(
+            canonical_dir=canonical,
+            parent_dir=parents,
+            score=lambda *_: {"label": 0, "generation_clipped": False},
+            method="MultiModalPGDBlankImage",
+            expected_cases=1,
+        )

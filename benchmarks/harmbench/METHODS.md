@@ -95,6 +95,9 @@ method keys in the paper's pipeline.
   identity, public hyperparameters, source index, paired image and hash, target-generation hash, executed-step/early-stop
   consistency, and optimization-checkpoint files must all survive readback. This prevents a partial case JSON from hiding
   an exact missing index when BlankImage or Patch is resumed after worker drain.
+- The 512-token completion resume and scoring boundaries likewise validate the exact parent receipt/image hash chain,
+  BF16 checkpoint and processor hashes, rendered prompt, deterministic sampling profile, completion token accounting,
+  generation hash, and sibling parent filename set. New completion receipts use atomic replacement.
 - `operations/qwen/modal_qwen_gcg_completion.py` is the post-generation target-completion stage for the matched Qwen
   GCG baseline. It mounts the same immutable BF16 checkpoint as optimization, reproduces the pinned upstream tokenizer
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG
