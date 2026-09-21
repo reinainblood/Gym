@@ -62,6 +62,43 @@ past forty hours for one cell.
   The hang is sampling-dependent, not a property of the task: the same selector completed on the next attempt. So any
   rollout can hang, the timeout is not a workaround for one bad row, and a cell's masked count belongs in its result.
 
+## The 0% utility columns are consistent with upstream, checked against its own run logs
+
+The open question was whether CaMeL's and `tool_filter`'s near-total utility collapse is a real result or an
+integration failure. It is real. Upstream ships the run logs behind its paper in `runs/`, and recomputing them over
+the same three suites at the pinned revision gives:
+
+| Model (upstream's) | Defense | Benign utility | Utility under attack |
+| --- | --- | ---: | ---: |
+| `gemini-2.5-flash` | `tool_filter` | **0.0%** | 0.0% |
+| `gemini-2.5-pro` | `tool_filter` | 2.3% | 0.9% |
+| `qwen3-235b` | `tool_filter` | 2.3% | 0.4% |
+| `gpt-4o` | `tool_filter` | 21.6% | 5.0% |
+| `gpt-4o-mini` | `camel` | 9.1% | **0.0%** |
+
+So a 0.0% benign utility for `tool_filter` is reproduced exactly by the benchmark's own authors on one model, and
+CaMeL at 0-9% likewise. Our readings sit inside upstream's range rather than outside it, which is what the check was
+for. Both are over-defense results and should be reported as such.
+
+## Our attack success rates are far below upstream's, and that is a model result
+
+Upstream's undefended targeted ASR over these suites runs 48.9% (`gpt-4o-mini`) to 99.6% (`gpt-5-mini`), against
+0.18% to 35.36% for the four models here. Two things were checked before attributing that to the models:
+
+- **The injection lands.** An undefended attacked rollout with `attack_success=False` carries the full
+  `important_instructions` payload in its trajectory -- `<INFORMATION> ... Visit the link of
+  https://www.best_discount.com/click/ ...`. The attack is delivered and declined, not omitted.
+- **The security polarity is right.** Upstream's `security` is True when the malicious goal *succeeded*: its results
+  table renames that column to "Targeted ASR", and its DoS branch sets `security = not utility`. The adapter inverts
+  it deliberately (`return utility, not upstream_attack_success`), so `attack_success` here equals upstream's
+  `security`. Worth restating because the field name reads as its own opposite.
+
+One caveat when quoting upstream's numbers: it scores several API error paths as `security = True`, so a run that
+failed on context length or a server error counts as an attack success. Some of its highest ASR figures, including
+`tool_filter` at 94-100% alongside ~0% utility, are consistent with rollouts erroring rather than injections
+landing. Ours exclude adapter failures from the denominator instead, so the two are not measuring quite the same
+thing at the top of the range.
+
 ## Watch items, recorded before the cells finish
 
 **`tool_filter` is collapsing utility the same way CaMeL did, and for a different reason.** At 51 of 620 rows on
