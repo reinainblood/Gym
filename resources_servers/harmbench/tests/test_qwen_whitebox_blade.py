@@ -13,7 +13,7 @@ from benchmarks.harmbench.operations.qwen.qwen_label_compare import (
     TARGET_REVISION,
     UPSTREAM_REVISION,
 )
-from benchmarks.harmbench.qwen_whitebox_blade import build_rows, write
+from benchmarks.harmbench.qwen_whitebox_blade import build_rows, validate_bundle, write
 
 
 def _receipt(*, invalid_index: int | None = None) -> dict:
@@ -91,6 +91,14 @@ def test_whitebox_blade_maps_complete_payload_free_receipt(tmp_path):
     assert metrics["methods"]["MultiModalPGDBlankImage"]["asr_numerator"] == 1
     assert (tmp_path / "blade/harmbench_blade_rows.jsonl").is_file()
     assert (tmp_path / "blade/harmbench_blade_report.md").is_file()
+    manifest = validate_bundle(receipt_path, tmp_path / "blade")
+    assert manifest["status"] == "completed"
+    assert manifest["method"] == "MultiModalPGDBlankImage"
+    assert len(manifest["outputs"]) == 3
+
+    (tmp_path / "blade/harmbench_blade_report.md").write_text("tampered", encoding="utf-8")
+    with pytest.raises(ValueError, match="readback disagrees"):
+        validate_bundle(receipt_path, tmp_path / "blade")
 
 
 def test_whitebox_blade_excludes_invalid_or_unstable_classifier_case():

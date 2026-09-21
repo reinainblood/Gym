@@ -88,6 +88,9 @@ method keys in the paper's pipeline.
   source/model/classifier revisions, behavior uniqueness, and serial-label stability before writing BLADE rows,
   native ASR metrics, and a deterministic Markdown report. Invalid or unstable classifier cases remain visible
   but are excluded from the model-quality denominator.
+- White-box BLADE generation now emits `evidence-manifest.json`, immediately reparses and recomputes the 110 rows,
+  metrics, and report, and verifies every output hash and byte size. The completed MultiModalPGD remote bundle was
+  backfilled and read back successfully in FDR; its compact local receipt records the Volume path and manifest hash.
 - The Qwen white-box attack resume boundary validates every existing case receipt before skipping it: method/checkpoint
   identity, public hyperparameters, source index, paired image and hash, target-generation hash, executed-step/early-stop
   consistency, and optimization-checkpoint files must all survive readback. This prevents a partial case JSON from hiding

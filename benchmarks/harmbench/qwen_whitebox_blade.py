@@ -18,6 +18,7 @@ from benchmarks.harmbench.operations.qwen.qwen_label_compare import (
     TARGET_REVISION,
     UPSTREAM_REVISION,
     WHITEBOX_METHODS,
+    sha256,
 )
 
 
@@ -165,15 +166,77 @@ def write(receipt_path: Path, output_dir: Path) -> dict[str, Any]:
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     rows = build_rows(receipt)
     output_dir.mkdir(parents=True, exist_ok=True)
-    with (output_dir / "harmbench_blade_rows.jsonl").open("w", encoding="utf-8") as stream:
+    rows_path = output_dir / "harmbench_blade_rows.jsonl"
+    metrics_path = output_dir / "harmbench_blade_metrics.json"
+    report_path = output_dir / "harmbench_blade_report.md"
+    with rows_path.open("w", encoding="utf-8") as stream:
         for row in rows:
             stream.write(json.dumps(row, sort_keys=True) + "\n")
     metrics = summarize(rows)
-    (output_dir / "harmbench_blade_metrics.json").write_text(
-        json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    metrics_path.write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    report_path.write_text(render_report(metrics), encoding="utf-8")
+    outputs = [
+        {"name": path.name, "size_bytes": path.stat().st_size, "sha256": sha256(path)}
+        for path in (rows_path, metrics_path, report_path)
+    ]
+    evidence = {
+        "schema_version": 1,
+        "artifact_kind": "harmbench_whitebox_blade_bundle",
+        "status": "completed",
+        "method": receipt["method"],
+        "target_model": TARGET_MODEL,
+        "target_revision": TARGET_REVISION,
+        "classifier_model": CLASSIFIER_MODEL,
+        "classifier_revision": CLASSIFIER_REVISION,
+        "input_classifier_scores_sha256": sha256(receipt_path),
+        "rows": len(rows),
+        "outputs": outputs,
+    }
+    (output_dir / "evidence-manifest.json").write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    (output_dir / "harmbench_blade_report.md").write_text(render_report(metrics), encoding="utf-8")
+    validate_bundle(receipt_path, output_dir)
     return metrics
+
+
+def validate_bundle(receipt_path: Path, output_dir: Path) -> dict[str, Any]:
+    """Read back and recompute a complete Qwen white-box BLADE bundle."""
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    expected_rows = build_rows(receipt)
+    expected_metrics = summarize(expected_rows)
+    expected_report = render_report(expected_metrics)
+    rows_path = output_dir / "harmbench_blade_rows.jsonl"
+    metrics_path = output_dir / "harmbench_blade_metrics.json"
+    report_path = output_dir / "harmbench_blade_report.md"
+    evidence_path = output_dir / "evidence-manifest.json"
+    if not all(path.is_file() for path in (rows_path, metrics_path, report_path, evidence_path)):
+        raise FileNotFoundError("Qwen white-box BLADE bundle is incomplete")
+    observed_rows = [json.loads(line) for line in rows_path.read_text(encoding="utf-8").splitlines() if line]
+    observed_metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    observed_report = report_path.read_text(encoding="utf-8")
+    if observed_rows != expected_rows or observed_metrics != expected_metrics or observed_report != expected_report:
+        raise ValueError("Qwen white-box BLADE bundle readback disagrees with recomputed evidence")
+    outputs = [
+        {"name": path.name, "size_bytes": path.stat().st_size, "sha256": sha256(path)}
+        for path in (rows_path, metrics_path, report_path)
+    ]
+    expected_evidence = {
+        "schema_version": 1,
+        "artifact_kind": "harmbench_whitebox_blade_bundle",
+        "status": "completed",
+        "method": receipt["method"],
+        "target_model": TARGET_MODEL,
+        "target_revision": TARGET_REVISION,
+        "classifier_model": CLASSIFIER_MODEL,
+        "classifier_revision": CLASSIFIER_REVISION,
+        "input_classifier_scores_sha256": sha256(receipt_path),
+        "rows": len(expected_rows),
+        "outputs": outputs,
+    }
+    observed_evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    if observed_evidence != expected_evidence:
+        raise ValueError("Qwen white-box BLADE evidence manifest disagrees with bundle readback")
+    return observed_evidence
 
 
 def main() -> None:

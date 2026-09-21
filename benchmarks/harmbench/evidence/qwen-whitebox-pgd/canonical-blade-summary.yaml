@@ -26,6 +26,8 @@ blade:
   rows_sha256: 84e7ec292c0b99f232fb94b03e40f5324c81ebd23444ac1566888016b992e24e  # pragma: allowlist secret
   metrics_sha256: 2df6b13a4edbc2fd1993c4698dddf33abcde4961c853a2d057bdcae1422a5777  # pragma: allowlist secret
   report_sha256: 8406337a28c10bad4dc6a695f9a383b607caeee25b1017838080cd1c20bed021  # pragma: allowlist secret
+  evidence_manifest_sha256: 541019614aad2139398c60d0b243cde1ba20eac19c0f30d29b8fbc711d1b6c5b  # pragma: allowlist secret
+  remote_readback_status: completed
   total_rows: 110
   valid_rows: 110
   excluded_rows: 0
