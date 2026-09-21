@@ -195,8 +195,25 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   evidence manifest that binds row JSONL, metrics JSON, and Markdown by byte size and SHA-256 and fails on tampering.
 - A resumable client-fresh FDR runtime now preserves upstream PAIR/TAP Mixtral attacker/judge settings and changes only
   the independently receipt-bound Super target. Independent target calls within an upstream batch may execute in parallel,
-  while results and hashed call receipts remain in source order. One-behavior canaries are active under calls
-  `fc-01M32PDBQ742DRR68BTMJV16Q0` (PAIR) and `fc-01M32PDBM4K515H5206EZ4ESZX` (TAP). Do not launch their full campaigns
-  until each canary writes a valid `shard-receipt.json`; a live container is not success.
+  while results and hashed call receipts remain in source order. The final one-behavior canaries passed under calls
+  `fc-01M32Q6ACBVR9F2HBJR2JK6H74` (PAIR: 60 target calls) and `fc-01M32Q6A437YR5MYPTEM76ZTNK` (TAP: 20 target calls).
+  Both receipts bind the exact Super model/revision. Earlier attempts failed closed before writing attack artifacts: first on
+  a missing eager upstream provider dependency, then on the endpoint's thinking-mode response shape. The runtime now carries
+  the complete public dependency set and explicitly preserves the campaign's non-thinking target profile.
 - The existing Qwen BlankImage campaign reached 105 filename-level case files with its existing workers still live. This
   remains progress only. Continue to wait for worker drain, then redeploy and use `status_method` before any repair.
+
+## TAP-Transfer full Super milestone — 2026-09-21 14:42 CDT
+
+- The official HarmBench 1.0 Zenodo archive (DOI `10.5281/zenodo.10714577`, archive MD5
+  `ac0e8210389b81951f66da6daaa6db3b`) contains the pinned TAP-Transfer source experiment. The 394,358-byte member was
+  range-read without downloading the 10.4 GB archive and matched SHA-256
+  `71438be2ca516be44b7ffc03230c01719b8fe3c24c9cae89e17deecd28c92de2`.
+- The historical source held 403 behaviors. Import validation proved it covers all 400 behaviors in the current pinned corpus
+  plus exactly three retired IDs bound by a stable aggregate hash. Filtering only those retired rows and restoring current
+  source order produced a 400-case artifact with SHA-256
+  `0b75db8c0151fefb550479f3f27f6976eef578a0f68cc8774f6a6ac3df08ce0e`.
+- Fresh Super collection and scoring completed 400/400 healthy cases with zero failures/missing, 26 successes, and 6.5% ASR.
+  Raw classifier replay matched 300/300; copyright replay matched 100/100. The strict method report and deterministic BLADE
+  bundle readback both passed. Do not reuse any target responses from the historical archive; only its fixed attack cases enter
+  this result.

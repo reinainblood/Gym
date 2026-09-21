@@ -305,6 +305,12 @@ def build(
                 and copyright_control_passed
             )
             or (
+                method_name in {"TAP-Transfer", "GCG-Transfer"}
+                and generation_control_passed
+                and classifier_control_passed
+                and copyright_control_passed
+            )
+            or (
                 method_name == "GCG"
                 and gcg_source_control_passed
                 and classifier_control_passed
@@ -328,6 +334,8 @@ def build(
         protocol_validation = "passed_upstream_pap_classifier_copyright_controls"
     elif validated and method_name == "DirectRequest":
         protocol_validation = "passed_upstream_direct_classifier_copyright_controls"
+    elif validated and method_name in {"TAP-Transfer", "GCG-Transfer"}:
+        protocol_validation = "passed_transfer_source_classifier_copyright_controls"
     elif validated and method_name == "GCG":
         protocol_validation = "passed_gcg_generation_classifier_copyright_controls"
     elif method_name in {"MultiModalDirectRequest", "MultiModalRenderText"}:

@@ -87,7 +87,8 @@ def test_report_rejects_wrong_model_identity(tmp_path):
         )
 
 
-def test_human_run_requires_all_three_matching_controls(tmp_path):
+@pytest.mark.parametrize("method", ["HumanJailbreaks", "TAP-Transfer"])
+def test_generated_run_requires_all_three_matching_controls(tmp_path, method):
     dataset = tmp_path / "dataset.jsonl"
     rollouts = tmp_path / "rollouts.jsonl"
     failures = tmp_path / "failures.jsonl"
@@ -99,8 +100,8 @@ def test_human_run_requires_all_three_matching_controls(tmp_path):
     copyright_control = tmp_path / "copyright.json"
     generation = tmp_path / "generation.json"
     cases = [
-        {"harmbench_id": "a", "method": "HumanJailbreaks", "attack_test_case_index": 0},
-        {"harmbench_id": "b", "method": "HumanJailbreaks", "attack_test_case_index": 0},
+        {"harmbench_id": "a", "method": method, "attack_test_case_index": 0},
+        {"harmbench_id": "b", "method": method, "attack_test_case_index": 0},
     ]
     _write_jsonl(dataset, cases)
     _write_jsonl(
@@ -128,7 +129,7 @@ def test_human_run_requires_all_three_matching_controls(tmp_path):
     source.write_text(
         json.dumps(
             {
-                "method": "HumanJailbreaks",
+                "method": method,
                 "upstream_revision": "pinned-test",
                 "generation_receipt": {"test_cases_sha256": "cases-sha"},
             }
@@ -187,7 +188,11 @@ def test_human_run_requires_all_three_matching_controls(tmp_path):
     )
     manifest, _ = build(**kwargs)
     assert manifest["status"] == "validated"
-    assert manifest["protocol_validation"] == "passed_generation_classifier_copyright_controls"
+    assert manifest["protocol_validation"] == (
+        "passed_generation_classifier_copyright_controls"
+        if method == "HumanJailbreaks"
+        else "passed_transfer_source_classifier_copyright_controls"
+    )
     quality.write_text(json.dumps({"run": {"verdicts": {"healthy": 1, "unhealthy": 0, "unobserved": 1}}}))
     manifest_with_gap, _ = build(**kwargs)
     assert manifest_with_gap["status"] == "provisional"

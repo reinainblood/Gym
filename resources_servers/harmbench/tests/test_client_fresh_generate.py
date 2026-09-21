@@ -50,6 +50,7 @@ def test_client_target_preserves_messages_and_records_only_hashes(monkeypatch, c
     ]
     assert requests[1][1]["messages"] == messages[0]
     assert requests[1][1]["max_tokens"] == 150
+    assert requests[1][1]["chat_template_kwargs"] == {"enable_thinking": False}
     assert len(target.calls) == 2
     assert set(target.calls[0]) == {
         "request_sha256",

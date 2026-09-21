@@ -109,6 +109,7 @@ class ClientTarget:
                 "messages": messages,
                 "temperature": temperature,
                 "max_tokens": max_n_tokens,
+                "chat_template_kwargs": {"enable_thinking": False},
             }
             if stop_tokens:
                 payload["stop"] = stop_tokens
