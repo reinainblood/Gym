@@ -16,11 +16,29 @@ import csv
 import hashlib
 import json
 import mimetypes
+import re
 from pathlib import Path
 from typing import Any
 
 from benchmarks.harmbench.methods import get_method
 from benchmarks.harmbench.prepare import UPSTREAM_REVISION
+
+
+GCG_PUBLIC_BEHAVIORS = 400
+GCG_PUBLIC_STEPS = 500
+GCG_PUBLIC_SEARCH_WIDTH = 512
+GCG_TARGETS = {
+    "super": (
+        "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+        "hf-ea-0e636f7",
+        "nemotron_3_5_super_gcg",
+    ),
+    "qwen": (
+        "Qwen/Qwen3.5-122B-A10B",
+        "dc4d348443bc740c68e2d77492492c11606384d5",  # pragma: allowlist secret
+        "nemotron_3_5_qwen_gcg",
+    ),
+}
 
 
 def sha256(path: Path) -> str:
@@ -54,6 +72,63 @@ def _input_content(test_case: Any, image_dir: Path | None) -> tuple[str | list[d
     ], sha256(image_path)
 
 
+def _validate_gcg_generation_receipt(generation_receipt: dict[str, Any], generation_receipt_path: Path | None) -> None:
+    """Validate and, for CLI materialization, read back GCG's complete shard evidence."""
+    required = {
+        "behaviors": GCG_PUBLIC_BEHAVIORS,
+        "cases": GCG_PUBLIC_BEHAVIORS,
+        "num_steps": GCG_PUBLIC_STEPS,
+        "search_width": GCG_PUBLIC_SEARCH_WIDTH,
+    }
+    mismatched = [key for key, expected in required.items() if generation_receipt.get(key) != expected]
+    num_shards = generation_receipt.get("num_shards")
+    manifest = generation_receipt.get("shard_receipts")
+    if not isinstance(num_shards, int) or not 1 <= num_shards <= 16:
+        mismatched.append("num_shards")
+    if not isinstance(manifest, list) or len(manifest) != num_shards:
+        mismatched.append("shard_receipts")
+    if mismatched:
+        raise ValueError(f"GCG generation receipt failed fields {','.join(sorted(set(mismatched)))}")
+
+    first_name = manifest[0].get("name") if isinstance(manifest[0], dict) else None
+    match = re.fullmatch(r"(super|qwen)-00-of-(\d{2})\.json", first_name or "")
+    if match is None or int(match.group(2)) != num_shards:
+        raise ValueError("GCG shard receipt manifest has an invalid first entry")
+    target = match.group(1)
+    model_id, model_revision, experiment = GCG_TARGETS[target]
+    expected_names = [f"{target}-{index:02d}-of-{num_shards:02d}.json" for index in range(num_shards)]
+    observed_names = []
+    for row in manifest:
+        if not isinstance(row, dict):
+            raise ValueError("GCG shard receipt manifest contains a non-object entry")
+        name, digest = row.get("name"), row.get("sha256")
+        if not isinstance(name, str) or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("GCG shard receipt manifest contains an invalid entry")
+        observed_names.append(name)
+    if observed_names != expected_names:
+        raise ValueError("GCG shard receipt manifest is incomplete or out of source order")
+
+    identity = {
+        "source_target_model": model_id,
+        "source_target_revision": model_revision,
+        "experiment": experiment,
+    }
+    identity_mismatch = [key for key, expected in identity.items() if generation_receipt.get(key) != expected]
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    expected_manifest_hash = hashlib.sha256(canonical).hexdigest()
+    if generation_receipt.get("shard_receipts_sha256") != expected_manifest_hash:
+        identity_mismatch.append("shard_receipts_sha256")
+    if identity_mismatch:
+        raise ValueError(f"GCG generation receipt failed fields {','.join(sorted(identity_mismatch))}")
+
+    if generation_receipt_path is not None:
+        receipt_dir = generation_receipt_path.parent / "shard-receipts"
+        for row in manifest:
+            path = receipt_dir / row["name"]
+            if not path.is_file() or sha256(path) != row["sha256"]:
+                raise ValueError(f"GCG shard receipt readback failed for {row['name']}")
+
+
 def materialize(
     *,
     method_name: str,
@@ -63,6 +138,7 @@ def materialize(
     run_id: str,
     target_type: str,
     generation_receipt: dict[str, Any],
+    generation_receipt_path: Path | None = None,
     image_dir: Path | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     method = get_method(method_name)
@@ -84,6 +160,8 @@ def materialize(
     for key, expected in required_receipt.items():
         if generation_receipt.get(key) != expected:
             raise ValueError(f"generation receipt {key} does not match the requested {method.name} source")
+    if method.name == "GCG":
+        _validate_gcg_generation_receipt(generation_receipt, generation_receipt_path)
     if method.generation == "client_fresh" and (
         not generation_receipt.get("client_model")
         or generation_receipt.get("source_target_model") != generation_receipt.get("client_model")
@@ -99,6 +177,11 @@ def materialize(
     unknown = set(attack_cases) - set(behaviors)
     if unknown:
         raise ValueError(f"attack cases contain unknown behavior IDs: {sorted(unknown)[:5]}")
+    if method.name == "GCG" and (
+        len(attack_cases) != GCG_PUBLIC_BEHAVIORS
+        or any(not isinstance(cases, list) or len(cases) != 1 for cases in attack_cases.values())
+    ):
+        raise ValueError("GCG requires exactly one generated case for every one of 400 public behaviors")
 
     rows: list[dict[str, Any]] = []
     for behavior_id, cases in attack_cases.items():
@@ -174,6 +257,7 @@ def main() -> None:
         run_id=args.run_id,
         target_type=args.target_type,
         generation_receipt=json.loads(args.generation_receipt.read_text(encoding="utf-8")),
+        generation_receipt_path=args.generation_receipt,
         image_dir=args.image_dir,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)

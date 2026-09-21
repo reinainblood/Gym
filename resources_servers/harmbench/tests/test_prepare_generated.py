@@ -3,6 +3,7 @@
 
 import base64
 import csv
+import hashlib
 import importlib
 import json
 
@@ -200,6 +201,100 @@ def test_rejects_incompatible_target_and_unmatched_behaviors(tmp_path):
             run_id="run-3",
             target_type="text_api",
             generation_receipt=_receipt("PAIR", cases_path, behavior_path, "model-1", "run-3"),
+        )
+
+
+def test_gcg_requires_full_corpus_and_rehashes_shard_receipts(tmp_path):
+    behavior_path = tmp_path / "behaviors.csv"
+    cases_path = tmp_path / "test_cases.json"
+    receipt_path = tmp_path / "generation-receipt.json"
+    with behavior_path.open("w", newline="", encoding="utf-8") as output:
+        writer = csv.DictWriter(
+            output,
+            fieldnames=[
+                "BehaviorID",
+                "Behavior",
+                "ContextString",
+                "FunctionalCategory",
+                "SemanticCategory",
+                "Tags",
+                "RedactedImageDescription",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(
+            {
+                "BehaviorID": f"b{index:03d}",
+                "Behavior": "synthetic behavior",
+                "FunctionalCategory": "standard",
+                "SemanticCategory": "test",
+                "Tags": "",
+            }
+            for index in range(400)
+        )
+    cases = {f"b{index:03d}": ["synthetic case"] for index in range(400)}
+    cases_path.write_text(json.dumps(cases), encoding="utf-8")
+    shard_dir = tmp_path / "shard-receipts"
+    shard_dir.mkdir()
+    manifest = []
+    for index in range(2):
+        path = shard_dir / f"super-{index:02d}-of-02.json"
+        path.write_text(json.dumps({"shard": index}), encoding="utf-8")
+        manifest.append({"name": path.name, "sha256": sha256(path)})
+    receipt = _receipt("GCG", cases_path, behavior_path, "nemotron_3_5_super_gcg", "full-run")
+    receipt.update(
+        {
+            "source_target_model": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+            "source_target_revision": "hf-ea-0e636f7",
+            "behaviors": 400,
+            "cases": 400,
+            "num_steps": 500,
+            "search_width": 512,
+            "num_shards": 2,
+            "shard_receipts": manifest,
+            "shard_receipts_sha256": hashlib.sha256(
+                json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest(),
+        }
+    )
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    rows, _ = materialize(
+        method_name="GCG",
+        test_cases_path=cases_path,
+        behaviors_path=behavior_path,
+        experiment="nemotron_3_5_super_gcg",
+        run_id="full-run",
+        target_type="text_weights",
+        generation_receipt=receipt,
+        generation_receipt_path=receipt_path,
+    )
+    assert len(rows) == 400
+
+    (shard_dir / "super-01-of-02.json").write_text('{"tampered": true}', encoding="utf-8")
+    with pytest.raises(ValueError, match="readback failed"):
+        materialize(
+            method_name="GCG",
+            test_cases_path=cases_path,
+            behaviors_path=behavior_path,
+            experiment="nemotron_3_5_super_gcg",
+            run_id="full-run",
+            target_type="text_weights",
+            generation_receipt=receipt,
+            generation_receipt_path=receipt_path,
+        )
+
+    partial_cases = dict(list(cases.items())[:-1])
+    cases_path.write_text(json.dumps(partial_cases), encoding="utf-8")
+    receipt["test_cases_sha256"] = sha256(cases_path)
+    with pytest.raises(ValueError, match="exactly one generated case"):
+        materialize(
+            method_name="GCG",
+            test_cases_path=cases_path,
+            behaviors_path=behavior_path,
+            experiment="nemotron_3_5_super_gcg",
+            run_id="full-run",
+            target_type="text_weights",
+            generation_receipt=receipt,
         )
 
 
