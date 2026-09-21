@@ -77,6 +77,10 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   only at 110/110. It revalidates all case/image/checkpoint chains plus the gradient/checkpoint receipt and writes
   `attack-manifest.json`. The separate completion app now refuses to start canonical or replicate completion without
   rehashing that exact 110-case manifest and its files.
+- After all 110 canonical 512-token completions exist, call the completion app's own `finalize_method`. It requires exact
+  parent/canonical filename parity, revalidates every completion against its parent and attack manifest, enforces one
+  checkpoint/processor/sampling identity, and writes `completion-manifest-512.json`. The scorer refuses to run until that
+  manifest and all 110 completion hashes pass readback.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
 

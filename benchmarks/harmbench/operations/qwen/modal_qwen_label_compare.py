@@ -31,8 +31,10 @@ base_image = (
 )
 if modal.is_local():
     prompts = LOCAL.parents[3] / "resources_servers" / "harmbench" / "prompts.py"
-    image = base_image.add_local_file(LOCAL / "qwen_label_compare.py", "/app/qwen_label_compare.py").add_local_file(
-        prompts, "/app/harmbench_prompts.py"
+    image = (
+        base_image.add_local_file(LOCAL / "qwen_label_compare.py", "/app/qwen_label_compare.py")
+        .add_local_file(LOCAL / "qwen_completion_worker.py", "/app/qwen_completion_worker.py")
+        .add_local_file(prompts, "/app/harmbench_prompts.py")
     )
 else:
     image = base_image
@@ -91,6 +93,7 @@ def compare(run_id: str, method: str = "MultiModalPGD", replicate: str = "r1") -
 )
 def score_canonical(run_id: str, method: str) -> dict:
     """Score one complete 110-case 512-token white-box cohort and persist payload-free evidence."""
+    from qwen_completion_worker import validate_completion_manifest
     from qwen_label_compare import RawClassifier, score_canonical_receipts
 
     if not re.fullmatch(r"[a-z0-9-]+", run_id):
@@ -99,6 +102,7 @@ def score_canonical(run_id: str, method: str) -> dict:
         raise ValueError(f"unknown public method: {method}")
 
     method_dir = Path("/results") / run_id / method
+    validate_completion_manifest(method_dir, method)
     output_dir = method_dir / "label-comparison"
     output_path = output_dir / "canonical-512.json"
     if output_path.exists():

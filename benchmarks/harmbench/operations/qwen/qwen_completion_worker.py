@@ -145,6 +145,99 @@ def validate_attack_manifest(method_dir: Path, method: str) -> dict:
     return manifest
 
 
+def finalize_completion_artifact(*, method_dir: Path, method: str) -> dict:
+    """Reconcile exactly 110 canonical 512-token completions against finalized attacks."""
+    attack_manifest = validate_attack_manifest(method_dir, method)
+    parent_dir = method_dir / "cases"
+    completion_dir = method_dir / COMPLETIONS_DIRNAME
+    parent_paths = sorted(parent_dir.glob("*.json"))
+    completion_paths = sorted(completion_dir.glob("*.json"))
+    if len(parent_paths) != 110 or [path.name for path in completion_paths] != [path.name for path in parent_paths]:
+        raise ValueError("canonical completion finalizer requires exactly 110 parent-matched receipts")
+    first = json.loads(completion_paths[0].read_text(encoding="utf-8"))
+    processor_hashes = first.get("processor_file_sha256")
+    if not isinstance(processor_hashes, dict) or not processor_hashes:
+        raise ValueError("canonical completion processor hash manifest is missing")
+    if any(not isinstance(value, str) or len(value) != 64 for value in processor_hashes.values()):
+        raise ValueError("canonical completion processor hash manifest is invalid")
+    completion_manifest = []
+    for parent_path, completion_path in zip(parent_paths, completion_paths, strict=True):
+        parent = json.loads(parent_path.read_text(encoding="utf-8"))
+        validate_completion_receipt(
+            completion_path,
+            parent_path,
+            checkpoint_config_sha256=attack_manifest["checkpoint_config_sha256"],
+            checkpoint_index_sha256=attack_manifest["checkpoint_index_sha256"],
+            processor_file_sha256=processor_hashes,
+            rendered_prompt_sha256=parent["prompt_sha256"],
+        )
+        completion_manifest.append({"name": completion_path.name, "sha256": sha256(completion_path)})
+    canonical = json.dumps(completion_manifest, sort_keys=True, separators=(",", ":")).encode()
+    manifest = {
+        "schema_version": 1,
+        "artifact_kind": "qwen_whitebox_completion_manifest",
+        "status": "completed",
+        "method": method,
+        "model_id": MODEL_ID,
+        "model_revision": MODEL_REVISION,
+        "completions": 110,
+        "max_new_tokens": PROTOCOL_MAX_NEW_TOKENS,
+        "sampling": {"do_sample": False, "num_beams": 1, "use_cache": False},
+        "attack_manifest_sha256": sha256(method_dir / "attack-manifest.json"),
+        "checkpoint_config_sha256": attack_manifest["checkpoint_config_sha256"],
+        "checkpoint_index_sha256": attack_manifest["checkpoint_index_sha256"],
+        "processor_file_sha256": processor_hashes,
+        "completion_receipts": completion_manifest,
+        "completion_receipts_sha256": hashlib.sha256(canonical).hexdigest(),
+    }
+    output_path = method_dir / "completion-manifest-512.json"
+    temporary = output_path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, output_path)
+    return manifest
+
+
+def validate_completion_manifest(method_dir: Path, method: str) -> dict:
+    """Rehash a finalized canonical-completion campaign before scoring."""
+    attack_manifest = validate_attack_manifest(method_dir, method)
+    path = method_dir / "completion-manifest-512.json"
+    if not path.is_file():
+        raise FileNotFoundError("Qwen white-box completion manifest is missing")
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "schema_version": 1,
+        "artifact_kind": "qwen_whitebox_completion_manifest",
+        "status": "completed",
+        "method": method,
+        "model_id": MODEL_ID,
+        "model_revision": MODEL_REVISION,
+        "completions": 110,
+        "max_new_tokens": PROTOCOL_MAX_NEW_TOKENS,
+        "sampling": {"do_sample": False, "num_beams": 1, "use_cache": False},
+        "attack_manifest_sha256": sha256(method_dir / "attack-manifest.json"),
+        "checkpoint_config_sha256": attack_manifest["checkpoint_config_sha256"],
+        "checkpoint_index_sha256": attack_manifest["checkpoint_index_sha256"],
+    }
+    mismatched = [key for key, value in expected.items() if manifest.get(key) != value]
+    receipts = manifest.get("completion_receipts")
+    if not isinstance(receipts, list) or len(receipts) != 110:
+        mismatched.append("completion_receipts")
+    if mismatched:
+        raise ValueError(f"Qwen white-box completion manifest failed fields {','.join(sorted(set(mismatched)))}")
+    canonical = json.dumps(receipts, sort_keys=True, separators=(",", ":")).encode()
+    if manifest.get("completion_receipts_sha256") != hashlib.sha256(canonical).hexdigest():
+        raise ValueError("Qwen white-box completion receipt manifest hash mismatch")
+    completion_dir = method_dir / COMPLETIONS_DIRNAME
+    observed_names = [file.name for file in sorted(completion_dir.glob("*.json"))]
+    if observed_names != [row.get("name") for row in receipts]:
+        raise ValueError("Qwen white-box completion manifest filenames disagree with the Volume")
+    for row in receipts:
+        completion_path = completion_dir / row["name"]
+        if not completion_path.is_file() or sha256(completion_path) != row.get("sha256"):
+            raise ValueError("Qwen white-box completion manifest file readback failed")
+    return manifest
+
+
 class QwenCompletionRuntime:
     """Generation-only runtime bound to the exact differentiable checkpoint."""
 

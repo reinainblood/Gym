@@ -101,6 +101,9 @@ method keys in the paper's pipeline.
 - A CPU-only `finalize_method` gate on the white-box app binds all 110 validated case receipts and images to the passed
   gradient/checkpoint receipt in `attack-manifest.json`. Canonical and replicate completion refuse to load the model until
   that manifest, its aggregate hashes, filenames, and every referenced case/image file pass readback.
+- A second CPU-only finalizer on the completion app binds exactly 110 parent-matched canonical receipts to the attack
+  manifest, BF16 checkpoint, processor files, deterministic sampling profile, and 512-token cap. Canonical scoring requires
+  `completion-manifest-512.json` and rehashes all receipts before any classifier calls.
 - `operations/qwen/modal_qwen_gcg_completion.py` is the post-generation target-completion stage for the matched Qwen
   GCG baseline. It mounts the same immutable BF16 checkpoint as optimization, reproduces the pinned upstream tokenizer
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG

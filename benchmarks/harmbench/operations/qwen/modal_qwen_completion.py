@@ -132,6 +132,30 @@ class QwenCompletion:
         )
 
 
+@app.function(
+    image=image,
+    cpu=2,
+    memory=8192,
+    timeout=1800,
+    volumes={"/results": results},
+)
+def finalize_method(run_id: str, method: str) -> dict:
+    from qwen_completion_worker import WHITEBOX_METHODS, finalize_completion_artifact
+
+    if not re.fullmatch(r"[a-z0-9-]+", run_id):
+        raise ValueError("invalid run id")
+    if method not in WHITEBOX_METHODS:
+        raise ValueError("unknown public method")
+    manifest = finalize_completion_artifact(method_dir=Path("/results") / run_id / method, method=method)
+    results.commit()
+    return {
+        "run_id": run_id,
+        "method": method,
+        "status": manifest["status"],
+        "completions": manifest["completions"],
+    }
+
+
 @app.local_entrypoint()
 def main(
     run_id: str = "qwen35-122b-harmbench-whitebox-20260919",
