@@ -81,6 +81,9 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   parent/canonical filename parity, revalidates every completion against its parent and attack manifest, enforces one
   checkpoint/processor/sampling identity, and writes `completion-manifest-512.json`. The scorer refuses to run until that
   manifest and all 110 completion hashes pass readback.
+- Canonical scoring binds its payload-free receipt to the completion-manifest SHA-256, recomputes all case-level counts and
+  summary metrics before reuse, rejects duplicate indexes/behaviors or unexpected classifier fields, and writes the score
+  receipt atomically. An existing `canonical-512.json` is not reusable merely because it has a summary.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
 

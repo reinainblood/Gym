@@ -104,6 +104,8 @@ method keys in the paper's pipeline.
 - A second CPU-only finalizer on the completion app binds exactly 110 parent-matched canonical receipts to the attack
   manifest, BF16 checkpoint, processor files, deterministic sampling profile, and 512-token cap. Canonical scoring requires
   `completion-manifest-512.json` and rehashes all receipts before any classifier calls.
+- The canonical scorer binds `canonical-512.json` to that completion-manifest hash, recomputes the entire 110-case summary,
+  rejects duplicate identities and unsafe classifier receipt fields, validates before reuse, and persists atomically.
 - `operations/qwen/modal_qwen_gcg_completion.py` is the post-generation target-completion stage for the matched Qwen
   GCG baseline. It mounts the same immutable BF16 checkpoint as optimization, reproduces the pinned upstream tokenizer
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG

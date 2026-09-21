@@ -10,6 +10,7 @@ from benchmarks.harmbench.operations.qwen.qwen_label_compare import (
     score_canonical_receipts,
     sha256,
     summarize_case_rows,
+    validate_canonical_score_receipt,
 )
 from resources_servers.harmbench.app import CONTEXTUAL_PROMPT as APP_CONTEXTUAL_PROMPT
 from resources_servers.harmbench.app import STANDARD_PROMPT as APP_STANDARD_PROMPT
@@ -236,4 +237,35 @@ def test_canonical_scoring_rehashes_parent_receipts(tmp_path):
             score=lambda *_: {"label": 0, "generation_clipped": False},
             method="MultiModalPGDBlankImage",
             expected_cases=1,
+        )
+
+
+def test_canonical_score_receipt_recomputes_full_summary_and_rejects_tampering(tmp_path):
+    canonical = tmp_path / "canonical"
+    canonical.mkdir()
+    for index in range(110):
+        _write_canonical(canonical / f"{index:03d}.json", index=index)
+    receipt = score_canonical_receipts(
+        canonical_dir=canonical,
+        score=lambda *_: {"label": 0, "generation_clipped": False},
+        method="MultiModalPGDBlankImage",
+        expected_cases=110,
+    )
+    receipt.update({"run_id": "test-run", "completion_manifest_sha256": "a" * 64})
+    assert (
+        validate_canonical_score_receipt(
+            receipt,
+            run_id="test-run",
+            method="MultiModalPGDBlankImage",
+            completion_manifest_sha256="a" * 64,
+        )["status"]
+        == "completed"
+    )
+    receipt["summary"]["successes"] = 1
+    with pytest.raises(ValueError, match="summary disagrees"):
+        validate_canonical_score_receipt(
+            receipt,
+            run_id="test-run",
+            method="MultiModalPGDBlankImage",
+            completion_manifest_sha256="a" * 64,
         )

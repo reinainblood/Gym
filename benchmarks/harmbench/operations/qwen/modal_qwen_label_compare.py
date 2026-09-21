@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import tempfile
 from pathlib import Path
 
 import modal
@@ -94,7 +95,7 @@ def compare(run_id: str, method: str = "MultiModalPGD", replicate: str = "r1") -
 def score_canonical(run_id: str, method: str) -> dict:
     """Score one complete 110-case 512-token white-box cohort and persist payload-free evidence."""
     from qwen_completion_worker import validate_completion_manifest
-    from qwen_label_compare import RawClassifier, score_canonical_receipts
+    from qwen_label_compare import RawClassifier, score_canonical_receipts, sha256, validate_canonical_score_receipt
 
     if not re.fullmatch(r"[a-z0-9-]+", run_id):
         raise ValueError("invalid run id")
@@ -102,11 +103,19 @@ def score_canonical(run_id: str, method: str) -> dict:
         raise ValueError(f"unknown public method: {method}")
 
     method_dir = Path("/results") / run_id / method
+    completion_manifest = method_dir / "completion-manifest-512.json"
     validate_completion_manifest(method_dir, method)
+    completion_manifest_sha256 = sha256(completion_manifest)
     output_dir = method_dir / "label-comparison"
     output_path = output_dir / "canonical-512.json"
     if output_path.exists():
         existing = json.loads(output_path.read_text(encoding="utf-8"))
+        validate_canonical_score_receipt(
+            existing,
+            run_id=run_id,
+            method=method,
+            completion_manifest_sha256=completion_manifest_sha256,
+        )
         return {"status": "already_complete", "output": str(output_path), "summary": existing["summary"]}
 
     classifier = RawClassifier(CLASSIFIER_URL, os.environ["HARMBENCH_CLASSIFIER_API_KEY"])
@@ -118,9 +127,18 @@ def score_canonical(run_id: str, method: str) -> dict:
         expected_cases=110,
         parent_dir=method_dir / "cases",
     )
-    receipt.update({"run_id": run_id})
+    receipt.update({"run_id": run_id, "completion_manifest_sha256": completion_manifest_sha256})
+    validate_canonical_score_receipt(
+        receipt,
+        run_id=run_id,
+        method=method,
+        completion_manifest_sha256=completion_manifest_sha256,
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(receipt, indent=2, sort_keys=True), encoding="utf-8")
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=output_dir, delete=False) as temporary:
+        temporary.write(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+        temporary_path = Path(temporary.name)
+    os.replace(temporary_path, output_path)
     results.commit()
     return {"status": "completed", "output": str(output_path), "summary": receipt["summary"]}
 
