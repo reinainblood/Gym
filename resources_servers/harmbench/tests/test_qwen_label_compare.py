@@ -81,7 +81,7 @@ def _write_canonical(path, *, index: int, method: str = "MultiModalPGDBlankImage
                 "behavior": f"synthetic behavior {index}",
                 "context": "",
                 "model_id": "Qwen/Qwen3.5-122B-A10B",
-                "model_revision": "dc4d348443bc740c68e2d77492492c11606384d5",
+                "model_revision": "dc4d348443bc740c68e2d77492492c11606384d5",  # pragma: allowlist secret
                 "max_new_tokens": 512,
                 "generation": f"synthetic generation {index}",
                 "generation_sha256": f"generation-hash-{index}",
