@@ -113,7 +113,15 @@ while true; do
                 echo "[$(date +%H:%M:%S)] skipping ${key}/${defense}: endpoint at ${seconds}s, still busy"
                 continue
             fi
-            echo "[$(date +%H:%M:%S)] starting ${key}/${defense} (endpoint ${seconds}s, ${stacks} stacks, ${free}% free)"
+            # A sharded cell costs DRIFT_SHARDS stacks, not one. Counting it as one is how a
+            # ceiling of five became seven live stacks.
+            cost=1
+            [ "$defense" = "drift" ] && cost="$DRIFT_SHARDS"
+            if [ $(( stacks + cost )) -gt "$MAX_STACKS" ]; then
+                echo "[$(date +%H:%M:%S)] skipping ${key}/${defense}: needs ${cost} stacks, only $(( MAX_STACKS - stacks )) free"
+                continue
+            fi
+            echo "[$(date +%H:%M:%S)] starting ${key}/${defense} (${cost} stacks; endpoint ${seconds}s, ${stacks} live, ${free}% free)"
             if [ "$defense" = "drift" ]; then
                 SHARDS="$DRIFT_SHARDS" DEFENSES="$defense" bash benchmarks/agentdyn/launch_defense_grid.sh "$key"
             else
