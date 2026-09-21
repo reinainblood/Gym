@@ -42,11 +42,10 @@ past forty hours for one cell.
   anything: the agent server runs rollouts behind `asyncio.Semaphore(1)`, so every rollout in both arms was collected
   one at a time per stack. The grid uses one process per cell, and three per cell for DRIFT. Per-sample isolation and
   deterministic verification are unchanged; only the number of stacks differs.
-- **PromptGuard2 uses a mirror.** `project-free-llama/Llama-Prompt-Guard-2-86M` at revision
-  `43882965632dcb7b20299530f6436ac759d07fd9`, because Meta's canonical repository is gated behind manual approval and
-  this host has no Hugging Face token. Every PromptGuard2 rollout records the repository and revision that classified
-  it. `check_prompt_guard_provenance.py` performs the comparison once access exists; until then no canonical claim is
-  made.
+- **PromptGuard2 is canonical, with a mixed provenance string.** The treatment now runs
+  `meta-llama/Llama-Prompt-Guard-2-86M@a8ded8e697ce7c355e395a0df51f94adb4a2fd27`. Rows collected during gated access
+  name the public mirror instead; the two were compared file by file, including `model.safetensors`, and are
+  identical, so both name the same weights rather than two treatments. No rerun was required.
 - **PIGuard is pinned** to `dd78b24e330193a22d2293ac66922dd4f982f563` rather than resolving a moving Hub `main`,
   which matters because upstream loads it with `trust_remote_code=True`.
 - **The routed defenses were fixed mid-campaign.** CaMeL, Progent, and DRIFT were reading Gym's `<think>` envelope as

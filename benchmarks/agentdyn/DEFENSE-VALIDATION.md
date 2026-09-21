@@ -54,6 +54,28 @@ The PIGuard result reproduces the benchmark's intended over-defense signal: the 
 but also reduced legitimate utility to zero. The first download used upstream `trust_remote_code=True`; publishing a
 repeatable defense config additionally requires pinning the detector revision instead of resolving moving Hub main.
 
+## Resolved, 2026-09-20: PromptGuard2 is canonical
+
+Meta granted access, and the mirror was compared against
+`meta-llama/Llama-Prompt-Guard-2-86M` at revision `a8ded8e697ce7c355e395a0df51f94adb4a2fd27`. All five files match
+byte for byte, `model.safetensors` included:
+
+```text
+MATCH config.json / model.safetensors / special_tokens_map.json / tokenizer.json / tokenizer_config.json
+Compared 5 files; 0 differ or are missing.
+```
+
+The config now names the canonical repository and revision. **The rerun this ledger previously called for is not
+needed.** It was required because the mirror's identity was unverified; the file hashes now establish that the mirror
+served the same classifier, so rows already collected measure the same artifact rather than a lookalike.
+
+One consequence to read correctly: PromptGuard2 rows collected before this point record
+`project-free-llama/Llama-Prompt-Guard-2-86M@43882965632dcb7b20299530f6436ac759d07fd9` as their detector source, and
+rows collected after it record the canonical repository. Those are two names for one set of weights, not two
+treatments. Reproduce the comparison with `check_prompt_guard_provenance.py`.
+
+The paragraph below is retained as the record of what was known at the time.
+
 PromptGuard2 was validated provisionally from public mirror
 `project-free-llama/Llama-Prompt-Guard-2-86M` at immutable revision
 `43882965632dcb7b20299530f6436ac759d07fd9`. All five files covered by the repository's Meta-format
