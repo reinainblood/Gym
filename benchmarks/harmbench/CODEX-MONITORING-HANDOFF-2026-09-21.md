@@ -88,3 +88,8 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   function, and require `target-completions/qwen-bf16/target-completion-receipt.json` before classifier scoring.
 - The completion runner returns only indexes, counts, statuses, and call IDs. Its private Volume receipts contain model
   generations needed by the scorer; never print or download their payload fields into commentary or logs.
+- After the completion finalizer passes, deploy `operations/qwen/modal_qwen_gcg_score.py` in FDR and call its `score`
+  function once. It rehashes the 400 private completion receipts and scores every case twice through the pinned serial raw
+  HarmBench classifier, writing only payload-free `classifier-scores.json`. Download that single receipt and run
+  `qwen_gcg_blade.py`; require 400 reconciled source indexes, exact model/classifier revisions, stable denominator
+  accounting, and successful readback of its JSONL, metrics JSON, and Markdown report before reporting the baseline.

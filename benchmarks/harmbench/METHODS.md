@@ -93,6 +93,10 @@ method keys in the paper's pipeline.
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG
   generation and shard receipts before model load, and requires a complete 400-receipt completion manifest. It is a
   separate app so deploying it cannot interrupt the active white-box image attack workers or the persistent GCG app.
+- `operations/qwen/modal_qwen_gcg_score.py` rehashes that 400-receipt manifest and runs two serial passes through the
+  pinned raw HarmBench classifier without copying generations into its output. `qwen_gcg_blade.py` then checks all model,
+  source, classifier, denominator, and case-level hashes before emitting payload-free BLADE rows, native metrics, and a
+  deterministic report; invalid or unstable classifier cases remain visible but outside the model-quality denominator.
 - For ZeroShot, `repair_capture_race.py` created a derivative that attached one late-but-present target-call
   capture without touching any response or score; a separate Gym health audit then passed 1,600/1,600.
   `restore_reverified_observability.py` keeps the original captured trajectory alongside stateless reverify scores
