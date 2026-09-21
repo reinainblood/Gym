@@ -733,7 +733,7 @@ def main() -> None:
     parser.add_argument(
         "--skill",
         type=Path,
-        default=Path("benchmarks/kidbench/reporting/KIDBENCH_BLADE_SKILL.md"),
+        default=Path("benchmarks/kidbench/reporting/blade-skill.md"),
         help="The benchmark-specialised SKILL.md to ship in the bundle.",
     )
     args = parser.parse_args()
