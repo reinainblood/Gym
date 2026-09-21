@@ -171,3 +171,12 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   it does not satisfy either 200-behavior shard receipt or the 400-behavior finalization gate.
 - Qwen BlankImage reached 90/110 completed cases and immediately assigned replacement work to the three existing streams.
   Patch remains gated until those workers drain and the current branch can be safely redeployed for exact reconciliation.
+
+### BlankImage shard-drain update — 2026-09-21 11:51 CDT
+
+- Qwen MultiModalPGDBlankImage reached 96/110 case files. Filename-level source partition accounting showed modulo-4
+  shards 1 and 3 complete with 28/28 and 27/27 cases, while shards 0 and 2 had 22/28 and 19/27, leaving 6 and 8 cases.
+- Two unfinished checkpoint streams remained visible and advancing, matching the two incomplete shards. The drop from
+  three visible streams to two was therefore normal shard drain, not a lost worker. Do not relaunch completed shards.
+- Continue to wait for both remaining streams and all attack workers to drain before redeploying the current branch and
+  calling `status_method`; filename counts are progress evidence only and do not replace that exact validity audit.
