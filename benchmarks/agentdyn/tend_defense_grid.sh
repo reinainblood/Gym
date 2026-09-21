@@ -30,7 +30,11 @@ cd "$ROOT_DIR"
 
 RESULTS_DIR="${RESULTS_DIR:-results/agentdyn-defense-matrix}"
 LOG_DIR="${LOG_DIR:-${RESULTS_DIR}/logs}"
-MAX_STACKS="${MAX_STACKS:-14}"
+# Deliberately small. Each stack is a full Ray cluster, not just two FastAPI servers, and
+# this host is shared with other benchmark campaigns. Fourteen of these plus their neighbours
+# took the machine to 15MB free and ~8GB across ~466 processes, which puts every campaign on
+# it at risk of an OOM kill, not only this one. Raise it only when the box is otherwise idle.
+MAX_STACKS="${MAX_STACKS:-5}"
 # Gate on what the OS itself thinks, not on "Pages free". macOS keeps free pages near zero by
 # design and holds the rest as active/inactive, so a free-pages threshold either never trips or
 # never clears. `memory_pressure` reports the number that actually tracks headroom here.

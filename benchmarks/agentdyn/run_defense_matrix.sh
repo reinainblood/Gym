@@ -155,11 +155,47 @@ except Exception:
     return 1
 }
 
+# Every `gym env start` brings up its own Ray cluster, and Ray's processes do not listen on
+# this invocation's port block -- so the lib's port-scoped teardown leaves the cluster behind.
+# A leaked cluster is invisible until the machine is thrashing: 18 of them were live on this
+# host at once, ~8GB, with 15MB free, putting every campaign on it at risk of an OOM kill.
+#
+# `gym env start` is a process-group leader, so killing its group takes the servers and the
+# Ray cluster together. GYM_PGID is this stack's group; nothing else shares it. (The driver's
+# own group does not work here -- several cells launched by the grid share one.)
+GYM_PGID=""
+
+stop_this_stack() {
+    if [ -n "$GYM_PGID" ]; then
+        kill -9 -"$GYM_PGID" 2>/dev/null
+        GYM_PGID=""
+        sleep 2
+    fi
+    gym_runner_stop_servers
+    sweep_orphaned_ray_clusters
+}
+
+# Belt and braces for clusters already adrift: a gcs_server owned by this worktree whose
+# parent is gone (reparented to launchd) belongs to no live stack. Both conditions are
+# required -- a cluster with a live parent is somebody's running work, including a
+# neighbouring campaign's.
+sweep_orphaned_ray_clusters() {
+    local pid owner
+    for pid in $(pgrep -f gcs_server 2>/dev/null); do
+        [ "$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')" = "1" ] || continue
+        owner=$(lsof -p "$pid" -a -d cwd -Fn 2>/dev/null | grep '^n' | sed 's/^n//')
+        case "$owner" in
+            "$ROOT_DIR"*) kill -9 "$pid" 2>/dev/null && echo "  swept orphaned Ray cluster ${pid}" ;;
+        esac
+    done
+}
+
 start_servers() {
     local tag="$1"
     nohup .venv/bin/gym env start \
         --config benchmarks/agentdyn/config.yaml --config "$ENV_YAML" \
         > "${LOG_DIR}/${tag}.servers.log" 2>&1 &
+    GYM_PGID=$(ps -o pgid= -p $! 2>/dev/null | tr -d ' ')
     # Poll our own head port rather than `gym env status`, which takes no --config and so
     # reports whatever is on the default port 11000 -- another campaign's stack, not ours.
     gym_runner_wait_for_head "${LOG_DIR}/${tag}.servers.log" || return 1
@@ -177,7 +213,7 @@ run_cell() {
     for attempt in 1 2 3; do
         if ! gym_runner_head_is_up; then
             echo "  [$(date +%H:%M:%S)] ${tag} head server down; restarting stack"
-            gym_runner_stop_servers
+            stop_this_stack
             start_servers "$tag" || return 1
         fi
         echo "  [$(date +%H:%M:%S)] ${tag} attempt ${attempt} (concurrency ${concurrency}) -> ${out}"
@@ -256,11 +292,11 @@ for entry in "${SELECTED[@]}"; do
     for defense in $DEFENSES; do
         echo "[$(date +%H:%M:%S)] DEFENSE ${defense}"
         write_env_yaml "$base_url" "$model" "$token_var" "$defense" "$system_role"
-        gym_runner_stop_servers
+        stop_this_stack
         start_servers "${slug}.${defense}" || continue
         run_cell "$slug" "$defense" "$concurrency"
     done
 done
 
-gym_runner_stop_servers
+stop_this_stack
 echo "[$(date +%H:%M:%S)] All requested cells finished."
