@@ -77,6 +77,9 @@ def validate(
     total_calls = 0
     shard_evidence = []
     for shard_index, manifest_row in enumerate(manifest):
+        expected_manifest_name = f"{shard_index:02d}-of-{num_shards:02d}.json"
+        if manifest_row.get("name") != expected_manifest_name:
+            raise ValueError("client-fresh shard manifest is not in canonical source-shard order")
         shard_root = artifact_root / "shards" / f"{shard_index:02d}-of-{num_shards:02d}"
         shard_receipt_path = shard_root / "shard-receipt.json"
         shard_cases_path = shard_root / "generated" / "test_cases.json"

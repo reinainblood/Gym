@@ -114,3 +114,21 @@ def test_client_fresh_control_rejects_tampered_shard(tmp_path):
             generation_receipt=receipt,
             output=tmp_path / "control.json",
         )
+
+
+def test_client_fresh_control_rejects_rehashed_noncanonical_manifest_name(tmp_path):
+    behaviors, root, receipt = _write_fixture(tmp_path)
+    final = json.loads(receipt.read_text())
+    final["shard_receipts"][0]["name"] = "relabeled.json"
+    final["shard_receipts_sha256"] = hashlib.sha256(
+        json.dumps(final["shard_receipts"], sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    receipt.write_text(json.dumps(final), encoding="utf-8")
+    with pytest.raises(ValueError, match="canonical source-shard order"):
+        validate(
+            method="PAIR",
+            artifact_root=root,
+            behaviors=behaviors,
+            generation_receipt=receipt,
+            output=tmp_path / "control.json",
+        )
