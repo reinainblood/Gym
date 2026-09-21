@@ -12,6 +12,7 @@ from benchmarks.harmbench.operations.gcg_small_models_worker import (
     TARGETS,
     behavior_artifact_path,
     completed_behavior_count,
+    run_generation_if_needed,
     shard_behavior_ids,
 )
 
@@ -62,3 +63,30 @@ def test_completion_count_uses_upstream_nested_behavior_layout(tmp_path):
     (individual / "second.json").write_text('{"second": ["synthetic"]}', encoding="utf-8")
     assert completed_behavior_count(individual, expected) == 1
     assert behavior_artifact_path(individual, "second") == individual / "second" / "test_cases.json"
+
+
+def test_complete_shard_skips_expensive_generation(monkeypatch, tmp_path):
+    individual = tmp_path / "test_cases_individual_behaviors"
+    artifact = behavior_artifact_path(individual, "complete")
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text('{"complete": ["synthetic"]}', encoding="utf-8")
+    invoked = []
+    monkeypatch.setattr(
+        "benchmarks.harmbench.operations.gcg_small_models_worker.subprocess.run",
+        lambda *args, **kwargs: invoked.append((args, kwargs)),
+    )
+    run_generation_if_needed(
+        individual_dir=individual,
+        behavior_ids=["complete"],
+        command=["python", "expensive.py"],
+        upstream=tmp_path,
+    )
+    assert invoked == []
+
+    run_generation_if_needed(
+        individual_dir=individual,
+        behavior_ids=["complete", "missing"],
+        command=["python", "expensive.py"],
+        upstream=tmp_path,
+    )
+    assert len(invoked) == 1

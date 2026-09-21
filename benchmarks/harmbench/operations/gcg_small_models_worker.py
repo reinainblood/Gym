@@ -66,6 +66,14 @@ def completed_behavior_count(individual_dir: Path, behavior_ids: list[str]) -> i
     return sum(behavior_artifact_path(individual_dir, behavior_id).is_file() for behavior_id in behavior_ids)
 
 
+def run_generation_if_needed(
+    *, individual_dir: Path, behavior_ids: list[str], command: list[str], upstream: Path
+) -> None:
+    """Avoid reloading frontier weights when a resumable shard is already complete."""
+    if completed_behavior_count(individual_dir, behavior_ids) != len(behavior_ids):
+        subprocess.run(command, cwd=upstream, check=True)
+
+
 def validate_upstream(upstream: Path) -> dict[str, str]:
     """Validate the exact public pipeline and GCG method configuration."""
     revision = subprocess.check_output(
@@ -193,6 +201,7 @@ def run_shard(
     model_key = f"nemotron_3_5_{target}_gcg"
     output_dir = output_root / "GCG" / model_key / "test_cases"
     output_dir.mkdir(parents=True, exist_ok=True)
+    individual_dir = output_dir / "test_cases_individual_behaviors"
     command = [
         "python",
         "/app/incremental_generate.py",
@@ -216,8 +225,9 @@ def run_shard(
         ",".join(selected),
         "--quiet-upstream",
     ]
-    subprocess.run(command, cwd=upstream, check=True)
-    individual_dir = output_dir / "test_cases_individual_behaviors"
+    # Resume and receipt repair must not reload a frontier checkpoint when every selected
+    # upstream behavior artifact is already present.
+    run_generation_if_needed(individual_dir=individual_dir, behavior_ids=selected, command=command, upstream=upstream)
     completed = completed_behavior_count(individual_dir, selected)
     if completed != len(selected):
         raise ValueError(f"GCG shard saved {completed}/{len(selected)} expected behavior artifacts")
