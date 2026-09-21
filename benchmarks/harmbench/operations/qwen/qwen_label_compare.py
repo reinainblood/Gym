@@ -25,6 +25,7 @@ CLASSIFIER_REVISION = "bda705349d1144fa618770bea64d99ce54e3835b"  # pragma: allo
 CLASSIFIER_CLIP_TOKENS = 512
 TARGET_MODEL = "Qwen/Qwen3.5-122B-A10B"
 TARGET_REVISION = "dc4d348443bc740c68e2d77492492c11606384d5"  # pragma: allowlist secret
+UPSTREAM_REVISION = "8e1604d1171fe8a48d8febecd22f600e462bdcdd"  # pragma: allowlist secret
 LABELS = {"yes": 1, "no": 0}
 WHITEBOX_METHODS = {"MultiModalPGD", "MultiModalPGDPatch", "MultiModalPGDBlankImage"}
 
@@ -145,7 +146,11 @@ def score_canonical_receipts(
                 "index": receipt["index"],
                 "behavior_id": receipt["behavior_id"],
                 "canonical_receipt_sha256": sha256(path),
+                "parent_receipt_sha256": receipt["parent_receipt_sha256"],
                 "generation_sha256": receipt["generation_sha256"],
+                "test_case_image_sha256": receipt["test_case_image_sha256"],
+                "functional_category": receipt.get("functional_category"),
+                "semantic_category": receipt.get("semantic_category"),
                 "generation_token_count": int(receipt["generation_token_count"]),
                 "finish_reason": receipt["finish_reason"],
                 "labels": labels,
@@ -171,6 +176,7 @@ def score_canonical_receipts(
         "classifier_clip_tokens": CLASSIFIER_CLIP_TOKENS,
         "target_model": TARGET_MODEL,
         "target_revision": TARGET_REVISION,
+        "upstream_revision": UPSTREAM_REVISION,
         "summary": {
             "expected_cases": expected_cases,
             "scored_cases": len(case_rows),

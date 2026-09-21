@@ -85,6 +85,10 @@ def _write_canonical(path, *, index: int, method: str = "MultiModalPGDBlankImage
                 "max_new_tokens": 512,
                 "generation": f"synthetic generation {index}",
                 "generation_sha256": f"generation-hash-{index}",
+                "parent_receipt_sha256": f"parent-hash-{index}",
+                "test_case_image_sha256": f"image-hash-{index}",
+                "functional_category": "standard",
+                "semantic_category": "synthetic",
                 "generation_token_count": 512 if index == 0 else 12,
                 "finish_reason": "length" if index == 0 else "stop",
             }

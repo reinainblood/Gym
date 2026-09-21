@@ -78,6 +78,10 @@ method keys in the paper's pipeline.
   `operations/qwen/modal_qwen_label_compare.py --canonical-only` scores the complete cohort twice through the
   pinned serial raw classifier. It refuses partial cohorts, mismatched methods/checkpoints, or non-512-token
   receipts and writes `label-comparison/canonical-512.json` without attack strings, target outputs, or prompts.
+  After downloading that payload-free receipt, `qwen_whitebox_blade.py` validates the full 110-case denominator,
+  source/model/classifier revisions, behavior uniqueness, and serial-label stability before writing BLADE rows,
+  native ASR metrics, and a deterministic Markdown report. Invalid or unstable classifier cases remain visible
+  but are excluded from the model-quality denominator.
 - For ZeroShot, `repair_capture_race.py` created a derivative that attached one late-but-present target-call
   capture without touching any response or score; a separate Gym health audit then passed 1,600/1,600.
   `restore_reverified_observability.py` keeps the original captured trajectory alongside stateless reverify scores
