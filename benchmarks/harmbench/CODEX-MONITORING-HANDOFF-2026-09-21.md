@@ -67,3 +67,12 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   and must not be resumed until active BlankImage workers drain and exact missing indexes are reconciled.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
+
+## Qwen GCG preflight artifact — 2026-09-21 05:24 CDT
+
+- Volume prefix `qwen-gcg-canary-20260921a` already exists from an earlier incomplete attempt. At this audit it
+  contained only runtime configuration and one 349-byte operational log last modified at 00:24:53 CDT. It had no
+  nested behavior `test_cases.json`, no shard receipt, no completion marker, and no live Qwen GCG container.
+- This prefix is **not** a passed canary. Do not duplicate or resume it while the full Super campaign is active.
+  After Super reaches 400/400, both Super calls are terminal, its two receipts exist, and finalization succeeds,
+  recheck ownership and live containers, then resume this same immutable Qwen canary prefix through `run_qwen`.
