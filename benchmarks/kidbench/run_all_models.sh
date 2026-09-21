@@ -46,18 +46,29 @@ ENV_YAML="${ENV_YAML:-${RESULTS_DIR}/env.${HEAD_PORT}.yaml}"
 
 source "${ROOT_DIR}/scripts/benchmark_runner_lib.sh"
 
-set -a; source "${ENV_FILE:-/Users/kruge/Documents/ChatGPT/NVIDIA/.env}"; set +a
+# Endpoints and tokens come from a dotenv file, never from this script. ENV_FILE points at
+# it; the default is the repository root, which is gitignored.
+ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "No env file at ${ENV_FILE}. Copy benchmarks/kidbench/configs/env.yaml.example for the" >&2
+    echo "server wiring, and set the KIDBENCH_*_BASE_URL and token variables it documents." >&2
+    exit 1
+fi
+set -a; source "$ENV_FILE"; set +a
 
 # Per-model concurrency, because the deployments do not all absorb the same load. Kimi K3
 # returns 503 "No available prefill workers (all circuits open or unhealthy)" well before
 # the others do, so it gets a lower ceiling rather than a retry storm against a sick router.
 #
-# key | slug | base_url | model id | token env var | single-turn concurrency
+# Model ids are public; base URLs are deployment-specific and are read from the environment
+# by name so no endpoint is baked into a tracked file.
+#
+# key | slug | base-url env var | model id | token env var | single-turn concurrency
 MODELS=(
-"ultra|nemotron-3-ultra-550b|https://snorkelai-fdr--ep-nvidia-nemotron-3-ultra-550b-a55b-nvfp-63eebc.us-west.modal.direct/v1|nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4|MODAL_PROXY_TOKEN|96"
-"kimi|kimi-k3|https://snorkelai-fdr--ep-kimi-k3-server.us-west.modal.direct/v1|moonshotai/Kimi-K3|MODAL_PROXY_TOKEN|32"
-"qwen|qwen3.5-122b-a10b|https://snorkelai-fdr--ep-qwen3-5-122b-a10b-fp8-server.us-west.modal.direct/v1|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN|96"
-"supervl|nemotron-3.5-super-vl|https://snorkelai-fdr--nemotron-3-5-super-vl-ea-nemotronvision.us-east.modal.direct/v1|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN|96"
+"ultra|nemotron-3-ultra-550b|KIDBENCH_ULTRA_BASE_URL|nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4|MODAL_PROXY_TOKEN|96"
+"kimi|kimi-k3|KIDBENCH_KIMI_BASE_URL|moonshotai/Kimi-K3|MODAL_PROXY_TOKEN|32"
+"qwen|qwen3.5-122b-a10b|KIDBENCH_QWEN_BASE_URL|Qwen/Qwen3.5-122B-A10B-FP8|MODAL_PROXY_TOKEN|96"
+"supervl|nemotron-3.5-super-vl|KIDBENCH_SUPER_VL_BASE_URL|nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16|SUPER_VL_MODAL_TOKEN|96"
 )
 
 write_env_yaml() {
@@ -114,7 +125,7 @@ kidbench_actor_model:
   responses_api_models:
     inference_provider:
       entrypoint: app.py
-      base_url: https://snorkelai-fdr--kidbench-gemma4-31b-ara-actor-serve.modal.run/v1
+      base_url: ${KIDBENCH_ACTOR_BASE_URL:?set KIDBENCH_ACTOR_BASE_URL to the deployed actor endpoint}
       api_key: \${oc.env:MODAL_PROXY_TOKEN,""}
       model: wangzhang/gemma-4-31B-it-abliterated
       uses_reasoning_parser: false
@@ -179,7 +190,12 @@ gym_runner_clear_shadowing_env_yaml || exit 1
 
 WANTED=("$@")
 for entry in "${MODELS[@]}"; do
-    IFS='|' read -r key slug base_url model token_var model_concurrency <<< "$entry"
+    IFS='|' read -r key slug base_url_var model token_var model_concurrency <<< "$entry"
+    base_url="${!base_url_var:-}"
+    if [ -z "$base_url" ]; then
+        echo "SKIP ${key}: ${base_url_var} is not set in ${ENV_FILE}" >&2
+        continue
+    fi
     if [ ${#WANTED[@]} -gt 0 ] && [[ ! " ${WANTED[*]} " =~ " ${key} " ]]; then
         continue
     fi
