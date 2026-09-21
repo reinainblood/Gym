@@ -99,6 +99,18 @@ class QwenGCGCompletion:
         )
         completion_dir = output_root / "target-completions" / "qwen-bf16" / "individual"
         if all((completion_dir / f"{index:03d}.json").is_file() for index in selected):
+            if limit:
+                return json.dumps(
+                    {
+                        "artifact_id": artifact_id,
+                        "target": "qwen",
+                        "status": "canary_complete",
+                        "shard_index": shard_index,
+                        "num_shards": num_shards,
+                        "completed_behaviors": len(selected),
+                    },
+                    sort_keys=True,
+                )
             receipt = write_completion_shard_receipt(
                 output_root=output_root,
                 artifact_id=artifact_id,
@@ -126,6 +138,18 @@ class QwenGCGCompletion:
             )
             results.commit()
             completed += 1
+        if limit:
+            return json.dumps(
+                {
+                    "artifact_id": artifact_id,
+                    "target": "qwen",
+                    "status": "canary_complete",
+                    "shard_index": shard_index,
+                    "num_shards": num_shards,
+                    "completed_behaviors": completed,
+                },
+                sort_keys=True,
+            )
         receipt = write_completion_shard_receipt(
             output_root=output_root,
             artifact_id=artifact_id,

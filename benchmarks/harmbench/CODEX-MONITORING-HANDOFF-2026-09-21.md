@@ -87,7 +87,9 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   completion shards, require 400 validated individual receipts and both completion-shard receipts, call its `finalize`
   function, and require `target-completions/qwen-bf16/target-completion-receipt.json` before classifier scoring.
 - The completion runner returns only indexes, counts, statuses, and call IDs. Its private Volume receipts contain model
-  generations needed by the scorer; never print or download their payload fields into commentary or logs.
+  generations needed by the scorer; never print or download their payload fields into commentary or logs. A bounded
+  `limit` call is a payload-producing canary but intentionally writes no canonical completion-shard receipt; only an
+  unbounded full shard may satisfy the finalizer's shard evidence gate.
 - After the completion finalizer passes, deploy `operations/qwen/modal_qwen_gcg_score.py` in FDR and call its `score`
   function once. It rehashes the 400 private completion receipts and scores every case twice through the pinned serial raw
   HarmBench classifier, writing only payload-free `classifier-scores.json`. Download that single receipt and run

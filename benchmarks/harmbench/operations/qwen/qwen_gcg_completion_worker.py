@@ -255,6 +255,9 @@ def write_completion_shard_receipt(
     selected: list[int],
     behaviors_path: Path = BEHAVIORS,
 ) -> dict[str, Any]:
+    expected_selected = shard_indexes(shard_index, num_shards)
+    if selected != expected_selected:
+        raise ValueError("canonical Qwen GCG completion receipt requires the complete source-order shard")
     completion_dir = output_root / "target-completions" / "qwen-bf16" / "individual"
     cases_path, generation_receipt_path = generation_paths(output_root)
     behaviors, cases, _ = load_generation_artifact(

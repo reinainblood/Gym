@@ -116,6 +116,15 @@ def test_qwen_completion_shards_cover_source_order_and_require_receipts(tmp_path
     assert first[:3] == [0, 2, 4]
     assert second[:3] == [1, 3, 5]
     assert sorted(first + second) == list(range(PUBLIC_BEHAVIORS))
+    with pytest.raises(ValueError, match="complete source-order shard"):
+        write_completion_shard_receipt(
+            output_root=output_root,
+            artifact_id=artifact_id,
+            shard_index=0,
+            num_shards=2,
+            selected=first[:1],
+            behaviors_path=behaviors_path,
+        )
     completion_dir = output_root / "target-completions" / "qwen-bf16" / "individual"
     completion_dir.mkdir(parents=True)
     generation_receipt_sha256 = sha256(receipt_path)
