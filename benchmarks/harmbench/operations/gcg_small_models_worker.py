@@ -56,6 +56,16 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def behavior_artifact_path(individual_dir: Path, behavior_id: str) -> Path:
+    """Return upstream SingleBehaviorRedTeamingMethod's per-behavior case path."""
+    return individual_dir / behavior_id / "test_cases.json"
+
+
+def completed_behavior_count(individual_dir: Path, behavior_ids: list[str]) -> int:
+    """Count only complete upstream per-behavior case files."""
+    return sum(behavior_artifact_path(individual_dir, behavior_id).is_file() for behavior_id in behavior_ids)
+
+
 def validate_upstream(upstream: Path) -> dict[str, str]:
     """Validate the exact public pipeline and GCG method configuration."""
     revision = subprocess.check_output(
@@ -208,7 +218,7 @@ def run_shard(
     ]
     subprocess.run(command, cwd=upstream, check=True)
     individual_dir = output_dir / "test_cases_individual_behaviors"
-    completed = sum((individual_dir / f"{behavior_id}.json").is_file() for behavior_id in selected)
+    completed = completed_behavior_count(individual_dir, selected)
     if completed != len(selected):
         raise ValueError(f"GCG shard saved {completed}/{len(selected)} expected behavior artifacts")
     receipt = {
@@ -254,7 +264,9 @@ def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
     individual_dir = output_dir / "test_cases_individual_behaviors"
     behaviors = upstream / "data/behavior_datasets" / PUBLIC_DATASET
     selected = shard_behavior_ids(behaviors, 0, 1)
-    missing = [behavior_id for behavior_id in selected if not (individual_dir / f"{behavior_id}.json").is_file()]
+    missing = [
+        behavior_id for behavior_id in selected if not behavior_artifact_path(individual_dir, behavior_id).is_file()
+    ]
     if missing:
         raise ValueError(f"cannot finalize: {len(missing)} GCG behaviors are missing")
     subprocess.run(

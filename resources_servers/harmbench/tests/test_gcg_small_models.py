@@ -10,6 +10,8 @@ from benchmarks.harmbench.operations.gcg_small_models_worker import (
     PUBLIC_SEARCH_WIDTH,
     PUBLIC_STEPS,
     TARGETS,
+    behavior_artifact_path,
+    completed_behavior_count,
     shard_behavior_ids,
 )
 
@@ -48,3 +50,15 @@ def test_behavior_shard_rejects_wrong_corpus_and_selection(tmp_path):
         shard_behavior_ids(source, 0, 2)
     with pytest.raises(ValueError, match="invalid shard"):
         shard_behavior_ids(source, 2, 2)
+
+
+def test_completion_count_uses_upstream_nested_behavior_layout(tmp_path):
+    individual = tmp_path / "test_cases_individual_behaviors"
+    expected = ["first", "second"]
+    first = behavior_artifact_path(individual, "first")
+    first.parent.mkdir(parents=True)
+    first.write_text('{"first": ["synthetic"]}', encoding="utf-8")
+    # A legacy flat file must not satisfy the upstream artifact contract.
+    (individual / "second.json").write_text('{"second": ["synthetic"]}', encoding="utf-8")
+    assert completed_behavior_count(individual, expected) == 1
+    assert behavior_artifact_path(individual, "second") == individual / "second" / "test_cases.json"
