@@ -15,6 +15,7 @@ from benchmarks.harmbench.operations.gcg_small_models_worker import (
     PUBLIC_SEARCH_WIDTH,
     PUBLIC_STEPS,
     TARGETS,
+    UPSTREAM_REVISION,
     behavior_artifact_path,
     completed_behavior_count,
     run_generation_if_needed,
@@ -116,7 +117,7 @@ def _write_receipt_set(tmp_path, *, target="super", artifact_id="full-run", num_
             "checkpoint_manifest_sha256": "a" * 64,
             "checkpoint_manifest_status": "verified",
             "upstream": {
-                "revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd",
+                "revision": UPSTREAM_REVISION,
                 "pipeline_sha256": PIPELINE_SHA256,
                 "gcg_config_sha256": GCG_CONFIG_SHA256,
             },
