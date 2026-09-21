@@ -58,7 +58,7 @@ _QWEN_RE = re.compile(
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _MISSING_CLOSE_TOOL_NAME_RE = re.compile(
-    r"<tool_name>\s*([a-zA-Z_]\w*)\s*(?=<arguments>)",
+    r"<tool_name>\s*([a-zA-Z_]\w*)\s*>?\s*(?:<tool_name>\s*)?(?=<arguments>)",
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _MISSING_OPEN_TOOL_NAME_RE = re.compile(
@@ -78,7 +78,11 @@ _ATTRIBUTE_TOOL_NAME_RE = re.compile(
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _UNTERMINATED_ATTRIBUTE_TOOL_NAME_RE = re.compile(
-    r"<tool_name=([a-zA-Z_]\w*)\s*(?=<arguments>)",
+    r"<tool_name=([a-zA-Z_]\w*)\s*(?=<arguments>|</arguments>)",
+    re.DOTALL | re.IGNORECASE | re.ASCII,
+)
+_FUNCTION_MISMATCHED_CLOSE_RE = re.compile(
+    r"<function=([a-zA-Z_]\w*)\s*</function>\s*(?=<arguments>)",
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _TOOL_NAME_HARMONY_WRAPPER_RE = re.compile(
@@ -94,7 +98,15 @@ _TAG_NAME_BROKEN_ARGUMENT_RE = re.compile(
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _TAG_AS_TOOL_NAME_PLACEHOLDER_RE = re.compile(
-    r"<([a-zA-Z_]\w*)>\s*TOOL_NAME(?:\s*:\s*[a-zA-Z_]\w*)?\s*</\1>\s*(?=<arguments>)",
+    r"<([a-zA-Z_]\w*)>\s*TOOL_NAME(?:\s*[:=]\s*[a-zA-Z_]\w*)?\s*</\1>\s*(?=<arguments>)",
+    re.DOTALL | re.IGNORECASE | re.ASCII,
+)
+_TAG_AS_TOOL_NAME_MISMATCHED_CLOSE_RE = re.compile(
+    r"<([a-zA-Z_]\w*)>\s*</tool>\s*(?=<arguments>)",
+    re.DOTALL | re.IGNORECASE | re.ASCII,
+)
+_TAG_AS_TOOL_NAME_MISSING_CLOSE_RE = re.compile(
+    r"<([a-zA-Z_]\w*)>\s*(?:\1|TOOL_NAME)?\s*(?=<arguments>)",
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
 _HARMONY_OPEN_CALL_RE = re.compile(
@@ -308,10 +320,13 @@ def _recover_malformed_xml_calls(response_text: str) -> List[ExtractedToolCall]:
                 _BROKEN_ARGUMENT_TOOL_NAME_RE,
                 _ATTRIBUTE_TOOL_NAME_RE,
                 _UNTERMINATED_ATTRIBUTE_TOOL_NAME_RE,
+                _FUNCTION_MISMATCHED_CLOSE_RE,
                 _TOOL_NAME_HARMONY_WRAPPER_RE,
                 _TAG_AS_TOOL_NAME_RE,
                 _TAG_NAME_BROKEN_ARGUMENT_RE,
                 _TAG_AS_TOOL_NAME_PLACEHOLDER_RE,
+                _TAG_AS_TOOL_NAME_MISMATCHED_CLOSE_RE,
+                _TAG_AS_TOOL_NAME_MISSING_CLOSE_RE,
             ),
         )
         if name_match is None:
@@ -559,10 +574,13 @@ def has_unparsed_tool_call_markup(response_text: str) -> bool:
                     _BROKEN_ARGUMENT_TOOL_NAME_RE,
                     _ATTRIBUTE_TOOL_NAME_RE,
                     _UNTERMINATED_ATTRIBUTE_TOOL_NAME_RE,
+                    _FUNCTION_MISMATCHED_CLOSE_RE,
                     _TOOL_NAME_HARMONY_WRAPPER_RE,
                     _TAG_AS_TOOL_NAME_RE,
                     _TAG_NAME_BROKEN_ARGUMENT_RE,
                     _TAG_AS_TOOL_NAME_PLACEHOLDER_RE,
+                    _TAG_AS_TOOL_NAME_MISMATCHED_CLOSE_RE,
+                    _TAG_AS_TOOL_NAME_MISSING_CLOSE_RE,
                 ),
             )
             is not None

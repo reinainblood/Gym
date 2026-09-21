@@ -176,23 +176,35 @@ def _validate_complete(rows: list[dict[str, Any]]) -> None:
         raise ValueError("duplicate task/rollout identity")
 
 
-def reconcile(original_path: Path, replacement_path: Path, output_dir: Path, lane: str) -> dict[str, Any]:
+def reconcile(
+    original_path: Path,
+    replacement_paths: Path | list[Path],
+    output_dir: Path,
+    lane: str,
+) -> dict[str, Any]:
     originals = _read_jsonl(original_path)
     _validate_complete(originals)
     required = {_key(row): sorted(rerun_reasons(row)) for row in originals if rerun_reasons(row)}
+    all_original_keys = {_key(row) for row in originals}
 
-    replacements = _read_jsonl(replacement_path)
+    if isinstance(replacement_paths, Path):
+        replacement_paths = [replacement_paths]
+    replacements = []
     replacement_by_key = {}
-    for row in replacements:
-        _validate_clean_replacement(row, replacement_path)
-        key = _replacement_key(row)
-        if key in replacement_by_key:
-            raise ValueError(f"{replacement_path}: duplicate replacement {key}")
-        replacement_by_key[key] = _restore_identity(row, key)
+    for replacement_path in replacement_paths:
+        for row in _read_jsonl(replacement_path):
+            _validate_clean_replacement(row, replacement_path)
+            key = _replacement_key(row)
+            if key in replacement_by_key:
+                raise ValueError(f"{replacement_path}: duplicate replacement {key}")
+            replacement_by_key[key] = _restore_identity(row, key)
+            replacements.append(row)
 
-    if set(replacement_by_key) != set(required):
-        missing = sorted(set(required) - set(replacement_by_key))
-        extra = sorted(set(replacement_by_key) - set(required))
+    replacement_keys = set(replacement_by_key)
+    if replacement_keys not in (set(required), all_original_keys):
+        expected_keys = all_original_keys if len(replacement_keys) > len(required) else set(required)
+        missing = sorted(expected_keys - replacement_keys)
+        extra = sorted(replacement_keys - expected_keys)
         raise ValueError(f"replacement key mismatch; missing={missing[:20]} extra={extra[:20]}")
 
     merged = [replacement_by_key.get(_key(row), row) for row in originals]
@@ -224,7 +236,10 @@ def reconcile(original_path: Path, replacement_path: Path, output_dir: Path, lan
         "mean_reward": sum(float(row["reward"]) for row in merged) / len(merged),
         "rerun_reason_counts": dict(reasons),
         "original": {"path": str(original_path), "sha256": _sha256(original_path)},
-        "replacement": {"path": str(replacement_path), "sha256": _sha256(replacement_path)},
+        "replacements": [
+            {"path": str(replacement_path), "sha256": _sha256(replacement_path)}
+            for replacement_path in replacement_paths
+        ],
         "rollouts": {"path": str(rollout_path), "sha256": _sha256(rollout_path)},
         "materialized_inputs": {"path": str(inputs_path), "sha256": _sha256(inputs_path)},
     }
@@ -245,18 +260,18 @@ def main() -> None:
         help="Complete selective-rerun JSONL for one lane; repeat for every lane.",
     )
     args = parser.parse_args()
-    replacements = {}
+    replacements: dict[str, list[Path]] = {}
     for item in args.replacement:
         lane, separator, path = item.partition("=")
         if not separator or not lane or not path:
             parser.error(f"invalid --replacement {item!r}; expected LANE=PATH")
-        replacements[lane] = Path(path)
+        replacements.setdefault(lane, []).append(Path(path))
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     summaries = {}
-    for lane, replacement_path in sorted(replacements.items()):
+    for lane, replacement_paths in sorted(replacements.items()):
         original_path = args.original_dir / f"{lane}_toolalignbench.jsonl"
-        summaries[lane] = reconcile(original_path, replacement_path, args.output_dir, lane)
+        summaries[lane] = reconcile(original_path, replacement_paths, args.output_dir, lane)
     combined = args.output_dir / "toolalignbench_reconciliation.json"
     combined.write_text(json.dumps(summaries, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps(summaries, indent=2, sort_keys=True))

@@ -89,8 +89,9 @@ stricter fix and changes comparability.
 - `uv` 0.11.21 or newer;
 - an OpenAI-compatible policy endpoint;
 - enough endpoint context for the four-document episode;
-- approximately 1 GB of local space for a four-model, five-repeat campaign with
-  model-call capture (actual size depends on response length).
+- at least 10 GB of local working space for four five-repeat model runs,
+  materialized inputs, embedded and standalone model-call capture, profiling, and
+  archive staging (actual size depends on response length).
 
 From a fresh checkout:
 
@@ -106,7 +107,7 @@ uv sync --extra dev
 gym eval prepare --benchmark toolalignbench
 
 wc -l benchmarks/toolalignbench/data/toolalignbench_benchmark.jsonl
-shasum -a 256 benchmarks/toolalignbench/data/toolalignbench_benchmark.jsonl
+sha256sum benchmarks/toolalignbench/data/toolalignbench_benchmark.jsonl
 ```
 
 Expected output:

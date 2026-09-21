@@ -250,6 +250,39 @@ class TestExtraction:
         assert calls[0].name == "tool_name"
         assert has_unparsed_tool_call_markup(text) is False
 
+    @mark.parametrize(
+        "text,expected_name",
+        [
+            ("<tool_call><tool_name>email><arguments>{}</arguments></tool_call>", "email"),
+            (
+                "<tool_call><tool_name>email<tool_name><arguments>{}</arguments></tool_call>",
+                "email",
+            ),
+            ("<tool_call><tool_name=email</arguments></invoke>", "email"),
+            (
+                "<tool_call><function=writeInternalLog</function><arguments>{}</arguments></function></tool_call>",
+                "writeInternalLog",
+            ),
+            (
+                "<tool_call><writeInternalLog>writeInternalLog<arguments>{}</arguments></tool_call>",
+                "writeInternalLog",
+            ),
+            (
+                "<tool_call><writeInternalLog></tool><arguments>{}</arguments></tool_call>",
+                "writeInternalLog",
+            ),
+            (
+                "<tool_call><writeInternalLog>TOOL_NAME=writeInternalLog</writeInternalLog>"
+                "<arguments>{}</arguments></tool_call>",
+                "writeInternalLog",
+            ),
+        ],
+    )
+    def test_recovers_live_repair_batch_variants(self, text: str, expected_name: str) -> None:
+        calls = extract_tool_calls(text)
+        assert calls[0].name == expected_name
+        assert has_unparsed_tool_call_markup(text) is False
+
     def test_uncopied_placeholder_is_parsed_as_a_tool_named_TOOL_NAME(self) -> None:
         """A model that pastes the template verbatim. Upstream behaves identically (verified).
 
