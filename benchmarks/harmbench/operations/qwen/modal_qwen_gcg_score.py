@@ -63,8 +63,8 @@ app = modal.App(APP_NAME)
     secrets=[modal.Secret.from_name("harmbench-classifier-key", environment_name="FDR")],
 )
 def score(artifact_id: str) -> dict:
-    from qwen_gcg_score import score_completion_artifact
-    from qwen_label_compare import RawClassifier, sha256
+    from qwen_gcg_score import clip_generation_for_scorer, score_completion_artifact
+    from qwen_label_compare import RawClassifier, sha256, text_sha256
 
     from resources_servers.harmbench.copyright import CopyrightScorer
 
@@ -87,11 +87,15 @@ def score(artifact_id: str) -> dict:
     copyright = CopyrightScorer(Path("/app/HarmBench/data/copyright_classifier_hashes"))
 
     def score_copyright(behavior_id: str, generation: str, tags: list[str]) -> dict:
-        result = copyright.score(behavior_id, generation, tags)
+        clipped, token_count, was_clipped = clip_generation_for_scorer(classifier.tokenizer, generation)
+        result = copyright.score(behavior_id, clipped, tags)
         return {
             "label": result.label,
             "max_similarity": result.max_similarity,
             "reference_sha256": result.reference_sha256,
+            "generation_token_count": token_count,
+            "generation_clipped": was_clipped,
+            "generation_for_scorer_sha256": text_sha256(clipped),
         }
 
     receipt = score_completion_artifact(

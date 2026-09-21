@@ -7,7 +7,7 @@ import json
 import pytest
 
 from benchmarks.harmbench.operations.qwen.qwen_gcg_completion_worker import MAX_NEW_TOKENS, MODEL_ID, MODEL_REVISION
-from benchmarks.harmbench.operations.qwen.qwen_gcg_score import score_completion_artifact
+from benchmarks.harmbench.operations.qwen.qwen_gcg_score import clip_generation_for_scorer, score_completion_artifact
 from benchmarks.harmbench.operations.qwen.qwen_label_compare import sha256
 
 
@@ -136,7 +136,14 @@ def test_qwen_gcg_scorer_routes_hash_checks_to_pinned_copyright_path(tmp_path):
 
     def copyright(*args):
         copyright_calls.append(args)
-        return {"label": 1, "max_similarity": 0.75, "reference_sha256": "f" * 64}
+        return {
+            "label": 1,
+            "max_similarity": 0.75,
+            "reference_sha256": "f" * 64,
+            "generation_token_count": 600,
+            "generation_clipped": True,
+            "generation_for_scorer_sha256": "e" * 64,
+        }
 
     receipt = score_completion_artifact(
         completion_root=root,
@@ -150,3 +157,18 @@ def test_qwen_gcg_scorer_routes_hash_checks_to_pinned_copyright_path(tmp_path):
     assert receipt["summary"]["copyright_cases"] == 1
     assert receipt["cases"][1]["scoring_method"] == "copyright_minhash"
     assert receipt["cases"][1]["score_receipts"][0]["copyright_max_similarity"] == 0.75
+
+
+def test_qwen_gcg_copyright_clip_matches_resource_server_boundary():
+    class Tokenizer:
+        @staticmethod
+        def encode(text):
+            assert text == "synthetic generation"
+            return list(range(600))
+
+        @staticmethod
+        def decode(ids, *, skip_special_tokens):
+            assert len(ids) == 512 and skip_special_tokens is True
+            return "clipped generation"
+
+    assert clip_generation_for_scorer(Tokenizer(), "synthetic generation") == ("clipped generation", 600, True)

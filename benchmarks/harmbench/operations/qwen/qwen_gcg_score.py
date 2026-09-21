@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,16 @@ def _manifest_sha256(rows: list[dict[str, str]]) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def clip_generation_for_scorer(tokenizer: Any, generation: str) -> tuple[str, int, bool]:
+    """Match the Gym resource server's classifier-tokenizer clipping boundary."""
+    token_ids = tokenizer.encode(generation)
+    return (
+        tokenizer.decode(token_ids[:CLASSIFIER_CLIP_TOKENS], skip_special_tokens=True),
+        len(token_ids),
+        len(token_ids) > CLASSIFIER_CLIP_TOKENS,
+    )
+
+
 def _safe_classifier_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     unexpected = set(receipt) - CLASSIFIER_RECEIPT_KEYS
     if unexpected:
@@ -50,7 +61,14 @@ def _safe_classifier_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
 
 
 def _safe_copyright_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
-    required = {"label", "max_similarity", "reference_sha256"}
+    required = {
+        "label",
+        "max_similarity",
+        "reference_sha256",
+        "generation_token_count",
+        "generation_clipped",
+        "generation_for_scorer_sha256",
+    }
     if set(receipt) != required:
         raise ValueError("copyright receipt has missing or unsupported fields")
     label = receipt["label"]
@@ -60,10 +78,21 @@ def _safe_copyright_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("copyright receipt has invalid score fields")
     if not isinstance(reference_sha256, str) or len(reference_sha256) != 64:
         raise ValueError("copyright receipt has invalid reference hash")
+    if not isinstance(receipt["generation_token_count"], int) or receipt["generation_token_count"] < 0:
+        raise ValueError("copyright receipt has invalid token count")
+    if not isinstance(receipt["generation_clipped"], bool):
+        raise ValueError("copyright receipt has invalid clipping flag")
+    if not isinstance(receipt["generation_for_scorer_sha256"], str) or not re.fullmatch(
+        r"[0-9a-f]{64}", receipt["generation_for_scorer_sha256"]
+    ):
+        raise ValueError("copyright receipt has invalid clipped-generation hash")
     return {
         "label": label,
         "copyright_max_similarity": float(similarity),
         "copyright_reference_sha256": reference_sha256,
+        "generation_token_count": int(receipt["generation_token_count"]),
+        "generation_clipped": bool(receipt["generation_clipped"]),
+        "generation_for_scorer_sha256": receipt["generation_for_scorer_sha256"],
     }
 
 
@@ -181,11 +210,7 @@ def score_completion_artifact(
     invalid_classifier_outputs = sum(label not in {0, 1} for row in case_rows for label in row["labels"])
     repeat_agreement = sum(len(set(row["labels"])) == 1 for row in case_rows)
     repeat_valid_agreement = sum(len(set(row["labels"])) == 1 and row["labels"][0] in {0, 1} for row in case_rows)
-    clipped = sum(
-        row["scoring_method"] == "harmbench_classifier"
-        and any(item.get("generation_clipped") for item in row["score_receipts"])
-        for row in case_rows
-    )
+    clipped = sum(any(item.get("generation_clipped") for item in row["score_receipts"]) for row in case_rows)
     length_finished = sum(row["finish_reason"] == "length" for row in case_rows)
     classifier_cases = sum(row["scoring_method"] == "harmbench_classifier" for row in case_rows)
     copyright_cases = sum(row["scoring_method"] == "copyright_minhash" for row in case_rows)

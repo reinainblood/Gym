@@ -93,7 +93,8 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
 - After the completion finalizer passes, deploy `operations/qwen/modal_qwen_gcg_score.py` in FDR and call its `score`
   function once. It rehashes the 400 private completion receipts, routes ordinary behaviors through two serial passes of
   the pinned raw HarmBench classifier, and routes `hash_check` book/lyrics behaviors through the pinned upstream MinHash
-  references. Require the pinned split of 300 classifier cases plus 100 copyright cases (50 book, 50 lyrics). It writes
+  references after the same pinned classifier-tokenizer 512-token clip used by the resource server. Require the pinned
+  split of 300 classifier cases plus 100 copyright cases (50 book, 50 lyrics), with clip counts and hashes. It writes
   only payload-free `classifier-scores.json`. Download that single receipt and run
   `qwen_gcg_blade.py`; require 400 reconciled source indexes, exact model/classifier revisions, stable denominator
   accounting, and successful readback of its JSONL, metrics JSON, Markdown report, and `evidence-manifest.json` before

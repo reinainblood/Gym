@@ -95,7 +95,8 @@ method keys in the paper's pipeline.
   separate app so deploying it cannot interrupt the active white-box image attack workers or the persistent GCG app.
 - `operations/qwen/modal_qwen_gcg_score.py` rehashes that 400-receipt manifest, runs two serial passes through the pinned
   raw HarmBench classifier for ordinary behaviors, and preserves the upstream MinHash path for `hash_check` book/lyrics
-  behaviors without copying generations into its output. Both the scorer and BLADE validator enforce the pinned 300
+  behaviors after the same classifier-tokenizer 512-token clip used by the Gym resource server, without copying
+  generations into its output. Both the scorer and BLADE validator enforce the pinned 300
   classifier / 100 copyright split, including 50 book and 50 lyrics cases. `qwen_gcg_blade.py` then checks all model, source, scorer,
   denominator, and case-level hashes before emitting payload-free BLADE rows, native metrics, and a
   deterministic report; invalid or unstable classifier cases remain visible but outside the model-quality denominator.
