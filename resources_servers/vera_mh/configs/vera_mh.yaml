@@ -13,7 +13,15 @@ vera_mh:
       # Upstream's temperature=0 default is dropped for gpt-5+ reasoning models, so it stays unset here.
       judge_reasoning_effort: low
       judge_temperature: null
-      judge_parse_retries: 3
+      # Raised from upstream's 3. The judge answers a small share of (transcript, question)
+      # slots in prose ("ANSWER: No\nREASONING: ...") instead of the requested JSON, and
+      # those slots are sticky: the first-attempt prose rate is 2.0%, but once a slot has
+      # failed once it fails again ~35% of the time. Retries are independent (73 of 73
+      # multi-attempt slots returned different text each time), so more attempts do clear
+      # them. At 3 retries ~3 conversations per model exhausted the budget, and because one
+      # unparseable question aborts the whole conversation, a formatting flake was
+      # discarding entire 30-turn transcripts. This changes no verdict: it only asks again.
+      judge_parse_retries: 8
 
 # Official judge and user simulators reached through any OpenAI-compatible Chat Completions endpoint; endpoint
 # details stay out of the repo. Model ids default to the upstream recommended profile.
