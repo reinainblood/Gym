@@ -109,6 +109,9 @@ method keys in the paper's pipeline.
 - New BlankImage/Patch BLADE inputs must include the completed run identity and completion-manifest SHA. The earlier PGD
   receipt is admitted only through an explicit legacy-PGD branch backed by its validated remote bundle; a partially filled
   modern provenance tuple fails closed.
+- `qwen_whitebox_result.py` packages modern BlankImage/Patch results only after validating the attack, completion, score,
+  and BLADE hash chain. Its normalized manifest reports native and BLADE denominators separately and performs deterministic
+  manifest/report/evidence readback; historical PGD remains represented by its dedicated compact evidence receipt.
 - `operations/qwen/modal_qwen_gcg_completion.py` is the post-generation target-completion stage for the matched Qwen
   GCG baseline. It mounts the same immutable BF16 checkpoint as optimization, reproduces the pinned upstream tokenizer
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG

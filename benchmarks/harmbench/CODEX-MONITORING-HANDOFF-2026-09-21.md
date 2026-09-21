@@ -87,6 +87,9 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
 - BLADE requires that modern score provenance for BlankImage and Patch. The completed PGD receipt predates the new
   completion-manifest field and is accepted only as an explicit legacy `MultiModalPGD` format backed by its independently
   checksummed and remotely read-back bundle; partial modern provenance is rejected for every method.
+- Run `qwen_whitebox_result.py` after a modern BlankImage or Patch BLADE bundle passes. It verifies the complete
+  attack→completion→score→BLADE hash chain, keeps native and BLADE denominators distinct, and emits checksummed
+  `run-manifest.json`, `report.md`, and `evidence-manifest.json`. It intentionally does not relabel historical PGD.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
 
