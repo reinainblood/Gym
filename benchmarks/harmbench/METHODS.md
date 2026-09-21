@@ -88,6 +88,10 @@ method keys in the paper's pipeline.
   source/model/classifier revisions, behavior uniqueness, and serial-label stability before writing BLADE rows,
   native ASR metrics, and a deterministic Markdown report. Invalid or unstable classifier cases remain visible
   but are excluded from the model-quality denominator.
+- The Qwen white-box attack resume boundary validates every existing case receipt before skipping it: method/checkpoint
+  identity, public hyperparameters, source index, paired image and hash, target-generation hash, executed-step/early-stop
+  consistency, and optimization-checkpoint files must all survive readback. This prevents a partial case JSON from hiding
+  an exact missing index when BlankImage or Patch is resumed after worker drain.
 - `operations/qwen/modal_qwen_gcg_completion.py` is the post-generation target-completion stage for the matched Qwen
   GCG baseline. It mounts the same immutable BF16 checkpoint as optimization, reproduces the pinned upstream tokenizer
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG

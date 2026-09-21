@@ -65,6 +65,10 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
 - Qwen MultiModalPGD now has complete 110/110 canonical 512-token scoring and BLADE evidence. The long-running
   MultiModalPGDBlankImage campaign remains active under app `ap-07zo5VR8b4cd4UHMb6VHBM`; Patch remains incomplete
   and must not be resumed until active BlankImage workers drain and exact missing indexes are reconciled.
+- Before any BlankImage or Patch resume after worker drain, redeploy the current branch to the same white-box app. The
+  resume path now skips an existing index only after validating its case receipt, paired image and hash, exact method and
+  checkpoint identity, public hyperparameters, generation hash, step accounting, and optimization-checkpoint files. A
+  present-but-stale or truncated JSON is not completion evidence and must fail closed rather than suppress repair.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
 

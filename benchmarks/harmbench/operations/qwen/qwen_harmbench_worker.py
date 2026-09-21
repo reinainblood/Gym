@@ -14,6 +14,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import time
 from pathlib import Path
 
@@ -60,6 +61,79 @@ def tensor_stats(tensor) -> dict[str, float]:
         "l1": float(tensor.abs().sum().item()),
         "l2": float(tensor.float().norm().item()),
     }
+
+
+def validate_case_receipt(case_path: Path, *, method: str, index: int, row: dict[str, str]) -> dict:
+    """Accept a resumable white-box case only when its full artifact contract still holds."""
+    if method not in METHODS:
+        raise ValueError("unknown public method")
+    receipt = json.loads(case_path.read_text(encoding="utf-8"))
+    behavior_id = row["BehaviorID"]
+    public_class = "MultiModalPGDPatch" if method == "MultiModalPGDPatch" else "MultiModalPGD"
+    required = {
+        "schema_version": 1,
+        "status": "completed",
+        "method": method,
+        "public_method_class": public_class,
+        "model_id": MODEL_ID,
+        "model_revision": MODEL_REVISION,
+        "upstream_revision": UPSTREAM_REVISION,
+        "corrected_behaviors_sha256": CORRECTED_BEHAVIORS_SHA256,
+        "filename_corrections_sha256": CORRECTIONS_SHA256,
+        "index": index,
+        "behavior_id": behavior_id,
+        "behavior": row["Behavior"],
+        "context": row.get("ContextString", ""),
+        "functional_category": row.get("FunctionalCategory", "multimodal"),
+        "semantic_category": row.get("SemanticCategory", ""),
+        "image_file_name": row.get("ImageFileName"),
+        "hyperparameters": METHODS[method],
+        "seed": index,
+    }
+    mismatched = [key for key, value in required.items() if receipt.get(key) != value]
+    expected_image = case_path.parents[1] / "images" / f"{index:03d}-{behavior_id}.png"
+    if receipt.get("test_case_image") != str(expected_image) or not expected_image.is_file():
+        mismatched.append("test_case_image")
+    elif receipt.get("test_case_image_sha256") != sha256(expected_image):
+        mismatched.append("test_case_image_sha256")
+    generation = receipt.get("generation")
+    if (
+        not isinstance(generation, str)
+        or receipt.get("generation_sha256") != hashlib.sha256(generation.encode()).hexdigest()
+    ):
+        mismatched.append("generation_sha256")
+    for key in ("target_sha256", "prompt_sha256"):
+        if not isinstance(receipt.get(key), str) or not re.fullmatch(r"[0-9a-f]{64}", receipt[key]):
+            mismatched.append(key)
+    steps = receipt.get("steps_executed")
+    if not isinstance(steps, int) or not 1 <= steps <= METHODS[method]["num_steps"]:
+        mismatched.append("steps_executed")
+    elif receipt.get("stopped_early") != (steps < METHODS[method]["num_steps"]):
+        mismatched.append("stopped_early")
+    patch = receipt.get("patch")
+    if (method == "MultiModalPGDPatch") != isinstance(patch, dict):
+        mismatched.append("patch")
+    checkpoints = receipt.get("optimization_checkpoints")
+    if not isinstance(checkpoints, list) or not checkpoints:
+        mismatched.append("optimization_checkpoints")
+    else:
+        checkpoint_dir = case_path.parents[1] / "optimization-checkpoints" / f"{index:03d}-{behavior_id}"
+        for checkpoint in checkpoints:
+            path = Path(str(checkpoint.get("path", ""))) if isinstance(checkpoint, dict) else Path()
+            if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get("step"), int):
+                mismatched.append("optimization_checkpoints")
+                break
+            try:
+                path.relative_to(checkpoint_dir)
+            except ValueError:
+                mismatched.append("optimization_checkpoints")
+                break
+            if not path.is_file():
+                mismatched.append("optimization_checkpoints")
+                break
+    if mismatched:
+        raise ValueError(f"existing {method} case {index} failed fields {','.join(sorted(set(mismatched)))}")
+    return receipt
 
 
 class QwenHarmBenchRuntime:
@@ -292,6 +366,7 @@ class QwenHarmBenchRuntime:
         behavior_id = row["BehaviorID"]
         case_path = run_dir / "cases" / f"{index:03d}-{behavior_id}.json"
         if case_path.exists():
+            validate_case_receipt(case_path, method=method, index=index, row=row)
             return {"index": index, "behavior_id": behavior_id, "status": "already_complete"}
         self.torch.manual_seed(index)
         self.torch.cuda.manual_seed_all(index)
