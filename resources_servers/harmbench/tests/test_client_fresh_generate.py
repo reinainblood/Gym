@@ -18,7 +18,8 @@ from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstre
 UPSTREAM = harmbench_upstream()
 
 
-def test_client_target_preserves_messages_and_records_only_hashes():
+@pytest.mark.parametrize("concurrency", [1, 4])
+def test_client_target_preserves_messages_and_records_only_hashes(monkeypatch, concurrency):
     requests = []
 
     def request(path, payload):
@@ -38,12 +39,18 @@ def test_client_target_preserves_messages_and_records_only_hashes():
         revision="client-revision",
         request_json=request,
     )
-    messages = [[{"role": "user", "content": "synthetic request"}]]
+    monkeypatch.setenv("HARMBENCH_CLIENT_TARGET_CONCURRENCY", str(concurrency))
+    messages = [
+        [{"role": "user", "content": "synthetic request"}],
+        [{"role": "user", "content": "second synthetic request"}],
+    ]
     assert target.batched_generate(messages, max_n_tokens=150, temperature=0.0, stop_tokens=["}"]) == [
-        "synthetic response"
+        "synthetic response",
+        "synthetic response",
     ]
     assert requests[1][1]["messages"] == messages[0]
     assert requests[1][1]["max_tokens"] == 150
+    assert len(target.calls) == 2
     assert set(target.calls[0]) == {
         "request_sha256",
         "response_sha256",

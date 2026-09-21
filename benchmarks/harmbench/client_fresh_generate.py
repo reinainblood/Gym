@@ -15,6 +15,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -100,8 +101,7 @@ class ClientTarget:
         stop_tokens: list[str] | None = None,
         **_kwargs: Any,
     ) -> list[str]:
-        outputs: list[str] = []
-        for messages in conversations:
+        def generate_one(messages: list[dict[str, Any]]) -> tuple[str, dict[str, Any]]:
             if not isinstance(messages, list) or not all(isinstance(message, dict) for message in messages):
                 raise ValueError("client target requires OpenAI message dictionaries")
             payload = {
@@ -118,16 +118,24 @@ class ClientTarget:
             text = response["choices"][0]["message"]["content"]
             if not isinstance(text, str):
                 raise ValueError("client target returned a non-text completion")
-            self.calls.append(
-                {
-                    "request_sha256": text_sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"))),
-                    "response_sha256": text_sha256(text),
-                    "response_id_sha256": text_sha256(str(response.get("id", ""))),
-                    "finish_reason": response["choices"][0].get("finish_reason"),
-                    "model": response["model"],
-                }
-            )
-            outputs.append(text)
+            return text, {
+                "request_sha256": text_sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"))),
+                "response_sha256": text_sha256(text),
+                "response_id_sha256": text_sha256(str(response.get("id", ""))),
+                "finish_reason": response["choices"][0].get("finish_reason"),
+                "model": response["model"],
+            }
+
+        concurrency = int(os.environ.get("HARMBENCH_CLIENT_TARGET_CONCURRENCY", "1"))
+        if concurrency < 1:
+            raise ValueError("HARMBENCH_CLIENT_TARGET_CONCURRENCY must be positive")
+        if concurrency == 1 or len(conversations) < 2:
+            generated = [generate_one(messages) for messages in conversations]
+        else:
+            with ThreadPoolExecutor(max_workers=min(concurrency, len(conversations))) as pool:
+                generated = list(pool.map(generate_one, conversations))
+        outputs = [text for text, _receipt in generated]
+        self.calls.extend(receipt for _text, receipt in generated)
         return outputs
 
 

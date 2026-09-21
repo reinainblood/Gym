@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -121,6 +122,14 @@ def stream_jsonl(path: Path) -> Iterable[dict[str, Any]]:
             if not isinstance(value, dict):
                 raise ValueError(f"{path}:{line_number} is not a JSON object")
             yield value
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _has_image(row: dict[str, Any]) -> bool:
@@ -482,7 +491,57 @@ def write_analysis(
         json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (output_dir / "harmbench_blade_report.md").write_text(render_report(metrics), encoding="utf-8")
+    output_paths = (
+        records_path,
+        output_dir / "harmbench_blade_metrics.json",
+        output_dir / "harmbench_blade_report.md",
+    )
+    evidence = {
+        "schema_version": 1,
+        "artifact_kind": "harmbench_blade_bundle",
+        "status": "completed",
+        "rows": len(records),
+        "inputs": [
+            {"name": path.name, "size_bytes": path.stat().st_size, "sha256": sha256(path)}
+            for path in [*inputs, *(failure_sidecars or []), *(materialized_inputs or [])]
+        ],
+        "outputs": [
+            {"name": path.name, "size_bytes": path.stat().st_size, "sha256": sha256(path)} for path in output_paths
+        ],
+    }
+    (output_dir / "evidence-manifest.json").write_text(
+        json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    validate_bundle(output_dir)
     return metrics
+
+
+def validate_bundle(output_dir: Path) -> dict[str, Any]:
+    """Read back hashes and deterministically recompute a generic HarmBench BLADE bundle."""
+    manifest_path = output_dir / "evidence-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("artifact_kind") != "harmbench_blade_bundle" or manifest.get("status") != "completed":
+        raise ValueError("BLADE evidence manifest is not a completed HarmBench bundle")
+    declared = {row.get("name"): row for row in manifest.get("outputs", [])}
+    expected_names = {
+        "harmbench_blade_rows.jsonl",
+        "harmbench_blade_metrics.json",
+        "harmbench_blade_report.md",
+    }
+    if set(declared) != expected_names:
+        raise ValueError("BLADE evidence manifest has an unexpected output set")
+    for name in sorted(expected_names):
+        path = output_dir / name
+        row = declared[name]
+        if not path.is_file() or path.stat().st_size != row.get("size_bytes") or sha256(path) != row.get("sha256"):
+            raise ValueError(f"BLADE output readback disagrees for {name}")
+    rows = list(stream_jsonl(output_dir / "harmbench_blade_rows.jsonl"))
+    metrics = json.loads((output_dir / "harmbench_blade_metrics.json").read_text(encoding="utf-8"))
+    if len(rows) != manifest.get("rows") or summarize(rows) != metrics:
+        raise ValueError("BLADE rows or metrics readback disagrees with recomputation")
+    if (output_dir / "harmbench_blade_report.md").read_text(encoding="utf-8") != render_report(metrics):
+        raise ValueError("BLADE report readback disagrees with recomputation")
+    return manifest
 
 
 def main() -> None:

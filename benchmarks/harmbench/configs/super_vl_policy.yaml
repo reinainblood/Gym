@@ -7,7 +7,9 @@ policy_model:
       base_url: ${oc.env:HARMBENCH_SUPER_VL_BASE_URL,''}
       api_key: ${oc.env:HARMBENCH_SUPER_VL_API_KEY,''}
       model: ${oc.env:HARMBENCH_SUPER_VL_MODEL,''}
-      num_concurrent_requests: 4
+      # Six TP4 Super replicas sustain 120 Modal inputs at the deployed
+      # target-concurrency setting. Keep headroom for routing and scoring.
+      num_concurrent_requests: 96
       uses_reasoning_parser: false
       extra_body:
         chat_template_kwargs:

@@ -180,3 +180,23 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   three visible streams to two was therefore normal shard drain, not a lost worker. Do not relaunch completed shards.
 - Continue to wait for both remaining streams and all attack workers to drain before redeploying the current branch and
   calling `status_method`; filename counts are progress evidence only and do not replace that exact validity audit.
+
+## Full Super fixed/black-box milestone — 2026-09-21 14:18 CDT
+
+- The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was scaled in place to six live TP4 replicas, above the
+  requested floor of three. The independently served classifier app `ap-Z2MFk4t6FPLu9onmrrtkEd` has two live replicas.
+  The GCG app remains separate with exactly two attack workers; neither GCG shard was duplicated or redeployed.
+- DirectRequest, HumanJailbreaks, ZeroShot, and PAP-top5 now have complete full-corpus Super target runs with exact
+  expected/scored/failed/missing counts of 400/400/0/0, 2,000/2,000/0/0, 2,000/2,000/0/0, and 2,000/2,000/0/0.
+  A combined source-order collection bound 6,400 unique rollout IDs to 6,400 complete model-call captures and reconciled
+  6,400 healthy, zero unhealthy, zero unobserved trajectories before method-specific splitting.
+- All four runs passed their pinned upstream generation controls, exact raw-classifier replay, copyright replay, strict
+  `report_method_run.py` validation, and deterministic BLADE output readback. The BLADE writer now emits and validates an
+  evidence manifest that binds row JSONL, metrics JSON, and Markdown by byte size and SHA-256 and fails on tampering.
+- A resumable client-fresh FDR runtime now preserves upstream PAIR/TAP Mixtral attacker/judge settings and changes only
+  the independently receipt-bound Super target. Independent target calls within an upstream batch may execute in parallel,
+  while results and hashed call receipts remain in source order. One-behavior canaries are active under calls
+  `fc-01M32PDBQ742DRR68BTMJV16Q0` (PAIR) and `fc-01M32PDBM4K515H5206EZ4ESZX` (TAP). Do not launch their full campaigns
+  until each canary writes a valid `shard-receipt.json`; a live container is not success.
+- The existing Qwen BlankImage campaign reached 105 filename-level case files with its existing workers still live. This
+  remains progress only. Continue to wait for worker drain, then redeploy and use `status_method` before any repair.

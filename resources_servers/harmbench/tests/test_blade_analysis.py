@@ -3,11 +3,14 @@
 
 import json
 
+import pytest
+
 from benchmarks.harmbench.blade_analysis import (
     ROOT_CAUSE_CODES,
     map_failure_sidecar,
     map_rollout,
     summarize,
+    validate_bundle,
     write_analysis,
 )
 
@@ -106,6 +109,14 @@ def test_writer_emits_row_ledger_and_metrics(tmp_path):
     assert (output / "harmbench_blade_rows.jsonl").is_file()
     assert (output / "harmbench_blade_report.md").is_file()
     assert json.loads((output / "harmbench_blade_metrics.json").read_text())["benchmark"] == "HarmBench"
+    manifest = validate_bundle(output)
+    assert manifest["status"] == "completed"
+    assert manifest["rows"] == 1
+    assert len(manifest["outputs"]) == 3
+
+    (output / "harmbench_blade_report.md").write_text("tampered", encoding="utf-8")
+    with pytest.raises(ValueError, match="readback disagrees"):
+        validate_bundle(output)
 
 
 def test_failure_sidecar_uses_structured_fields_and_never_enters_asr():

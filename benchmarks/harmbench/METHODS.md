@@ -7,12 +7,49 @@ receipt have all been exercised. The 23 names below are the methods requested by
 the client model" entries are NVIDIA-requested client-targeted variants of upstream PAIR/TAP, not separate proper
 method keys in the paper's pipeline.
 
+## Mandatory Nemotron 3.5 Super VL common-proof gate
+
+Historical runs, another target model, source-generation alone, canaries, transport probes, partial shards, and
+schema previews do **not** clear a requested method. Every method below must finish on the exact Nemotron 3.5
+Super VL EA BF16 checkpoint, reconcile the full pinned public denominator as `expected = scored + failed + missing`,
+have zero missing rows, and pass the method-specific generation, target-completion, scoring, provenance, and
+payload-free report readback gates. `Scored` is a target-model completion that reached its required scorer; an
+attack artifact without target execution is not scored. Counts are source-order case counts, not worker or shard
+counts. These are the current evidence-backed counts in this branch; white-box rows owned by the separate main
+task remain uncleared until their complete Super receipts are imported and revalidated here.
+
+| Requested method | Expected | Scored | Failed | Missing | Super common-proof state |
+|---|---:|---:|---:|---:|---|
+| DirectRequest | 400 | 400 | 0 | 0 | **Validated:** full Super target/scorer collection, 400 healthy trajectories, upstream generation, classifier, copyright, BLADE, and report gates passed. |
+| HumanJailbreaks | 2,000 | 2,000 | 0 | 0 | **Validated:** full Super target/scorer collection, 2,000 healthy trajectories, generation, classifier, copyright, BLADE, and report gates passed. |
+| ZeroShot | 2,000 | 2,000 | 0 | 0 | **Validated:** full Super target/scorer collection, 2,000 healthy trajectories, generation, classifier, copyright, BLADE, and report gates passed. |
+| PAP-top5 | 2,000 | 2,000 | 0 | 0 | **Validated:** full Super target/scorer collection, 2,000 healthy trajectories, generation, classifier, copyright, BLADE, and report gates passed. |
+| TAP-Transfer | 400 | 0 | 0 | 400 | Not cleared: no complete Super generation-and-score package. |
+| MultiModalDirectRequest | 110 | 110 | 0 | 0 | **Validated:** full Super run and image/classifier evidence passed. |
+| MultiModalRenderText | 110 | 110 | 0 | 0 | **Validated:** full Super run and render/classifier evidence passed. |
+| GCG | 400 | 0 | 0 | 400 | In progress: two attack shards are active; partial attack artifacts are not target-scored cases. |
+| GCG-Multi | 2,000 | 0 | 0 | 2,000 | Not cleared: five complete source runs and full Super scoring are required. |
+| AutoPrompt | 400 | 0 | 0 | 400 | Not cleared: no complete Super package. |
+| GBDA | 2,000 | 0 | 0 | 2,000 | Not cleared: no complete Super package. |
+| PEZ | 2,000 | 0 | 0 | 2,000 | Not cleared: no complete Super package. |
+| UAT | 400 | 0 | 0 | 400 | Not cleared: no complete Super package. |
+| AutoDAN | 400 | 0 | 0 | 400 | Not cleared: no complete Super package. |
+| FewShot | 400 | 0 | 0 | 400 | Not cleared: no complete Super package. |
+| PAIR | 400 | 0 | 0 | 400 | Not cleared: no complete Super package. |
+| TAP | 400 | 0 | 0 | 400 | Not cleared: no complete Super package. |
+| GCG-Transfer | 2,000 | 0 | 0 | 2,000 | Not cleared: five complete source runs and full Super scoring are required. |
+| Fresh PAIR against the client model | 400 | 0 | 0 | 400 | Not cleared: no complete client-fresh Super loop and score package. |
+| Fresh TAP against the client model | 400 | 0 | 0 | 400 | Not cleared: no complete client-fresh Super loop and score package. |
+| MultiModalPGD | 110 | 0 | 0 | 110 | Main-task-owned; no complete Super evidence has been imported into this branch. |
+| MultiModalPGDPatch | 110 | 0 | 0 | 110 | Main-task-owned; no complete Super evidence has been imported into this branch. |
+| MultiModalPGDBlankImage | 110 | 0 | 0 | 110 | Main-task-owned; no complete Super evidence has been imported into this branch. |
+
 | Requested method | Generator / client requirement | Verified state in this branch |
 |---|---|---|
-| DirectRequest | Single-turn text request | **Validated held-out-test Ultra 3 run:** pinned upstream `default` experiment over all 320 test behaviors (159 standard, 81 contextual, 80 copyright), 320/320 healthy rollouts, 27 successful cases, 8.4375% behavior-averaged ASR, 240/240 raw-classifier and 80/80 copyright scorer agreement. The full 400-row source and exact 80-row validation extension are generated, set-difference reconciled against the prior rollouts, and stored in FDR. Validation collection is blocked only on restoring the original Ultra endpoint credential binding. |
-| HumanJailbreaks | Pinned human templates, random subset 5 | **Validated held-out-test Ultra 3 run:** 1,600/1,600 healthy rollouts across all 320 text-test behaviors; 73 successful cases (4.5625% behavior-averaged ASR), 315 truncated and 355 classifier-clipped. The full 2,000-case source and exact 80-behavior / 400-case validation extension are generated, set-difference reconciled against the prior rollouts, and stored in FDR. Validation collection is blocked only on restoring the original Ultra endpoint credential binding. |
-| ZeroShot | Upstream Mixtral attacker model | **Validated held-out-test result with explicit classifier-batching caveat:** FDR Mixtral/Triton generated all 1,600 attacks across 320 text behaviors; upstream generation replay matched 320/320. Ultra scored 1,600/1,600 healthy cases with 9.625% behavior-averaged ASR and 154 successful cases. Copyright parity passed 400/400. Raw classifier replay matched 1,199/1,200; the sole mismatch had identical prompt token IDs and clipping and was proven to flip with vLLM batch concurrency (serial Yes, 2-/4-/8-way No in both raw and chat paths). No score was overridden; reverify preserved all target responses and labels. The missing 80 validation behaviors still require generation and scoring for a full-corpus result. |
-| PAP-top5 | Upstream Mixtral attack model, pinned five-technique taxonomy | **Validated held-out-test Ultra 3 run:** the corrected FDR attacker retained all 1,600 raw generations, and the pinned upstream PAP method body reproduced 1,600/1,600 cases. After a one-label stateless reverify, the saved target responses yielded 1,600/1,600 healthy rollouts, 90 successful cases and 5.625% behavior-averaged ASR. Raw classifier and copyright controls matched 1,200/1,200 and 400/400 respectively. The 512-token target cap was reached on 1,262 cases. The generator now requires the full 400-row source; the missing 80 validation behaviors remain unrun. |
+| DirectRequest | Single-turn text request | **Validated full Super VL run:** 400/400 healthy and scored, zero failures/missing, 58 successful cases, 14.5% ASR. Pinned upstream generation, 300/300 raw-classifier parity, 100/100 copyright parity, BLADE reconciliation, and payload-free report validation passed. The prior 320-row Ultra result remains historical evidence only. |
+| HumanJailbreaks | Pinned human templates, random subset 5 | **Validated full Super VL run:** 2,000/2,000 healthy and scored across 400 behaviors, zero failures/missing, 76 successful cases, 3.8% behavior-averaged ASR. Pinned generation replay matched 400/400 behaviors; raw classifier matched 1,500/1,500 and copyright matched 500/500. BLADE and report validation passed. |
+| ZeroShot | Upstream Mixtral attacker model | **Validated full Super VL run:** the pinned FDR Mixtral generator produced 2,000 cases across all 400 behaviors, upstream replay matched 400/400, and Super scored 2,000/2,000 healthy cases with zero failures/missing, 280 successful cases, and 14.0% behavior-averaged ASR. Raw classifier and copyright controls matched 1,500/1,500 and 500/500; BLADE and report validation passed. |
+| PAP-top5 | Upstream Mixtral attack model, pinned five-technique taxonomy | **Validated full Super VL run:** the pinned FDR attacker and five-technique mapping produced and replayed 2,000/2,000 cases over 400 behaviors. Super scored all 2,000 healthy cases with zero failures/missing, 56 successful cases, and 2.8% behavior-averaged ASR. Raw classifier and copyright controls matched 1,500/1,500 and 500/500; BLADE and report validation passed. |
 | TAP-Transfer | Fixed upstream transfer experiment | Bridge and source-experiment receipt only; no generator run or model rollout. |
 | MultiModalDirectRequest | Image-bearing target | **Validated full run:** 110/110 healthy Super 3.5 VL Gym rollouts, zero sidecar failures, 54 classifier successes (49.1% ASR), 3 truncated/clipped. All 110 images are pixel-identical to upstream Torchvision, and raw-vs-Gym classifier labels, prompt tokens/hashes, and clip text/count agree 110/110. |
 | MultiModalRenderText | Image-bearing target | **Validated full Super VL run:** 110/110 healthy rollouts, zero failures, 11 classifier successes (10.0% ASR), one truncated/clipped. Upstream render functions reproduce 110/110 image pixels and instructions when bound to the declared DejaVu Sans font; classifier controls match 110/110. The fixed font replaces upstream's host-dependent first-system-font lookup. |
