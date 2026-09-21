@@ -30,8 +30,8 @@ method keys in the paper's pipeline.
 | Fresh PAIR against the client model | Client-model queries inside the PAIR loop | Cataloged, but **not runnable yet**: a verified live client-target binding and attack-loop adapter are required. |
 | Fresh TAP against the client model | Client-model queries inside the TAP tree search | Cataloged, but **not runnable yet**: a verified live client-target binding and attack-loop adapter are required. |
 | MultiModalPGD | Local multimodal weights and image gradients | **Qwen white-box attack and canonical scoring complete; Gym/report reconciliation remains.** The exact Qwen 3.5 122B-A10B BF16 checkpoint produced all 110 optimized images and protocol-correct 512-token target completions. The pinned raw HarmBench classifier scored 31/110 successes (28.18% ASR), with 110/110 repeat agreement on two serial passes. Seven labels differ from the superseded 256-token parents; two are among 66 cases where the old cap did not bind. A 12-case fresh-container replicate matched 12/12 canonical labels. Super 3.5 VL has a passed 8×H200 raw-pixel gradient canary but no full PGD campaign. |
-| MultiModalPGDPatch | Local multimodal weights and image gradients | The same verified Super VL gradient runtime now satisfies the checkpoint/autograd prerequisite. The patch-specific mask, 2,000-step protocol, save/reload image parity, and full method run remain to execute. |
-| MultiModalPGDBlankImage | Local multimodal weights and image gradients | Cataloged from the pinned public repository with its 1,000-step configuration. No complete scored model run exists. Treat the pinned pipeline's `MultiModalPGD` class mapping as a source behavior to preserve and audit, not permission to rename another method. |
+| MultiModalPGDPatch | Local multimodal weights and image gradients | A resumable Qwen 3.5 122B-A10B BF16 campaign is active under the public 2,000-step patch protocol; no complete scored result exists yet. The same verified Super VL gradient runtime separately satisfies the checkpoint/autograd prerequisite, but no full Super patch campaign has run. |
+| MultiModalPGDBlankImage | Local multimodal weights and image gradients | A resumable Qwen 3.5 122B-A10B BF16 campaign is active under the pinned 1,000-step configuration; no complete scored result exists yet. Treat the pinned pipeline's `MultiModalPGD` class mapping as a source behavior to preserve and audit, not permission to rename another method. |
 
 ## Current reproducible paths
 
@@ -73,6 +73,11 @@ method keys in the paper's pipeline.
 - `harmbench_generated/prepare.py` preserves the previous fixed-slot aggregate metrics under its dataset SHA-256
   when switching generated methods. This prevents a stale canary or previous method denominator from silently
   contaminating the next Gym run.
+- `operations/qwen/modal_qwen_completion.py` regenerates canonical target completions from committed white-box
+  images at HarmBench's 512-token cap. After and only after one method has all 110 completion receipts,
+  `operations/qwen/modal_qwen_label_compare.py --canonical-only` scores the complete cohort twice through the
+  pinned serial raw classifier. It refuses partial cohorts, mismatched methods/checkpoints, or non-512-token
+  receipts and writes `label-comparison/canonical-512.json` without attack strings, target outputs, or prompts.
 - For ZeroShot, `repair_capture_race.py` created a derivative that attached one late-but-present target-call
   capture without touching any response or score; a separate Gym health audit then passed 1,600/1,600.
   `restore_reverified_observability.py` keeps the original captured trajectory alongside stateless reverify scores
