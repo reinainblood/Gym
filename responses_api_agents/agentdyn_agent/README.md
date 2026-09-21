@@ -13,11 +13,14 @@ selects exactly one defense; defenses are not stacked. The base config starts on
 defense treatment can set `default_defense` in its run config without duplicating the task matrix. Filter and
 system-defense runtime parity must be established independently before defense-specific configs are published.
 
-PromptGuard2's detector source is configurable independently of the defense name. During gated-access validation,
-`prompt_guard_2_model_name` and `prompt_guard_2_model_revision` may identify a provenance-recorded mirror while the
-run remains labeled `prompt_guard_2_detector`. Before publication, replace the mirror with Meta's canonical model,
-verify the model checksum, and rerun the same treatment. `prompt_guard_2_local_path` is a development-only cache
-override; it does not replace the source repository and revision recorded in each rollout.
+PromptGuard2's detector source is configurable independently of the defense name, so
+`prompt_guard_2_model_name` and `prompt_guard_2_model_revision` can identify either Meta's gated repository or an
+ungated mirror while the run stays labeled `prompt_guard_2_detector`. The config now names the canonical
+`meta-llama/Llama-Prompt-Guard-2-86M@a8ded8e697...`; the mirror used during gated-access validation was verified
+byte-identical to it, file by file, so no rerun was needed and rows collected either way measure the same
+classifier. The ungated alternative and the verification command are in the benchmark README, for reproducers
+without Meta access. `prompt_guard_2_local_path` is a development-only cache override; it does not replace the
+source repository and revision recorded in each rollout.
 
 Some OpenAI-compatible endpoints, including the Qwen3.5 SGLang deployment used for baselining, reject the newer
 `developer` message role. Set `model_system_role: system` for those endpoints. The default remains `developer`, and

@@ -17,6 +17,37 @@ unverified until their auxiliary-model routing and upstream parity are individua
 The first undefended live smoke receipt is recorded in [`LIVE-VALIDATION.md`](LIVE-VALIDATION.md).
 Per-defense runtime status is tracked in [`DEFENSE-VALIDATION.md`](DEFENSE-VALIDATION.md).
 
+## Reproducing the PromptGuard2 cells without Meta access
+
+`prompt_guard_2_detector` loads `meta-llama/Llama-Prompt-Guard-2-86M`, which is **gated**: running those cells needs
+an `HF_TOKEN` for an account Meta has granted. Without one the download fails outright rather than silently.
+
+There is a free ungated alternative, and it is not a substitute of unknown quality -- it is the same weights:
+
+```text
+project-free-llama/Llama-Prompt-Guard-2-86M
+revision 43882965632dcb7b20299530f6436ac759d07fd9
+```
+
+All five files, `model.safetensors` included, hash identically to canonical
+`meta-llama/Llama-Prompt-Guard-2-86M@a8ded8e697ce7c355e395a0df51f94adb4a2fd27`. Reproduce that comparison rather than
+taking it on trust:
+
+```bash
+HF_TOKEN=... python benchmarks/agentdyn/check_prompt_guard_provenance.py   # exits 0 when every file matches
+```
+
+To use the mirror, point the two config keys at it:
+
+```yaml
+prompt_guard_2_model_name: project-free-llama/Llama-Prompt-Guard-2-86M
+prompt_guard_2_model_revision: 43882965632dcb7b20299530f6436ac759d07fd9
+```
+
+Each rollout records the repository and revision that classified it, so a run against the mirror is self-describing
+rather than indistinguishable from a canonical one. Some of this campaign's PromptGuard2 rows were collected that
+way, before access was granted; see [`DEFENSE-VALIDATION.md`](DEFENSE-VALIDATION.md).
+
 ## Running the grid
 
 Undefended baselines for all four models are in [`BASELINE-VALIDATION.md`](BASELINE-VALIDATION.md). The defense grid
