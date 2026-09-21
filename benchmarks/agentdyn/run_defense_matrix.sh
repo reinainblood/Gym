@@ -27,6 +27,12 @@
 # Every stage passes --resume, so re-running after an interruption picks up where it
 # stopped instead of re-spending GPU time on rollouts that already landed.
 set -uo pipefail
+# Job control, so each `gym env start` leads its OWN process group. Without it a background
+# child inherits the script's group, and the group kill in stop_this_stack below takes the
+# driver down with the servers -- measured: script pgid 81710, background child pgid 81710.
+# That killed two canary drivers and two cells before it was spotted, each at the moment a
+# cell finished and the next teardown ran.
+set -m
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
@@ -166,10 +172,18 @@ except Exception:
 GYM_PGID=""
 
 stop_this_stack() {
-    if [ -n "$GYM_PGID" ]; then
+    # Belt and braces for the same trap: never group-kill our own group, whatever `set -m`
+    # did. Compare against the driver's real pgid, not $$ -- a script is not always its own
+    # group leader, so `$GYM_PGID != $$` can be true while still naming our group.
+    local own_pgid
+    own_pgid=$(ps -o pgid= -p $$ 2>/dev/null | tr -d ' ')
+    if [ -n "$GYM_PGID" ] && [ "$GYM_PGID" != "$own_pgid" ]; then
         kill -9 -"$GYM_PGID" 2>/dev/null
         GYM_PGID=""
         sleep 2
+    elif [ -n "$GYM_PGID" ]; then
+        echo "  refusing to group-kill ${GYM_PGID}: that is this driver's own group" >&2
+        GYM_PGID=""
     fi
     gym_runner_stop_servers
     sweep_orphaned_ray_clusters
