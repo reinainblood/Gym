@@ -25,6 +25,7 @@ from benchmarks.harmbench.prepare_generated import materialize, sha256
 
 
 ENSEMBLE_RUNS = {"GCG-Multi", "GCG-Transfer"}
+CLIENT_FRESH_RUNNER = Path(__file__).with_name("client_fresh_generate.py")
 UPSTREAM_TARGET_TYPES = {
     "text_api": "closed_source",
     "text_weights": "open_source",
@@ -52,8 +53,6 @@ def audit_method_catalog(upstream: Path) -> int:
 
 def _upstream_config(upstream: Path, method_name: str, experiment: str) -> tuple[str, str]:
     method = get_method(method_name)
-    if method.generation == "client_fresh":
-        raise ValueError("client-fresh PAIR/TAP requires a verified client-model target binding")
     head = subprocess.check_output(["git", "-C", str(upstream), "rev-parse", "HEAD"], text=True).strip()
     if head != UPSTREAM_REVISION:
         raise ValueError(f"HarmBench checkout is {head}, expected {UPSTREAM_REVISION}")
@@ -79,12 +78,52 @@ def build_generate_command(
     models_config: Path | None = None,
     method_config: Path | None = None,
     run_id: str | None = None,
+    client_base_url: str | None = None,
+    client_model: str | None = None,
+    client_revision: str | None = None,
+    client_api_key_env: str | None = None,
+    client_binding_receipt: Path | None = None,
 ) -> tuple[list[str], str, str]:
     class_name, pipeline_sha256 = _upstream_config(upstream, method_name, experiment)
+    method = get_method(method_name)
     if method_name in ENSEMBLE_RUNS and run_id not in {"0", "1", "2", "3", "4"}:
         raise ValueError(f"{method_name} requires one of the pinned run IDs 0–4")
     if method_name not in ENSEMBLE_RUNS and run_id is not None:
         raise ValueError(f"{method_name} has no upstream run IDs; omit --run-id")
+    if method.generation == "client_fresh":
+        required_client = {
+            "client_base_url": client_base_url,
+            "client_model": client_model,
+            "client_revision": client_revision,
+            "client_api_key_env": client_api_key_env,
+            "client_binding_receipt": client_binding_receipt,
+        }
+        missing = [key for key, value in required_client.items() if not value]
+        if missing:
+            raise ValueError(f"client-fresh PAIR/TAP requires {', '.join(missing)}")
+        command = [
+            str(upstream_python.resolve(strict=True)),
+            str(CLIENT_FRESH_RUNNER.resolve(strict=True)),
+            "--upstream",
+            str(upstream.resolve(strict=True)),
+            "--method",
+            method.upstream_key,
+            "--behaviors",
+            str(behaviors.resolve(strict=True)),
+            "--output-dir",
+            str(output_dir.resolve()),
+            "--client-base-url",
+            str(client_base_url),
+            "--client-model",
+            str(client_model),
+            "--client-revision",
+            str(client_revision),
+            "--api-key-env",
+            str(client_api_key_env),
+            "--client-binding-receipt",
+            str(client_binding_receipt.resolve(strict=True)),
+        ]
+        return command, class_name, pipeline_sha256
     command = [
         str(upstream_python.resolve(strict=True)),
         "generate_test_cases.py",
@@ -118,13 +157,20 @@ def run(
     models_config: Path | None = None,
     method_config: Path | None = None,
     run_id: str | None = None,
+    client_base_url: str | None = None,
+    client_model: str | None = None,
+    client_revision: str | None = None,
+    client_api_key_env: str | None = None,
+    client_binding_receipt: Path | None = None,
 ) -> Path | None:
     method = get_method(method_name)
     if target_type not in method.target_types:
         raise ValueError(f"{method_name} does not support {target_type}")
     output_dir.mkdir(parents=True, exist_ok=True)
     cases_path = output_dir / "test_cases.json"
-    if cases_path.exists() or (method_name not in ENSEMBLE_RUNS and any(output_dir.iterdir())):
+    if cases_path.exists() or (
+        method_name not in ENSEMBLE_RUNS and method.generation != "client_fresh" and any(output_dir.iterdir())
+    ):
         raise FileExistsError("use a new output directory; existing attack artifacts will not be overwritten")
     if method_name in ENSEMBLE_RUNS and (output_dir / f"test_cases_{run_id}.json").exists():
         raise FileExistsError(f"upstream run ID {run_id} already exists; refusing to overwrite it")
@@ -138,6 +184,11 @@ def run(
         models_config=models_config,
         method_config=method_config,
         run_id=run_id,
+        client_base_url=client_base_url,
+        client_model=client_model,
+        client_revision=client_revision,
+        client_api_key_env=client_api_key_env,
+        client_binding_receipt=client_binding_receipt,
     )
     effective_models_config = models_config or upstream / "configs/model_configs/models.yaml"
     effective_method_config = method_config or upstream / f"configs/method_configs/{class_name}_config.yaml"
@@ -229,6 +280,23 @@ def run(
             else None
         ),
     }
+    if method.generation == "client_fresh":
+        client_receipt_path = output_dir / "client-target-receipt.json"
+        if not client_receipt_path.is_file():
+            raise FileNotFoundError("client-fresh generation did not produce its target-binding receipt")
+        client_receipt = json.loads(client_receipt_path.read_text(encoding="utf-8"))
+        expected_client = {
+            "status": "completed",
+            "client_target_verified": True,
+            "client_model": client_model,
+            "client_revision": client_revision,
+            "source_target_model": client_model,
+            "behaviors_sha256": sha256(behaviors),
+            "test_cases_sha256": sha256(cases_path),
+        }
+        if any(client_receipt.get(key) != value for key, value in expected_client.items()):
+            raise ValueError("client-fresh target-binding receipt does not match the generated cases")
+        receipt.update(client_receipt)
     receipt_path = output_dir / "generation-receipt.json"
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     image_dir = output_dir / "images" if target_type.startswith("vision") else None
@@ -268,6 +336,11 @@ def main() -> None:
     parser.add_argument("--models-config", type=Path)
     parser.add_argument("--method-config", type=Path)
     parser.add_argument("--run-id")
+    parser.add_argument("--client-base-url")
+    parser.add_argument("--client-model")
+    parser.add_argument("--client-revision")
+    parser.add_argument("--client-api-key-env")
+    parser.add_argument("--client-binding-receipt", type=Path)
     args = parser.parse_args()
     run(
         upstream=args.upstream,
@@ -280,6 +353,11 @@ def main() -> None:
         models_config=args.models_config,
         method_config=args.method_config,
         run_id=args.run_id,
+        client_base_url=args.client_base_url,
+        client_model=args.client_model,
+        client_revision=args.client_revision,
+        client_api_key_env=args.client_api_key_env,
+        client_binding_receipt=args.client_binding_receipt,
     )
 
 

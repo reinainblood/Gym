@@ -27,8 +27,8 @@ method keys in the paper's pipeline.
 | PAIR | Upstream iterative attacker and judge | Bridge and target-type mapping only; no generator run or model rollout. |
 | TAP | Upstream tree-search attacker and judge | Bridge and target-type mapping only; no generator run or model rollout. |
 | GCG-Transfer | Fixed upstream transfer ensemble; run IDs 0–4 | Bridge enforces all five source runs before merging; no generator run or model rollout. |
-| Fresh PAIR against the client model | Client-model queries inside the PAIR loop | Cataloged, but **not runnable yet**: a verified live client-target binding and attack-loop adapter are required. |
-| Fresh TAP against the client model | Client-model queries inside the TAP tree search | Cataloged, but **not runnable yet**: a verified live client-target binding and attack-loop adapter are required. |
+| Fresh PAIR against the client model | Client-model queries inside the PAIR loop | The resumable client-target adapter preserves upstream PAIR's Mixtral attacker/judge, public stream/step/query budgets, and stopping rule while replacing only the target model with a verified OpenAI-compatible client endpoint. It requires an immutable deployment-binding receipt and environment-only API key; no full generator run or model rollout exists yet. |
+| Fresh TAP against the client model | Client-model queries inside the TAP tree search | The resumable client-target adapter preserves upstream TAP's Mixtral attacker/judge, branching, pruning, depth/query budgets, and stopping rule while replacing only the target model with a verified OpenAI-compatible client endpoint. It requires an immutable deployment-binding receipt and environment-only API key; no full generator run or model rollout exists yet. |
 | MultiModalPGD | Local multimodal weights and image gradients | **Qwen white-box attack and canonical scoring complete; Gym/report reconciliation remains.** The exact Qwen 3.5 122B-A10B BF16 checkpoint produced all 110 optimized images and protocol-correct 512-token target completions. The pinned raw HarmBench classifier scored 31/110 successes (28.18% ASR), with 110/110 repeat agreement on two serial passes. Seven labels differ from the superseded 256-token parents; two are among 66 cases where the old cap did not bind. A 12-case fresh-container replicate matched 12/12 canonical labels. Super 3.5 VL has a passed 8×H200 raw-pixel gradient canary but no full PGD campaign. |
 | MultiModalPGDPatch | Local multimodal weights and image gradients | A resumable Qwen 3.5 122B-A10B BF16 campaign is active under the public 2,000-step patch protocol; no complete scored result exists yet. The same verified Super VL gradient runtime separately satisfies the checkpoint/autograd prerequisite, but no full Super patch campaign has run. |
 | MultiModalPGDBlankImage | Local multimodal weights and image gradients | A resumable Qwen 3.5 122B-A10B BF16 campaign is active under the pinned 1,000-step configuration; no complete scored result exists yet. Treat the pinned pipeline's `MultiModalPGD` class mapping as a source behavior to preserve and audit, not permission to rename another method. |
@@ -56,6 +56,12 @@ method keys in the paper's pipeline.
   Python environment. It hashes the pipeline, model/method configs, behaviors, generated cases, and (for ensembles)
   each constituent run. `prepare_generated.py` refuses a method label that disagrees with its generation receipt.
   `harmbench_generated` is the Gym benchmark overlay for a verified generated JSONL.
+- For the two client-fresh variants, `run_upstream_generation.py` delegates to `client_fresh_generate.py`. That
+  adapter injects a verified OpenAI-compatible target into the unchanged pinned PAIR/TAP loop, persists each
+  behavior before moving on, and skips only behaviors with both a saved upstream test case and payload-free client
+  call receipt. It requires a deployment-binding receipt covering the app ID, endpoint hash, exact model ID, and
+  immutable revision; the API key is referenced only by environment-variable name and never enters arguments or
+  receipts. The final receipt binds all behavior-call receipt hashes to the generated cases before materialization.
 - `modal_zero_shot.py` and `modal_pap.py` generate the two pinned Mixtral methods in ephemeral **FDR** apps using
   one H200, eager vLLM, and the Triton MoE backend (the auto-selected FlashInfer CUTLASS path stalled in bounded
   canaries). Set `HARMBENCH_SOURCE_CSV` to the pinned 400-row `harmbench_behaviors_text_all.csv`; both launchers
