@@ -33,13 +33,58 @@ def _write_fixture(tmp_path):
         generated = shard_root / "generated"
         generated.mkdir(parents=True)
         indexes = list(range(shard, 400, 2))
+        shard_behaviors = shard_root / "behaviors.csv"
+        with shard_behaviors.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=["BehaviorID"])
+            writer.writeheader()
+            writer.writerows({"BehaviorID": f"b{index:03d}"} for index in indexes)
         shard_cases = {f"b{index:03d}": [f"case-{index}"] for index in indexes}
         cases_path = generated / "test_cases.json"
         target_path = generated / "client-target-receipt.json"
         cases_path.write_text(json.dumps(shard_cases), encoding="utf-8")
-        target_path.write_text(json.dumps({"status": "completed"}), encoding="utf-8")
         calls = len(indexes) * 3
         total_calls += calls
+        call_dir = generated / "client-call-receipts"
+        call_dir.mkdir()
+        behavior_hashes = {}
+        for index in indexes:
+            behavior_id = f"b{index:03d}"
+            call_receipt = {
+                "status": "completed",
+                "behavior_id": behavior_id,
+                "client_model": TARGET_MODEL,
+                "client_revision": TARGET_REVISION,
+                "calls": [
+                    {
+                        "request_sha256": f"{index:064x}",
+                        "response_sha256": f"{index + 1:064x}",
+                        "response_id_sha256": f"{index + 2:064x}",
+                        "finish_reason": "stop",
+                        "model": TARGET_MODEL,
+                    }
+                    for _ in range(3)
+                ],
+            }
+            call_path = call_dir / f"{behavior_id}.json"
+            call_path.write_text(json.dumps(call_receipt), encoding="utf-8")
+            behavior_hashes[behavior_id] = sha256(call_path)
+        target_path.write_text(
+            json.dumps(
+                {
+                    "status": "completed",
+                    "client_target_verified": True,
+                    "client_model": TARGET_MODEL,
+                    "client_revision": TARGET_REVISION,
+                    "source_target_model": TARGET_MODEL,
+                    "behaviors_sha256": sha256(shard_behaviors),
+                    "test_cases_sha256": sha256(cases_path),
+                    "behavior_receipts": len(indexes),
+                    "target_calls": calls,
+                    "behavior_receipt_sha256": behavior_hashes,
+                }
+            ),
+            encoding="utf-8",
+        )
         receipt = {
             "status": "completed",
             "method": "PAIR",
@@ -49,6 +94,7 @@ def _write_fixture(tmp_path):
             "num_shards": 2,
             "selected_source_indexes": indexes,
             "selected_behaviors": len(indexes),
+            "behaviors_sha256": sha256(shard_behaviors),
             "test_cases_sha256": sha256(cases_path),
             "client_target_receipt_sha256": sha256(target_path),
             "client_model": TARGET_MODEL,
@@ -125,6 +171,22 @@ def test_client_fresh_control_rejects_rehashed_noncanonical_manifest_name(tmp_pa
     ).hexdigest()
     receipt.write_text(json.dumps(final), encoding="utf-8")
     with pytest.raises(ValueError, match="canonical source-shard order"):
+        validate(
+            method="PAIR",
+            artifact_root=root,
+            behaviors=behaviors,
+            generation_receipt=receipt,
+            output=tmp_path / "control.json",
+        )
+
+
+def test_client_fresh_control_rejects_behavior_call_receipt_drift(tmp_path):
+    behaviors, root, receipt = _write_fixture(tmp_path)
+    call_path = root / "shards/00-of-02/generated/client-call-receipts/b000.json"
+    value = json.loads(call_path.read_text())
+    value["calls"][0]["response_sha256"] = "f" * 64
+    call_path.write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(ValueError, match="behavior-call receipt hash changed"):
         validate(
             method="PAIR",
             artifact_root=root,

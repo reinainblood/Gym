@@ -82,6 +82,7 @@ def validate(
             raise ValueError("client-fresh shard manifest is not in canonical source-shard order")
         shard_root = artifact_root / "shards" / f"{shard_index:02d}-of-{num_shards:02d}"
         shard_receipt_path = shard_root / "shard-receipt.json"
+        shard_behaviors_path = shard_root / "behaviors.csv"
         shard_cases_path = shard_root / "generated" / "test_cases.json"
         target_receipt_path = shard_root / "generated" / "client-target-receipt.json"
         if manifest_row.get("sha256") != sha256(shard_receipt_path):
@@ -97,6 +98,7 @@ def validate(
             "num_shards": num_shards,
             "selected_source_indexes": indexes,
             "selected_behaviors": len(indexes),
+            "behaviors_sha256": sha256(shard_behaviors_path),
             "test_cases_sha256": sha256(shard_cases_path),
             "client_target_receipt_sha256": sha256(target_receipt_path),
             "client_model": TARGET_MODEL,
@@ -109,6 +111,60 @@ def validate(
         shard_cases = json.loads(shard_cases_path.read_text(encoding="utf-8"))
         if list(shard_cases) != [ordered_ids[index] for index in indexes]:
             raise ValueError(f"client-fresh shard {shard_index} cases changed or reordered")
+        target_receipt = json.loads(target_receipt_path.read_text(encoding="utf-8"))
+        behavior_ids = [ordered_ids[index] for index in indexes]
+        behavior_hashes = target_receipt.get("behavior_receipt_sha256")
+        required_target = {
+            "status": "completed",
+            "client_target_verified": True,
+            "client_model": TARGET_MODEL,
+            "client_revision": TARGET_REVISION,
+            "source_target_model": TARGET_MODEL,
+            "behaviors_sha256": shard["behaviors_sha256"],
+            "test_cases_sha256": sha256(shard_cases_path),
+            "behavior_receipts": len(indexes),
+            "target_calls": int(shard["target_calls"]),
+        }
+        failed_target = [key for key, value in required_target.items() if target_receipt.get(key) != value]
+        if failed_target or not isinstance(behavior_hashes, dict) or set(behavior_hashes) != set(behavior_ids):
+            raise ValueError(f"client-fresh shard {shard_index} aggregate target receipt changed")
+        observed_calls = 0
+        for behavior_id in behavior_ids:
+            call_path = shard_root / "generated" / "client-call-receipts" / f"{behavior_id}.json"
+            if behavior_hashes[behavior_id] != sha256(call_path):
+                raise ValueError(f"client-fresh shard {shard_index} behavior-call receipt hash changed")
+            call_receipt = json.loads(call_path.read_text(encoding="utf-8"))
+            calls = call_receipt.get("calls")
+            if (
+                call_receipt.get("status") != "completed"
+                or call_receipt.get("behavior_id") != behavior_id
+                or call_receipt.get("client_model") != TARGET_MODEL
+                or call_receipt.get("client_revision") != TARGET_REVISION
+                or not isinstance(calls, list)
+                or not calls
+            ):
+                raise ValueError(f"client-fresh shard {shard_index} behavior-call receipt changed")
+            for call in calls:
+                if (
+                    set(call)
+                    != {
+                        "request_sha256",
+                        "response_sha256",
+                        "response_id_sha256",
+                        "finish_reason",
+                        "model",
+                    }
+                    or call.get("model") != TARGET_MODEL
+                ):
+                    raise ValueError(f"client-fresh shard {shard_index} call provenance changed")
+                if any(
+                    not isinstance(call.get(key), str) or len(call[key]) != 64
+                    for key in ("request_sha256", "response_sha256", "response_id_sha256")
+                ):
+                    raise ValueError(f"client-fresh shard {shard_index} call hashes are invalid")
+            observed_calls += len(calls)
+        if observed_calls != int(shard["target_calls"]):
+            raise ValueError(f"client-fresh shard {shard_index} behavior-call counts changed")
         observed_indexes.extend(indexes)
         total_calls += int(shard["target_calls"])
         shard_evidence.append(
