@@ -123,6 +123,18 @@ directly, and they are spread across many containers rather than concentrated in
 when the shared endpoints were returning 503s. That is infrastructure, and masking is the correct treatment --
 counting a request that never reached the model as a defense success would be the worst available error.
 
+The masked rollouts fail on first contact rather than part-way through. Comparing masked against scored rollouts on
+Kimi, where they concentrate:
+
+    MASKED   n=85    input_tokens median  5,047   max  10,402   model calls median 0
+    SCORED   n=2860  input_tokens median 42,513   max 417,915   model calls median 8
+
+A median of zero model calls is the whole diagnosis: these are not long conversations that overran a context window,
+they are rollouts whose first request to the model server returned 500. That matches intermittent upstream hiccups
+rather than anything about the task, the defense or the context size, and it is why re-collecting them is expected to
+succeed rather than to reproduce the same failure. They concentrate on Kimi because Kimi's endpoint had the roughest
+night, not because Kimi's rollouts are different in kind.
+
 **But masked is not the same as collected.** A masked row still occupies its slot in the 620, so a cell can reach
 620 rows and be scored on fewer: `supervl-tool_filter` is the worst at 40 masked, so it would report on 580. Before
 publication those rows should be re-collected by removing the masked entries from a finished cell's file and letting
