@@ -7,6 +7,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,10 @@ PUBLIC_DATASET = "harmbench_behaviors_text_all.csv"
 PUBLIC_BEHAVIORS = 400
 PUBLIC_STEPS = 500
 PUBLIC_SEARCH_WIDTH = 512
+EXECUTION_ONLY_DEVIATION = (
+    "candidate loss microbatching and disabled prefix reuse; public inputs, 500 steps, "
+    "512-candidate search, token gradients, losses, and global argmin preserved"
+)
 
 TARGETS: dict[str, dict[str, Any]] = {
     "super": {
@@ -245,10 +250,7 @@ def run_shard(
         "num_steps": PUBLIC_STEPS,
         "search_width": PUBLIC_SEARCH_WIDTH,
         "starting_search_batch_size": TARGETS[target]["starting_search_batch_size"],
-        "execution_only_deviation": (
-            "candidate loss microbatching and disabled prefix reuse; public inputs, 500 steps, "
-            "512-candidate search, token gradients, losses, and global argmin preserved"
-        ),
+        "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
         "shard_index": shard_index,
         "num_shards": num_shards,
         "selected_behaviors": len(selected),
@@ -261,6 +263,84 @@ def run_shard(
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return receipt
+
+
+def validate_complete_shard_receipts(
+    *, output_root: Path, behaviors: Path, target: str, artifact_id: str
+) -> list[dict[str, Any]]:
+    """Require a complete, source-order-consistent receipt set before finalization."""
+    receipt_dir = output_root / "shard-receipts"
+    paths = sorted(receipt_dir.glob(f"{target}-*-of-*.json"))
+    if not paths:
+        raise ValueError("cannot finalize: no completed GCG shard receipts")
+
+    parsed = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    shard_counts = {receipt.get("num_shards") for receipt in parsed}
+    if len(shard_counts) != 1:
+        raise ValueError("cannot finalize: GCG shard receipts disagree on num_shards")
+    num_shards = shard_counts.pop()
+    if not isinstance(num_shards, int) or not 1 <= num_shards <= 16:
+        raise ValueError("cannot finalize: invalid GCG shard receipt count")
+
+    expected_paths = [receipt_dir / f"{target}-{index:02d}-of-{num_shards:02d}.json" for index in range(num_shards)]
+    if paths != expected_paths:
+        raise ValueError("cannot finalize: incomplete or duplicate GCG shard receipt set")
+
+    bound_hashes: dict[str, set[str]] = {
+        "checkpoint_manifest_sha256": set(),
+        "model_config_sha256": set(),
+        "method_config_sha256": set(),
+    }
+    for index, receipt in enumerate(parsed):
+        selected = shard_behavior_ids(behaviors, index, num_shards)
+        expected_behavior_hash = hashlib.sha256("\n".join(selected).encode()).hexdigest()
+        required = {
+            "schema_version": 1,
+            "status": "completed",
+            "artifact_id": artifact_id,
+            "target": target,
+            "model_id": TARGETS[target]["model_id"],
+            "model_revision": TARGETS[target]["model_revision"],
+            "checkpoint_manifest_status": "verified",
+            "method": "GCG",
+            "num_steps": PUBLIC_STEPS,
+            "search_width": PUBLIC_SEARCH_WIDTH,
+            "starting_search_batch_size": TARGETS[target]["starting_search_batch_size"],
+            "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
+            "shard_index": index,
+            "num_shards": num_shards,
+            "selected_behaviors": len(selected),
+            "completed_behaviors": len(selected),
+            "behavior_ids_sha256": expected_behavior_hash,
+        }
+        mismatched = [key for key, expected in required.items() if receipt.get(key) != expected]
+        required_upstream = {
+            "revision": UPSTREAM_REVISION,
+            "pipeline_sha256": PIPELINE_SHA256,
+            "gcg_config_sha256": GCG_CONFIG_SHA256,
+        }
+        upstream = receipt.get("upstream")
+        if not isinstance(upstream, dict):
+            mismatched.extend(f"upstream.{key}" for key in required_upstream)
+        else:
+            mismatched.extend(
+                f"upstream.{key}" for key, expected in required_upstream.items() if upstream.get(key) != expected
+            )
+        for key, values in bound_hashes.items():
+            value = receipt.get(key)
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+                mismatched.append(key)
+            else:
+                values.add(value)
+        if mismatched:
+            raise ValueError(
+                f"cannot finalize: GCG shard receipt {index} failed fields {','.join(sorted(set(mismatched)))}"
+            )
+
+    for key, values in bound_hashes.items():
+        if len(values) != 1:
+            raise ValueError(f"cannot finalize: GCG shard receipts disagree on {key}")
+    return parsed
 
 
 def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
@@ -279,6 +359,12 @@ def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
     ]
     if missing:
         raise ValueError(f"cannot finalize: {len(missing)} GCG behaviors are missing")
+    validate_complete_shard_receipts(
+        output_root=output_root,
+        behaviors=behaviors,
+        target=target,
+        artifact_id=artifact_id,
+    )
     subprocess.run(
         ["python", "merge_test_cases.py", "--method_name", "GCG", "--save_dir", str(output_dir)],
         cwd=upstream,
@@ -305,10 +391,7 @@ def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
         "cases": PUBLIC_BEHAVIORS,
         "num_steps": PUBLIC_STEPS,
         "search_width": PUBLIC_SEARCH_WIDTH,
-        "execution_only_deviation": (
-            "candidate loss microbatching and disabled prefix reuse; public inputs, 500 steps, "
-            "512-candidate search, token gradients, losses, and global argmin preserved"
-        ),
+        "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
     }
     receipt_path = output_root / "generation-receipt.json"
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")

@@ -2,10 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import csv
+import hashlib
+import json
 
 import pytest
 
 from benchmarks.harmbench.operations.gcg_small_models_worker import (
+    EXECUTION_ONLY_DEVIATION,
+    GCG_CONFIG_SHA256,
+    PIPELINE_SHA256,
     PUBLIC_BEHAVIORS,
     PUBLIC_SEARCH_WIDTH,
     PUBLIC_STEPS,
@@ -14,6 +19,7 @@ from benchmarks.harmbench.operations.gcg_small_models_worker import (
     completed_behavior_count,
     run_generation_if_needed,
     shard_behavior_ids,
+    validate_complete_shard_receipts,
 )
 
 
@@ -90,3 +96,98 @@ def test_complete_shard_skips_expensive_generation(monkeypatch, tmp_path):
         upstream=tmp_path,
     )
     assert len(invoked) == 1
+
+
+def _write_receipt_set(tmp_path, *, target="super", artifact_id="full-run", num_shards=2):
+    behaviors = tmp_path / "behaviors.csv"
+    _behaviors(behaviors)
+    output_root = tmp_path / artifact_id
+    receipt_dir = output_root / "shard-receipts"
+    receipt_dir.mkdir(parents=True)
+    for index in range(num_shards):
+        selected = shard_behavior_ids(behaviors, index, num_shards)
+        receipt = {
+            "schema_version": 1,
+            "status": "completed",
+            "artifact_id": artifact_id,
+            "target": target,
+            "model_id": TARGETS[target]["model_id"],
+            "model_revision": TARGETS[target]["model_revision"],
+            "checkpoint_manifest_sha256": "a" * 64,
+            "checkpoint_manifest_status": "verified",
+            "upstream": {
+                "revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd",
+                "pipeline_sha256": PIPELINE_SHA256,
+                "gcg_config_sha256": GCG_CONFIG_SHA256,
+            },
+            "method": "GCG",
+            "num_steps": PUBLIC_STEPS,
+            "search_width": PUBLIC_SEARCH_WIDTH,
+            "starting_search_batch_size": TARGETS[target]["starting_search_batch_size"],
+            "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
+            "shard_index": index,
+            "num_shards": num_shards,
+            "selected_behaviors": len(selected),
+            "completed_behaviors": len(selected),
+            "behavior_ids_sha256": hashlib.sha256("\n".join(selected).encode()).hexdigest(),
+            "model_config_sha256": "b" * 64,
+            "method_config_sha256": "c" * 64,
+        }
+        path = receipt_dir / f"{target}-{index:02d}-of-{num_shards:02d}.json"
+        path.write_text(json.dumps(receipt), encoding="utf-8")
+    return output_root, behaviors
+
+
+def test_complete_shard_receipts_bind_every_source_order_partition(tmp_path):
+    output_root, behaviors = _write_receipt_set(tmp_path)
+    receipts = validate_complete_shard_receipts(
+        output_root=output_root,
+        behaviors=behaviors,
+        target="super",
+        artifact_id="full-run",
+    )
+    assert len(receipts) == 2
+    assert sum(receipt["completed_behaviors"] for receipt in receipts) == PUBLIC_BEHAVIORS
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda receipt: receipt.update(status="running"), "failed fields status"),
+        (lambda receipt: receipt.update(completed_behaviors=0), "failed fields completed_behaviors"),
+        (lambda receipt: receipt.update(behavior_ids_sha256="0" * 64), "failed fields behavior_ids_sha256"),
+        (
+            lambda receipt: receipt.update(checkpoint_manifest_sha256="d" * 64),
+            "disagree on checkpoint_manifest_sha256",
+        ),
+        (
+            lambda receipt: receipt["upstream"].update(pipeline_sha256="0" * 64),
+            "failed fields upstream.pipeline_sha256",
+        ),
+    ],
+)
+def test_complete_shard_receipts_reject_invalid_evidence(tmp_path, mutation, message):
+    output_root, behaviors = _write_receipt_set(tmp_path)
+    path = output_root / "shard-receipts" / "super-01-of-02.json"
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    mutation(receipt)
+    path.write_text(json.dumps(receipt), encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        validate_complete_shard_receipts(
+            output_root=output_root,
+            behaviors=behaviors,
+            target="super",
+            artifact_id="full-run",
+        )
+
+
+def test_complete_shard_receipts_reject_missing_partition(tmp_path):
+    output_root, behaviors = _write_receipt_set(tmp_path)
+    (output_root / "shard-receipts" / "super-01-of-02.json").unlink()
+    with pytest.raises(ValueError, match="incomplete or duplicate"):
+        validate_complete_shard_receipts(
+            output_root=output_root,
+            behaviors=behaviors,
+            target="super",
+            artifact_id="full-run",
+        )
