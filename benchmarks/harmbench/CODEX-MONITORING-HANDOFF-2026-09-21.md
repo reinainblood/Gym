@@ -217,3 +217,19 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   Raw classifier replay matched 300/300; copyright replay matched 100/100. The strict method report and deterministic BLADE
   bundle readback both passed. Do not reuse any target responses from the historical archive; only its fixed attack cases enter
   this result.
+
+## Client-fresh full campaigns — 2026-09-21 14:47 CDT
+
+- Persistent FDR app `harmbench-client-fresh-super`, app ID `ap-HsL55FPL5a3QhChWI6N2X5`, was deployed from pushed
+  commit `f8d8b46`. Results Volume: `harmbench-client-fresh-super-results`; Mixtral cache Volume:
+  `harmbench-mixtral-attacker-cache`. The exact Super target remains the independently receipt-bound served endpoint.
+- Full PAIR artifact `pair-super-full-400-20260921a` has exactly three source-order shards:
+  `fc-01M32R45HPJ483RX4R4E1EWVCW`, `fc-01M32R45MYM788VC98TNWKYMN3`, and
+  `fc-01M32R45RM8AK9CQDGV6HA9NQ2`.
+- Full TAP artifact `tap-super-full-400-20260921a` has exactly three source-order shards:
+  `fc-01M32R45XXW0G3X2T90NVQ6ZY3`, `fc-01M32R4610ATD46JKC6W9P3483`, and
+  `fc-01M32R4657KWVFY4MMZZAKRCFE`.
+- All six workers are live. Together they issue at most 120 concurrent target calls, matching the six-replica served Super
+  capacity. Do not duplicate a shard while its call/container remains live. A behavior is complete only when its private
+  upstream test-case artifact and hashed client-call receipt both persist; a full method is complete only after all three
+  shard receipts validate and the CPU finalizer writes the canonical 400-behavior generation receipt.
