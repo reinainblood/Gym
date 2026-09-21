@@ -101,6 +101,8 @@ method keys in the paper's pipeline.
 - A CPU-only `finalize_method` gate on the white-box app binds all 110 validated case receipts and images to the passed
   gradient/checkpoint receipt in `attack-manifest.json`. Canonical and replicate completion refuse to load the model until
   that manifest, its aggregate hashes, filenames, and every referenced case/image file pass readback.
+- The white-box app's CPU-only `status_method` performs the same per-index validation without model load and returns a
+  payload-free repair plan: valid/missing/invalid counts and indexes, extra-file counts, and the minimal shard IDs to resume.
 - A second CPU-only finalizer on the completion app binds exactly 110 parent-matched canonical receipts to the attack
   manifest, BF16 checkpoint, processor files, deterministic sampling profile, and 512-token cap. Canonical scoring requires
   `completion-manifest-512.json` and rehashes all receipts before any classifier calls.

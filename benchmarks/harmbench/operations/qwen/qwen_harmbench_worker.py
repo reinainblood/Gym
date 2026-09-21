@@ -214,6 +214,60 @@ def finalize_method_artifact(*, run_dir: Path, method: str, behaviors_path: Path
     return manifest
 
 
+def reconcile_method_status(*, run_dir: Path, method: str, behaviors_path: Path, num_shards: int = 4) -> dict:
+    """Return a payload-free exact-index repair plan without loading the model."""
+    if method not in METHODS:
+        raise ValueError("unknown public method")
+    if not 1 <= num_shards <= 16:
+        raise ValueError("invalid shard count")
+    with behaviors_path.open(newline="", encoding="utf-8") as stream:
+        behaviors = list(csv.DictReader(stream))
+    if len(behaviors) != PUBLIC_CASES:
+        raise ValueError(f"expected {PUBLIC_CASES} public multimodal behaviors, found {len(behaviors)}")
+    expected_case_names = {f"{index:03d}-{row['BehaviorID']}.json" for index, row in enumerate(behaviors)}
+    expected_image_names = {f"{index:03d}-{row['BehaviorID']}.png" for index, row in enumerate(behaviors)}
+    observed_case_names = {path.name for path in (run_dir / "cases").glob("*.json")}
+    observed_image_names = {path.name for path in (run_dir / "images").glob("*.png")}
+    valid_indexes = []
+    missing_indexes = []
+    invalid_indexes = []
+    for index, row in enumerate(behaviors):
+        case_path = run_dir / "cases" / f"{index:03d}-{row['BehaviorID']}.json"
+        if not case_path.is_file():
+            missing_indexes.append(index)
+            continue
+        try:
+            validate_case_receipt(case_path, method=method, index=index, row=row)
+        except (OSError, ValueError, json.JSONDecodeError):
+            invalid_indexes.append(index)
+        else:
+            valid_indexes.append(index)
+    repair_indexes = sorted([*missing_indexes, *invalid_indexes])
+    extra_case_files = len(observed_case_names - expected_case_names)
+    extra_image_files = len(observed_image_names - expected_image_names)
+    ready_to_finalize = (
+        len(valid_indexes) == PUBLIC_CASES and not repair_indexes and extra_case_files == 0 and extra_image_files == 0
+    )
+    return {
+        "schema_version": 1,
+        "artifact_kind": "qwen_whitebox_method_status",
+        "method": method,
+        "expected_cases": PUBLIC_CASES,
+        "valid_cases": len(valid_indexes),
+        "missing_cases": len(missing_indexes),
+        "invalid_cases": len(invalid_indexes),
+        "extra_case_files": extra_case_files,
+        "extra_image_files": extra_image_files,
+        "missing_indexes": missing_indexes,
+        "invalid_indexes": invalid_indexes,
+        "repair_indexes": repair_indexes,
+        "resume_shards": sorted({index % num_shards for index in repair_indexes}),
+        "num_shards": num_shards,
+        "ready_to_finalize": ready_to_finalize,
+        "attack_manifest_present": (run_dir / "attack-manifest.json").is_file(),
+    }
+
+
 class QwenHarmBenchRuntime:
     def __init__(self) -> None:
         import torch

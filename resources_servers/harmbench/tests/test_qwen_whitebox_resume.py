@@ -17,6 +17,7 @@ from benchmarks.harmbench.operations.qwen.qwen_harmbench_worker import (
     MODEL_REVISION,
     UPSTREAM_REVISION,
     finalize_method_artifact,
+    reconcile_method_status,
     sha256,
     validate_case_receipt,
 )
@@ -163,6 +164,31 @@ def test_whitebox_finalizer_reconciles_exact_110_case_campaign(tmp_path):
     assert manifest["cases"] == manifest["images"] == 110
     assert len(manifest["case_receipts"]) == len(manifest["optimized_images"]) == 110
     assert validate_attack_manifest(run_root / method, method)["status"] == "completed"
+    status = reconcile_method_status(
+        run_dir=run_root / method,
+        method=method,
+        behaviors_path=behaviors_path,
+    )
+    assert status["valid_cases"] == 110
+    assert status["repair_indexes"] == []
+    assert status["resume_shards"] == []
+    assert status["ready_to_finalize"] is True
+    assert status["attack_manifest_present"] is True
+
+    for index in (1, 6):
+        (run_root / method / "cases" / f"{index:03d}-b{index:03d}.json").unlink()
+    (run_root / method / "images" / "007-b007.png").write_bytes(b"tampered")
+    repair = reconcile_method_status(
+        run_dir=run_root / method,
+        method=method,
+        behaviors_path=behaviors_path,
+    )
+    assert repair["valid_cases"] == 107
+    assert repair["missing_indexes"] == [1, 6]
+    assert repair["invalid_indexes"] == [7]
+    assert repair["repair_indexes"] == [1, 6, 7]
+    assert repair["resume_shards"] == [1, 2, 3]
+    assert repair["ready_to_finalize"] is False
 
     extra = run_root / method / "cases" / "extra.json"
     extra.write_text("{}", encoding="utf-8")
