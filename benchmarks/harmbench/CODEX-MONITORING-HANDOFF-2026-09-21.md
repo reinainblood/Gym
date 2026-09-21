@@ -264,3 +264,16 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
 - Fresh Super target collection scored 400/400 healthy cases with zero failures/missing, 21 successes, and 5.25% ASR. Raw
   classifier replay matched 300/300 and copyright replay matched 100/100. The strict method report and deterministic BLADE
   readback passed. Ordinary TAP repair call `fc-01M32SEPNMVQFE36D2HDR27JGS` remains live; do not infer completion from PAIR.
+
+## Ordinary TAP full Super milestone — 2026-09-21 15:41 CDT
+
+- The official HarmBench 1.0 `TAP/mixtral_8x7b` source member is 408,632 bytes with SHA-256
+  `5b4dd35089a4b02458551b3cfbb6b747787a7bf14012775ef1d441d6aaf24867`. It contains 401 historical behaviors:
+  398 current-corpus rows plus the same three retired IDs present in other release artifacts.
+- FDR repair call `fc-01M32SEPNMVQFE36D2HDR27JGS` regenerated exactly the two missing current behaviors through the pinned
+  upstream TAP class, `mixtral_8x7b` experiment, and exact public method/model configs. Its completed receipt binds two
+  repaired behaviors and two cases. Merging official and repaired sources in current source order yielded 400 cases with
+  SHA-256 `a1c30c304c3fb92e37d8f16941a507069f9f6bd082dc35df6171f36342fb7db2`.
+- Fresh Super target collection scored 400/400 healthy cases with zero failures/missing, 35 successes, and 8.75% ASR. Raw
+  classifier replay matched 300/300 and copyright replay matched 100/100. The strict method report and deterministic BLADE
+  readback passed. Ordinary PAIR and TAP are now both validated; do not rerun either source or target result.
