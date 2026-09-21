@@ -1,0 +1,36 @@
+schema_version: 1
+artifact_kind: harmbench_full_text_generation_summary
+status: generation_complete_scoring_pending
+upstream_revision: 8e1604d1171fe8a48d8febecd22f600e462bdcdd  # pragma: allowlist secret
+behaviors:
+  cohort: harmbench_behaviors_text_all.csv
+  rows: 400
+  sha256: 8d81accedd38eaaf8b760618622bb888417d1fd0c86eba65c427a16f1cbb4afc  # pragma: allowlist secret
+storage:
+  environment: FDR
+  modal_volume: harmbench-full-text-generated-cases
+direct_request:
+  status: generation_complete_scoring_pending
+  experiment: default
+  run_id: direct-full-default-20260921
+  volume_path: direct-full-default-20260921  # pragma: allowlist secret
+  behaviors: 400
+  cases: 400
+  standard_behaviors: 200
+  contextual_behaviors: 100
+  copyright_behaviors: 100
+  test_cases_size_bytes: 194088
+  upstream_method_sha256: 277b6edea5b6aa77b962183dba8a4cace150d85448983e3496222f864d70995d  # pragma: allowlist secret
+  test_cases_sha256: b92e9a55aea706c30892219749141c01fd366d62f4c75bcca80e6dc2e7550723  # pragma: allowlist secret
+human_jailbreaks:
+  status: generation_complete_scoring_pending
+  experiment: random_subset_5
+  run_id: seed-1
+  volume_path: human-full-400  # pragma: allowlist secret
+  seed: 1
+  templates_per_behavior: 5
+  behaviors: 400
+  cases: 2000
+  test_cases_size_bytes: 4819841
+  template_source_sha256: 62e53558de1da3e67d1aec15c0dff59c848c0b374fd262ffad8f723fda0cd099  # pragma: allowlist secret
+  test_cases_sha256: 7e64aab4e8caaeaa8931fcd5a706c5894bd79d08ba705777ee3dd0706e7c54c9  # pragma: allowlist secret
