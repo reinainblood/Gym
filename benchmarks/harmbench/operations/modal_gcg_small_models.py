@@ -180,6 +180,29 @@ def finalize(target: str, artifact_id: str) -> dict:
     }
 
 
+@app.function(
+    image=image,
+    cpu=2,
+    memory=8192,
+    timeout=1800,
+    volumes={"/outputs": outputs},
+)
+def status_campaign(target: str, artifact_id: str, num_shards: int) -> dict:
+    """Return exact missing/invalid indexes and minimal repair shards without loading weights."""
+    from gcg_small_models_worker import PUBLIC_DATASET, reconcile_campaign_status
+
+    if target not in {"super", "qwen"}:
+        raise ValueError("target must be super or qwen")
+    _validate_call(artifact_id, 0, num_shards, 0)
+    return reconcile_campaign_status(
+        output_root=Path("/outputs") / artifact_id,
+        behaviors=Path("/app/HarmBench/data/behavior_datasets") / PUBLIC_DATASET,
+        target=target,
+        artifact_id=artifact_id,
+        num_shards=num_shards,
+    )
+
+
 @app.local_entrypoint()
 def main(target: str, artifact_id: str, num_shards: int = 1, limit: int = 1, detach: bool = False) -> None:
     """Launch a bounded canary or a full set of resumable shards."""

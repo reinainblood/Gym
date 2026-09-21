@@ -127,6 +127,9 @@ method keys in the paper's pipeline.
   denominator, and case-level hashes before emitting payload-free BLADE rows, native metrics, and a
   deterministic report; invalid or unstable classifier cases remain visible but outside the model-quality denominator.
   Its evidence manifest binds the classifier-score input and every output hash and is validated through a full readback.
+- The persistent GCG app's CPU-only `status_campaign` validates every nested behavior artifact's shape without emitting
+  its attack string, reports exact missing/invalid source indexes and unexpected entries, verifies complete shard receipts,
+  and returns the minimal shard IDs required for a resumable repair before finalization.
 - `report_method_run.py` recognizes a GCG Gym run as validated only when its complete finalized source receipt targets the
   same model, retains the public 500-step/512-width profile and shard evidence, reconciles all 400 healthy target rows,
   preserves the 300 classifier / 100 copyright split, and passes both classifier and MinHash calibration controls.

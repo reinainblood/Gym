@@ -359,6 +359,91 @@ def build_shard_receipt_manifest(
     return manifest, hashlib.sha256(canonical).hexdigest()
 
 
+def validate_behavior_artifact(path: Path, behavior_id: str) -> None:
+    """Validate one upstream nested GCG artifact without returning its attack payload."""
+    cases = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(cases, dict)
+        or set(cases) != {behavior_id}
+        or not isinstance(cases[behavior_id], list)
+        or len(cases[behavior_id]) != 1
+        or not isinstance(cases[behavior_id][0], str)
+        or not cases[behavior_id][0].strip()
+    ):
+        raise ValueError("invalid nested GCG behavior artifact")
+
+
+def reconcile_campaign_status(
+    *, output_root: Path, behaviors: Path, target: str, artifact_id: str, num_shards: int
+) -> dict[str, Any]:
+    """Return a payload-free exact-index GCG repair plan without loading weights."""
+    if target not in TARGETS:
+        raise ValueError(f"unsupported target: {target}")
+    if not 1 <= num_shards <= 16:
+        raise ValueError("invalid shard count")
+    behavior_ids = shard_behavior_ids(behaviors, 0, 1)
+    model_key = f"nemotron_3_5_{target}_gcg"
+    individual_dir = output_root / "GCG" / model_key / "test_cases" / "test_cases_individual_behaviors"
+    valid_indexes = []
+    missing_indexes = []
+    invalid_indexes = []
+    for index, behavior_id in enumerate(behavior_ids):
+        path = behavior_artifact_path(individual_dir, behavior_id)
+        if not path.is_file():
+            missing_indexes.append(index)
+            continue
+        try:
+            validate_behavior_artifact(path, behavior_id)
+        except (OSError, ValueError, json.JSONDecodeError):
+            invalid_indexes.append(index)
+        else:
+            valid_indexes.append(index)
+    expected_dirs = set(behavior_ids)
+    observed_entries = list(individual_dir.iterdir()) if individual_dir.is_dir() else []
+    extra_behavior_entries = sum(entry.name not in expected_dirs or not entry.is_dir() for entry in observed_entries)
+    repair_indexes = sorted([*missing_indexes, *invalid_indexes])
+    receipt_dir = output_root / "shard-receipts"
+    shard_receipt_paths = sorted(receipt_dir.glob(f"{target}-*-of-{num_shards:02d}.json"))
+    shard_receipts_valid = False
+    if len(shard_receipt_paths) == num_shards and len(valid_indexes) == PUBLIC_BEHAVIORS and not repair_indexes:
+        try:
+            validate_complete_shard_receipts(
+                output_root=output_root,
+                behaviors=behaviors,
+                target=target,
+                artifact_id=artifact_id,
+            )
+        except (OSError, ValueError, json.JSONDecodeError):
+            shard_receipts_valid = False
+        else:
+            shard_receipts_valid = True
+    return {
+        "schema_version": 1,
+        "artifact_kind": "harmbench_gcg_campaign_status",
+        "artifact_id": artifact_id,
+        "target": target,
+        "expected_behaviors": PUBLIC_BEHAVIORS,
+        "valid_behaviors": len(valid_indexes),
+        "missing_behaviors": len(missing_indexes),
+        "invalid_behaviors": len(invalid_indexes),
+        "extra_behavior_entries": extra_behavior_entries,
+        "missing_indexes": missing_indexes,
+        "invalid_indexes": invalid_indexes,
+        "repair_indexes": repair_indexes,
+        "resume_shards": sorted({index % num_shards for index in repair_indexes}),
+        "num_shards": num_shards,
+        "shard_receipts": len(shard_receipt_paths),
+        "shard_receipts_valid": shard_receipts_valid,
+        "ready_to_finalize": (
+            len(valid_indexes) == PUBLIC_BEHAVIORS
+            and not repair_indexes
+            and extra_behavior_entries == 0
+            and shard_receipts_valid
+        ),
+        "generation_receipt_present": (output_root / "generation-receipt.json").is_file(),
+    }
+
+
 def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
     """Merge a complete 400-behavior campaign and write the Gym-compatible generation receipt."""
     if target not in TARGETS:

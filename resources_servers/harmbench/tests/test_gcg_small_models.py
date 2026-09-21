@@ -19,6 +19,7 @@ from benchmarks.harmbench.operations.gcg_small_models_worker import (
     behavior_artifact_path,
     build_shard_receipt_manifest,
     completed_behavior_count,
+    reconcile_campaign_status,
     run_generation_if_needed,
     shard_behavior_ids,
     validate_complete_shard_receipts,
@@ -203,3 +204,54 @@ def test_complete_shard_receipts_reject_missing_partition(tmp_path):
             target="super",
             artifact_id="full-run",
         )
+
+
+def test_gcg_status_returns_exact_payload_free_repair_plan(tmp_path):
+    behaviors = tmp_path / "behaviors.csv"
+    _behaviors(behaviors)
+    output_root = tmp_path / "full-run"
+    individual = output_root / "GCG" / "nemotron_3_5_super_gcg" / "test_cases" / "test_cases_individual_behaviors"
+    for index in (0, 2):
+        path = behavior_artifact_path(individual, f"b{index:03d}")
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({f"b{index:03d}": ["synthetic"]}), encoding="utf-8")
+    invalid = behavior_artifact_path(individual, "b001")
+    invalid.parent.mkdir(parents=True)
+    invalid.write_text("{}", encoding="utf-8")
+    (individual / "extra").mkdir(parents=True)
+    status = reconcile_campaign_status(
+        output_root=output_root,
+        behaviors=behaviors,
+        target="super",
+        artifact_id="full-run",
+        num_shards=2,
+    )
+    assert status["valid_behaviors"] == 2
+    assert status["invalid_indexes"] == [1]
+    assert status["missing_indexes"][:2] == [3, 4]
+    assert status["repair_indexes"][:3] == [1, 3, 4]
+    assert status["resume_shards"] == [0, 1]
+    assert status["extra_behavior_entries"] == 1
+    assert status["ready_to_finalize"] is False
+
+
+def test_gcg_status_requires_all_artifacts_and_valid_shard_receipts_for_finalization(tmp_path):
+    output_root, behaviors = _write_receipt_set(tmp_path)
+    individual = output_root / "GCG" / "nemotron_3_5_super_gcg" / "test_cases" / "test_cases_individual_behaviors"
+    for index in range(PUBLIC_BEHAVIORS):
+        behavior_id = f"b{index:03d}"
+        path = behavior_artifact_path(individual, behavior_id)
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({behavior_id: ["synthetic"]}), encoding="utf-8")
+    status = reconcile_campaign_status(
+        output_root=output_root,
+        behaviors=behaviors,
+        target="super",
+        artifact_id="full-run",
+        num_shards=2,
+    )
+    assert status["valid_behaviors"] == PUBLIC_BEHAVIORS
+    assert status["shard_receipts"] == 2
+    assert status["shard_receipts_valid"] is True
+    assert status["ready_to_finalize"] is True
+    assert status["generation_receipt_present"] is False

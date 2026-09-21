@@ -62,6 +62,10 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   shard 0 `fc-01M31PKEVXNAFW3ZG082K5FQ3D`; shard 1 `fc-01M31PKEZX35EG5DF0RDMJGQ76`.
   Do not launch another campaign or duplicate either shard while its call/container is live. Resume only missing
   nested behavior artifacts with the same artifact ID and shard indexes after terminal calls and zero attack workers.
+- After both calls are terminal and workers are zero, redeploy the current branch and call the GCG app's CPU-only
+  `status_campaign("super", "super-gcg-full-20260921a", 2)`. It validates nested artifacts without returning attacks,
+  distinguishes missing from malformed source indexes, counts unexpected entries, verifies the complete shard-receipt set,
+  and returns the minimal `resume_shards`. Launch only those shard IDs; call `finalize` only when `ready_to_finalize` is true.
 - Qwen MultiModalPGD now has complete 110/110 canonical 512-token scoring and BLADE evidence. The long-running
   MultiModalPGDBlankImage campaign remains active under app `ap-07zo5VR8b4cd4UHMb6VHBM`; Patch remains incomplete
   and must not be resumed until active BlankImage workers drain and exact missing indexes are reconciled.
