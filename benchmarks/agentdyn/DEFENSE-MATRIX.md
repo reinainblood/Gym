@@ -42,6 +42,15 @@ past forty hours for one cell.
   anything: the agent server runs rollouts behind `asyncio.Semaphore(1)`, so every rollout in both arms was collected
   one at a time per stack. The grid uses one process per cell, and three per cell for DRIFT. Per-sample isolation and
   deterministic verification are unchanged; only the number of stacks differs.
+- **Collection moved mid-campaign, from one laptop to containers.** The first ~4,000 rollouts were collected on a
+  shared Mac at up to five concurrent stacks; the rest in one Modal container per cell, 32 at a time. Scores are
+  unaffected and the two halves pool legitimately: verification is deterministic against suite state, and the
+  selector file is byte-identical either way -- the container regenerates it with
+  `python -m benchmarks.agentdyn.prepare` and the result matches the laptop's copy exactly (`cmp`, sha256
+  `819443fe...`). What is not comparable across the two halves is wall-clock and throughput, so no timing figure in
+  this ledger should be read across the boundary. Four cells span it: `qwen-piguard_detector`, `qwen-camel`,
+  `kimi-camel` and `supervl-progent` each began on the laptop and finished in a container.
+
 - **PromptGuard2 is canonical, with a mixed provenance string.** The treatment now runs
   `meta-llama/Llama-Prompt-Guard-2-86M@a8ded8e697ce7c355e395a0df51f94adb4a2fd27`. Rows collected during gated access
   name the public mirror instead; the two were compared file by file, including `model.safetensors`, and are
