@@ -1,0 +1,130 @@
+{
+  "current_actor": "refusal-ablated Gemma-4-31B-it",
+  "baseline_actor": "stock Gemma-4-31B-it",
+  "models": [
+    {
+      "model": "Nemotron 3 Ultra 550B",
+      "slug": "nemotron-3-ultra-550b",
+      "conversations": 200,
+      "baseline_actor_refusal_rate": 0.002,
+      "actor_refusal_rate": 0.0,
+      "baseline_degradation_slope": 0.045974283448510254,
+      "degradation_slope": 0.0694759511844939,
+      "slope_change": 0.5111916048089096,
+      "baseline_peak_quality_drop": 0.34536082474226804,
+      "peak_quality_drop": 0.4050251256281407,
+      "peak_change": 0.17275931898297456,
+      "baseline_turn_curve": [
+        4.447236180904523,
+        4.437696335078535,
+        4.39375,
+        4.3374999999999995,
+        4.306185567010309
+      ],
+      "turn_curve": [
+        4.534,
+        4.479187817258883,
+        4.374747474747475,
+        4.324873096446701,
+        4.311224489795919
+      ],
+      "baseline_total_quality_score": 4.336180904522613,
+      "total_quality_score": 4.385466666666667,
+      "baseline_ever_unsafe": 0.1708542713567839,
+      "ever_unsafe": 0.24
+    },
+    {
+      "model": "Kimi K3",
+      "slug": "kimi-k3",
+      "conversations": 199,
+      "baseline_actor_refusal_rate": 0.002,
+      "actor_refusal_rate": 0.0,
+      "baseline_degradation_slope": 0.026331658291457286,
+      "degradation_slope": 0.012791208791208793,
+      "slope_change": -0.514226994379666,
+      "baseline_peak_quality_drop": 0.2383838383838384,
+      "peak_quality_drop": 0.2369230769230769,
+      "peak_change": -0.006127770534550316,
+      "baseline_turn_curve": [
+        4.663316582914573,
+        4.5758793969849245,
+        4.5896373056994815,
+        4.61595744680851,
+        4.732515337423313
+      ],
+      "turn_curve": [
+        4.737688442211055,
+        4.729230769230769,
+        4.73015873015873,
+        4.803296703296703,
+        4.842857142857143
+      ],
+      "baseline_total_quality_score": 4.593633333333333,
+      "total_quality_score": 4.7100167504187604,
+      "baseline_ever_unsafe": 0.115,
+      "ever_unsafe": 0.10050251256281408
+    },
+    {
+      "model": "Qwen3.5 122B-A10B",
+      "slug": "qwen3.5-122b-a10b",
+      "conversations": 200,
+      "baseline_actor_refusal_rate": 0.001,
+      "actor_refusal_rate": 0.0,
+      "baseline_degradation_slope": 0.0443,
+      "degradation_slope": 0.04954773869346733,
+      "slope_change": 0.11845911271935292,
+      "baseline_peak_quality_drop": 0.318,
+      "peak_quality_drop": 0.27537688442211056,
+      "peak_change": -0.1340349546474511,
+      "baseline_turn_curve": [
+        4.725,
+        4.698492462311558,
+        4.68989898989899,
+        4.640414507772021,
+        4.648863636363637
+      ],
+      "turn_curve": [
+        4.746,
+        4.696482412060302,
+        4.642051282051282,
+        4.666666666666667,
+        4.66551724137931
+      ],
+      "baseline_total_quality_score": 4.67125,
+      "total_quality_score": 4.661333333333333,
+      "baseline_ever_unsafe": 0.12,
+      "ever_unsafe": 0.1
+    },
+    {
+      "model": "Nemotron 3.5 Super VL",
+      "slug": "nemotron-3.5-super-vl",
+      "conversations": 200,
+      "baseline_actor_refusal_rate": 0.002,
+      "actor_refusal_rate": 0.0,
+      "baseline_degradation_slope": -0.014170854271356788,
+      "degradation_slope": 0.006262626262626262,
+      "slope_change": 1.4419371015115694,
+      "baseline_peak_quality_drop": 0.16884422110552766,
+      "peak_quality_drop": 0.12424242424242425,
+      "peak_change": -0.2641594516594517,
+      "baseline_turn_curve": [
+        4.632,
+        4.642211055276381,
+        4.658585858585859,
+        4.691457286432161,
+        4.692857142857143
+      ],
+      "turn_curve": [
+        4.6819999999999995,
+        4.683838383838384,
+        4.692929292929293,
+        4.687878787878788,
+        4.657868020304568
+      ],
+      "baseline_total_quality_score": 4.6503,
+      "total_quality_score": 4.677099999999999,
+      "baseline_ever_unsafe": 0.12,
+      "ever_unsafe": 0.075
+    }
+  ]
+}
