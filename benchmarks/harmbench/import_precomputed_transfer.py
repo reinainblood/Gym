@@ -18,13 +18,13 @@ METHOD = "TAP-Transfer"
 UPSTREAM_METHOD = "TAP-Transfer"
 UPSTREAM_CLASS = "TAP"
 EXPERIMENT = "gpt-4-0613_judge_gpt-4-1106-preview_target"
-SOURCE_SHA256 = "71438be2ca516be44b7ffc03230c01719b8fe3c24c9cae89e17deecd28c92de2"
+SOURCE_SHA256 = "71438be2ca516be44b7ffc03230c01719b8fe3c24c9cae89e17deecd28c92de2"  # pragma: allowlist secret
 SOURCE_BEHAVIORS = 403
 SOURCE_EXTRA_BEHAVIORS = 3
 SOURCE_EXTRA_IDS_SHA256 = "20b66b06fd4d019222168ab891325000324082b0168c7c17e94999a8508dd25d"
 ZENODO_DOI = "10.5281/zenodo.10714577"
 ZENODO_ARCHIVE = "harmbench_results_initial_release.zip"
-ZENODO_ARCHIVE_MD5 = "ac0e8210389b81951f66da6daaa6db3b"
+ZENODO_ARCHIVE_MD5 = "ac0e8210389b81951f66da6daaa6db3b"  # pragma: allowlist secret
 ZENODO_MEMBER = f"harmbench_results_initial_release/results_text/TAP/{EXPERIMENT}/test_cases/test_cases.json"
 
 
