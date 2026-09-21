@@ -132,6 +132,27 @@ is a strong claim whichever defense produces it.
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | _(undefended baseline)_ | 620 | 70.00% | 64.11% | 0.71% | 9.4 | 0 | 0 |
 | `camel` | 620 / 620 | 0.00% | 1.25% | 0.00% | 4.6 | 0 | 0 |
+| `progent` | 620 / 620 | 8.33% | 8.39% | 0.00% | 14.8 | 0 | 0 |
+
+### `Qwen/Qwen3.5-122B-A10B-FP8`
+
+| Defense | Rows | Benign utility | Utility under attack | ASR | Mean calls | Masked | Adapter errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| _(undefended baseline)_ | 620 | 70.00% | 61.96% | 35.36% | -- | 0 | 0 |
+| `prompt_guard_2_detector` | 620 / 620 | 60.00% | 32.14% | 24.82% | 10.9 | 0 | 0 |
+| `progent` | 620 / 620 | 6.67% | 7.50% | 2.68% | 12.8 | 0 | 0 |
+
+**PromptGuard2 on Qwen is, so far, the only defense here that trades rather than destroys.** It keeps 60.00% of 70.00%
+benign utility and removes about a third of the attack surface, 35.36% to 24.82%. Every other completed cell buys its
+security by not completing tasks.
+
+**A defense's security benefit is only measurable where there is undefended attack success to remove.** Ultra's
+undefended ASR is 0.71% and Kimi's is 0.18%, so `camel` and `progent` reaching 0.00% on Ultra prevented at most four
+attacks out of 560 -- the reading is dominated by the utility column, and the ASR column should not be quoted as
+evidence those defenses work. Only Qwen (35.36%) and Super-VL (15.89%) have enough undefended attack success for a
+defense's effect on security to be visible at all. This is a property of the models being unusually injection-
+resistant on this benchmark rather than of the defenses, and it means the cross-model summary has to be read per
+model rather than averaged.
 
 CaMeL stopped all four attacks that succeeded undefended, and completed none of the sixty benign tasks. Seven of the
 560 attacked rows kept utility.
