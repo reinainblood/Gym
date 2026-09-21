@@ -690,10 +690,24 @@ def build(
         (golden / f"{stem}_golden_report_metrics.json").write_text(dump(metrics_sidecar(model)), encoding="utf-8")
         (golden / f"{stem}_anchor_facts.json").write_text(dump(anchor_facts(model, models)), encoding="utf-8")
 
+        # Two files per model per track: the trajectories, and the aggregate metrics `gym eval
+        # run` computed beside them. Both belong in the bundle. The skill lists aggregate
+        # metrics only as an input to gather, and `blade_toolkit validate` globs `rollouts/
+        # *.jsonl` -- so a bundle missing every one of them still scores full marks. That is
+        # why this raises instead of skipping: nothing downstream would notice.
         for track in ("single_turn", "multi_turn"):
             source = results_dir / f"{model.slug}.{track}.jsonl"
-            if source.exists():
-                shutil.copyfile(source, rollouts / f"kidbench_{track}_{stem}.jsonl")
+            if not source.exists():
+                continue
+            shutil.copyfile(source, rollouts / f"kidbench_{track}_{stem}.jsonl")
+            metrics = results_dir / f"{model.slug}.{track}_aggregate_metrics.json"
+            if not metrics.exists():
+                raise SystemExit(
+                    f"missing {metrics}. It is written by `gym eval run` beside the rollouts; if the "
+                    f"run was sharded or used --no-aggregate, recompute it with `gym eval aggregate` "
+                    f"rather than shipping the bundle without it."
+                )
+            shutil.copyfile(metrics, rollouts / f"kidbench_{track}_{stem}_aggregate_metrics.json")
 
     (golden / "model_comparison_report.md").write_text(comparison_report(models, statistics), encoding="utf-8")
     (golden / "model_comparison_statistics.json").write_text(dump(statistics), encoding="utf-8")
