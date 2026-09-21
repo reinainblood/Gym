@@ -38,7 +38,9 @@ from benchmarks.kidbench.reporting.taxonomy import FAMILY_BY_KEY, ROOT_CAUSES, U
 from benchmarks.kidbench.upstream_spec import (
     CORE_METRICS,
     CULTURAL_METRIC,
+    DEFAULT_ACTOR,
     PAPER_ARXIV_ID,
+    SINGLE_TURN_TEMPERATURE,
     UPSTREAM_REVISION,
 )
 
@@ -251,15 +253,40 @@ def render_comparison(models: list[ModelResults]) -> str:
         )
     )
     add("")
-    add(
-        "Two deviations from the published protocol apply to every model equally, so cross-model "
-        "comparison is unaffected: the multi-turn child actor is stock `google/gemma-4-31B-it` rather "
-        "than the paper's unreleased refusal-ablated checkpoint (which makes every model look "
-        "slightly safer in multi-turn), and generation runs at `temperature=0.7` per upstream's "
-        "runner scripts rather than the `0` its README states. Per-model reports carry the detail."
-    )
+    add(_actor_and_sampling_note(models))
     add("")
     return "\n".join(out)
+
+
+def _actor_and_sampling_note(models: list[ModelResults]) -> str:
+    """The two protocol deviations, with the actor read from the run rather than asserted.
+
+    This paragraph named the stock actor long after the published runs moved to the ablated
+    one, because it was prose rather than a reading of the rollouts. The refusal rate is
+    recorded on every multi-turn conversation precisely so this claim can be measured, so it
+    is measured here: an actor that never refuses and an actor that sometimes does are
+    different instruments, and which one ran is not a detail a reader should have to infer.
+    """
+    rates = [
+        summary["actor_refusal_rate"]
+        for summary in (model.multi_turn_summary() for model in models)
+        if summary.get("actor_refusal_rate") is not None
+    ]
+    measured = (
+        f"Its measured refusal rate across this campaign is {max(rates):.4%}"
+        if rates
+        else "No actor refusal rate was recorded for this campaign"
+    )
+    return (
+        f"Two deviations from the published protocol apply to every model equally, so cross-model "
+        f"comparison is unaffected. The multi-turn child actor is `{DEFAULT_ACTOR.model_id}` pinned at "
+        f"`{(DEFAULT_ACTOR.revision or 'unpinned')[:12]}` — {DEFAULT_ACTOR.fidelity}, and not the paper's "
+        f"own unreleased checkpoint. {measured}. Generation runs at "
+        f"`temperature={SINGLE_TURN_TEMPERATURE}` per upstream's runner scripts rather than the `0` its "
+        f"README states. No single direction should be read into the actor's effect: it is measured "
+        f"per model in `actor-comparison.md`, and it does not move every model the same way. "
+        f"Per-model reports carry the detail."
+    )
 
 
 def _weakest(row: dict[str, Any]) -> str:
