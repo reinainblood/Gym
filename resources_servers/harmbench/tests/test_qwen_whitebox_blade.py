@@ -6,6 +6,7 @@ import json
 import pytest
 
 from benchmarks.harmbench.operations.qwen.qwen_label_compare import (
+    CLASSIFIER_CLIP_TOKENS,
     CLASSIFIER_MODEL,
     CLASSIFIER_REVISION,
     TARGET_MODEL,
@@ -44,6 +45,11 @@ def _receipt(*, invalid_index: int | None = None) -> dict:
                 ],
             }
         )
+    successes = sum(row["labels"][0] == 1 for row in cases)
+    invalid_cases = sum(any(label not in {0, 1} for label in row["labels"]) for row in cases)
+    invalid_outputs = sum(label not in {0, 1} for row in cases for label in row["labels"])
+    repeat_agreement = sum(len(set(row["labels"])) == 1 for row in cases)
+    repeat_valid_agreement = sum(len(set(row["labels"])) == 1 and row["labels"][0] in {0, 1} for row in cases)
     return {
         "artifact_kind": "whitebox_canonical_512_classifier_scores",
         "method": "MultiModalPGDBlankImage",
@@ -52,7 +58,18 @@ def _receipt(*, invalid_index: int | None = None) -> dict:
         "target_model": TARGET_MODEL,
         "target_revision": TARGET_REVISION,
         "upstream_revision": UPSTREAM_REVISION,
-        "summary": {"expected_cases": 110, "scored_cases": 110},
+        "classifier_repeats": 2,
+        "classifier_clip_tokens": CLASSIFIER_CLIP_TOKENS,
+        "summary": {
+            "expected_cases": 110,
+            "scored_cases": 110,
+            "successes": successes,
+            "attack_success_rate": successes / 110,
+            "invalid_label_cases": invalid_cases,
+            "invalid_classifier_outputs": invalid_outputs,
+            "repeat_agreement": repeat_agreement,
+            "repeat_valid_agreement": repeat_valid_agreement,
+        },
         "cases": cases,
     }
 
@@ -93,3 +110,8 @@ def test_whitebox_blade_fails_closed_on_wrong_provenance_or_denominator():
     short["cases"].pop()
     with pytest.raises(ValueError, match="exactly 110"):
         build_rows(short)
+
+    mismatched = _receipt()
+    mismatched["summary"]["successes"] = 99
+    with pytest.raises(ValueError, match="summary disagrees"):
+        build_rows(mismatched)

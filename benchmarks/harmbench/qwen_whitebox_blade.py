@@ -11,6 +11,7 @@ from typing import Any
 
 from benchmarks.harmbench.blade_analysis import ATTACK_FAMILIES, BladeRow, render_report, summarize
 from benchmarks.harmbench.operations.qwen.qwen_label_compare import (
+    CLASSIFIER_CLIP_TOKENS,
     CLASSIFIER_MODEL,
     CLASSIFIER_REVISION,
     TARGET_MODEL,
@@ -33,6 +34,8 @@ def build_rows(receipt: dict[str, Any]) -> list[BladeRow]:
         "target_model": TARGET_MODEL,
         "target_revision": TARGET_REVISION,
         "upstream_revision": UPSTREAM_REVISION,
+        "classifier_repeats": 2,
+        "classifier_clip_tokens": CLASSIFIER_CLIP_TOKENS,
     }
     for key, value in expected.items():
         if receipt.get(key) != value:
@@ -44,6 +47,47 @@ def build_rows(receipt: dict[str, Any]) -> list[BladeRow]:
         raise ValueError("canonical white-box BLADE input must contain exactly 110 scored cases")
     if len({row.get("behavior_id") for row in cases}) != 110:
         raise ValueError("canonical white-box BLADE input has duplicate behavior IDs")
+    if len({row.get("index") for row in cases}) != 110:
+        raise ValueError("canonical white-box BLADE input has duplicate case indexes")
+    required_case_fields = (
+        "behavior_id",
+        "index",
+        "canonical_receipt_sha256",
+        "parent_receipt_sha256",
+        "generation_sha256",
+        "test_case_image_sha256",
+        "functional_category",
+        "semantic_category",
+        "finish_reason",
+    )
+    for case in cases:
+        if any(case.get(field) in (None, "") for field in required_case_fields):
+            raise ValueError("canonical white-box BLADE input has missing case provenance")
+        if len(case.get("classifier_receipts", [])) != receipt["classifier_repeats"]:
+            raise ValueError("canonical white-box BLADE input has incomplete classifier repeats")
+
+    computed_successes = sum(row.get("labels", [None])[0] == 1 for row in cases)
+    computed_invalid_cases = sum(any(label not in {0, 1} for label in row.get("labels", [])) for row in cases)
+    computed_invalid_outputs = sum(label not in {0, 1} for row in cases for label in row.get("labels", []))
+    computed_repeat_agreement = sum(
+        len(row.get("labels", [])) == receipt["classifier_repeats"] and len(set(row["labels"])) == 1 for row in cases
+    )
+    computed_repeat_valid_agreement = sum(
+        len(row.get("labels", [])) == receipt["classifier_repeats"]
+        and len(set(row["labels"])) == 1
+        and row["labels"][0] in {0, 1}
+        for row in cases
+    )
+    expected_summary = {
+        "successes": computed_successes,
+        "attack_success_rate": computed_successes / len(cases),
+        "invalid_label_cases": computed_invalid_cases,
+        "invalid_classifier_outputs": computed_invalid_outputs,
+        "repeat_agreement": computed_repeat_agreement,
+        "repeat_valid_agreement": computed_repeat_valid_agreement,
+    }
+    if any(summary.get(key) != value for key, value in expected_summary.items()):
+        raise ValueError("canonical white-box BLADE input summary disagrees with case evidence")
 
     rows: list[BladeRow] = []
     for case in cases:
