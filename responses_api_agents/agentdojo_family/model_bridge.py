@@ -10,8 +10,7 @@ from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import Any, Literal
 
-from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
-from agentdojo.agent_pipeline.llms.openai_llm import _function_to_openai, _message_to_openai
+from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM, _function_to_openai, _message_to_openai
 from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime
 from agentdojo.types import (
     ChatAssistantMessage,
@@ -170,12 +169,24 @@ def agentdojo_messages_to_response_output(messages: Sequence[ChatMessage]) -> li
     return output
 
 
-class NeMoGymAgentDojoLLM(BasePipelineElement):
+class NeMoGymAgentDojoLLM(OpenAILLM):
     """Synchronous AgentDojo pipeline element backed by a NeMo Gym model server.
 
     AgentDojo's pipeline is synchronous. The adapter executes it in a worker thread;
     each model query is submitted back to the agent server's main asyncio loop so the
     existing ``ServerClient`` and its shared aiohttp transport remain authoritative.
+
+    It subclasses ``OpenAILLM`` rather than ``BasePipelineElement`` for one reason: the
+    ``tool_filter`` defense refuses to build unless ``isinstance(llm, OpenAILLM)``. Upstream's
+    ``__init__`` only assigns four attributes and opens no connection, so standing in for it
+    costs nothing and ``query`` below still owns every policy call.
+
+    The alternative -- handing upstream a real ``openai.OpenAI`` pointed at the serving
+    endpoint -- would make this the one treatment in the grid that bypasses the model server:
+    no token accounting, no per-rollout attribution, the OpenAI SDK's httpx transport that
+    this repo bans at concurrency, and no `developer`->`system` rewrite, which the Qwen
+    deployment rejects outright. ``self.client`` is the proxy instead, so `tool_filter`'s
+    `client.chat.completions.create` lands on the same path as every other call.
     """
 
     name = "nemo-gym-policy-model"
@@ -192,6 +203,12 @@ class NeMoGymAgentDojoLLM(BasePipelineElement):
         system_role: Literal["developer", "system"] = "developer",
     ) -> None:
         self.name = pipeline_name
+        # The OpenAILLM surface tool_filter reads: a client it can call, and a model name it
+        # puts in the request. Both point back here, not at the serving endpoint.
+        self.client = NeMoGymOpenAIProxy(self)
+        self.model = pipeline_name
+        self.temperature = request_options.get("temperature", 0.0)
+        self.reasoning_effort = None
         self._event_loop = event_loop
         self._server_client = server_client
         self._model_server_name = model_server_name

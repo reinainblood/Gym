@@ -26,15 +26,22 @@ from responses_api_agents.agentdojo_family.model_bridge import NeMoGymOpenAIProx
 
 
 AGENTDYN_SUITES = ("shopping", "github", "dailylife")
+# Upstream's full DEFENSES list, in upstream's own terms. The five that were originally
+# requested come first; the remaining four complete the sweep.
 AGENTDYN_DEFENSES = (
     "prompt_guard_2_detector",
     "piguard_detector",
     "camel",
     "progent",
     "drift",
+    "transformers_pi_detector",
+    "spotlighting_with_delimiting",
+    "repeat_user_prompt",
+    "tool_filter",
 )
 PROMPT_GUARD_2_UPSTREAM_MODEL = "meta-llama/Llama-Prompt-Guard-2-86M"
 PIGUARD_UPSTREAM_MODEL = "leolee99/PIGuard"
+TRANSFORMERS_PI_UPSTREAM_MODEL = "protectai/deberta-v3-base-prompt-injection-v2"
 # Detector defenses hard-code their classifier upstream and resolve moving Hub `main` at
 # construction time. Both are pinned here instead, so a published treatment names the exact
 # weights it scored with. PIGuard additionally ships custom modeling code that upstream loads
@@ -42,6 +49,7 @@ PIGUARD_UPSTREAM_MODEL = "leolee99/PIGuard"
 DETECTOR_UPSTREAM_MODELS = {
     "prompt_guard_2_detector": PROMPT_GUARD_2_UPSTREAM_MODEL,
     "piguard_detector": PIGUARD_UPSTREAM_MODEL,
+    "transformers_pi_detector": TRANSFORMERS_PI_UPSTREAM_MODEL,
 }
 ROUTED_DEFENSES = frozenset({"camel", "progent", "drift"})
 
@@ -55,6 +63,9 @@ class AgentDynAgentConfig(AgentDojoFamilyAgentConfig):
     piguard_model_name: str = PIGUARD_UPSTREAM_MODEL
     piguard_model_revision: str | None = None
     piguard_local_path: str | None = None
+    transformers_pi_model_name: str = TRANSFORMERS_PI_UPSTREAM_MODEL
+    transformers_pi_model_revision: str | None = None
+    transformers_pi_local_path: str | None = None
 
     def detector_source(self, defense: str) -> tuple[str, str | None, str | None]:
         """Return the (repository, revision, local cache override) backing a detector defense."""
@@ -63,6 +74,12 @@ class AgentDynAgentConfig(AgentDojoFamilyAgentConfig):
                 self.prompt_guard_2_model_name,
                 self.prompt_guard_2_model_revision,
                 self.prompt_guard_2_local_path,
+            )
+        if defense == "transformers_pi_detector":
+            return (
+                self.transformers_pi_model_name,
+                self.transformers_pi_model_revision,
+                self.transformers_pi_local_path,
             )
         return (self.piguard_model_name, self.piguard_model_revision, self.piguard_local_path)
 
@@ -78,6 +95,10 @@ class AgentDynRunRequest(AgentDojoFamilyRunRequest):
             "camel",
             "progent",
             "drift",
+            "transformers_pi_detector",
+            "spotlighting_with_delimiting",
+            "repeat_user_prompt",
+            "tool_filter",
         ]
         | None
     ) = None

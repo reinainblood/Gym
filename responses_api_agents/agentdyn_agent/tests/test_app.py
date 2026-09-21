@@ -52,15 +52,20 @@ def _request() -> AgentDynRunRequest:
     )
 
 
-def test_contract_exposes_only_agentdyn_suites_and_requested_defenses() -> None:
+def test_contract_exposes_only_agentdyn_suites_and_upstream_defenses() -> None:
     assert AGENTDYN_SUITES == ("shopping", "github", "dailylife")
-    assert AGENTDYN_DEFENSES == (
-        "prompt_guard_2_detector",
+    # Upstream's full DEFENSES list, nothing invented and nothing dropped.
+    assert set(AGENTDYN_DEFENSES) == {
+        "tool_filter",
+        "transformers_pi_detector",
         "piguard_detector",
+        "prompt_guard_2_detector",
+        "spotlighting_with_delimiting",
+        "repeat_user_prompt",
         "camel",
-        "progent",
         "drift",
-    )
+        "progent",
+    }
     with pytest.raises(ValueError):
         AgentDynRunRequest.model_validate({**_request().model_dump(), "suite": "banking"})
 
@@ -203,3 +208,39 @@ async def test_a_finished_rollout_is_untouched_by_the_timeout() -> None:
 
     assert result.mask_sample is False
     assert result.reward == 1.0
+
+
+def test_bridge_satisfies_the_tool_filter_contract_without_leaving_gym() -> None:
+    # tool_filter refuses to build unless the pipeline's llm is an OpenAILLM, and then calls
+    # `llm.client.chat.completions.create`. Standing in for OpenAILLM is what lets the defense
+    # run; pointing its client back at the bridge is what keeps the call on the model server
+    # rather than going straight at the serving endpoint, which would lose token accounting
+    # and skip the developer->system rewrite that the Qwen deployment requires.
+    from agentdojo.agent_pipeline.llms.openai_llm import OpenAILLM
+
+    from responses_api_agents.agentdojo_family.model_bridge import NeMoGymAgentDojoLLM, NeMoGymOpenAIProxy
+
+    bridge = object.__new__(NeMoGymAgentDojoLLM)
+    NeMoGymAgentDojoLLM.__init__(
+        bridge,
+        pipeline_name="policy-alias",
+        event_loop=MagicMock(),
+        server_client=MagicMock(),
+        model_server_name="policy_model",
+        model_url_path="/v1/chat/completions",
+        request_options={},
+    )
+
+    assert isinstance(bridge, OpenAILLM)
+    assert isinstance(bridge.client, NeMoGymOpenAIProxy)
+    assert bridge.client.chat.completions.create == bridge.create_chat_completion
+    assert bridge.model == "policy-alias"
+
+
+def test_transformers_pi_detector_source_is_pinned() -> None:
+    agent = _agent(default_defense="transformers_pi_detector")
+    agent.config.transformers_pi_model_revision = "90c9989b"
+    repo, revision, _ = agent.config.detector_source("transformers_pi_detector")
+
+    assert repo == "protectai/deberta-v3-base-prompt-injection-v2"
+    assert revision == "90c9989b"

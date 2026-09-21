@@ -31,6 +31,10 @@ SHARD_HEAD_PORTS_PER_CELL = 4
 DEFENSE_ORDER = (
     "prompt_guard_2_detector",
     "piguard_detector",
+    "transformers_pi_detector",
+    "spotlighting_with_delimiting",
+    "repeat_user_prompt",
+    "tool_filter",
     "camel",
     "progent",
     "drift",
@@ -45,7 +49,12 @@ CELL_PORT_DEFENSE_ORDER = (
     "progent",
     "piguard_detector",
     "drift",
+    "transformers_pi_detector",
+    "spotlighting_with_delimiting",
+    "repeat_user_prompt",
+    "tool_filter",
 )
+DEFENSES_PER_MODEL = len(CELL_PORT_DEFENSE_ORDER)
 # Launcher model keys, by slug. The grid scripts take the key; everything else uses the slug.
 MODEL_KEYS = {
     "nemotron-3-ultra": "ultra",
@@ -59,7 +68,11 @@ DEFENSE_COST = {
     "drift": 55,
     "progent": 16,
     "piguard_detector": 14,
+    "transformers_pi_detector": 12,
     "prompt_guard_2_detector": 10,
+    "tool_filter": 10,
+    "spotlighting_with_delimiting": 9,
+    "repeat_user_prompt": 9,
     "camel": 4,
 }
 MODEL_SLUGS = {
@@ -190,7 +203,7 @@ def runner_state(results_dir: Path, slug: str, defense: str) -> str:
         defense_index = CELL_PORT_DEFENSE_ORDER.index(defense)
     except ValueError:
         return "unknown"
-    cell_index = model_index * 5 + defense_index
+    cell_index = model_index * DEFENSES_PER_MODEL + defense_index
 
     def live(head_port: int) -> bool | None:
         lock = results_dir / f".runner.{head_port}.lock"

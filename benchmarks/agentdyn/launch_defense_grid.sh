@@ -29,7 +29,7 @@ cd "$ROOT_DIR"
 RESULTS_DIR="${RESULTS_DIR:-results/agentdyn-defense-matrix}"
 LOG_DIR="${LOG_DIR:-${RESULTS_DIR}/logs}"
 SHARD_DIR="${SHARD_DIR:-${RESULTS_DIR}/shards}"
-DEFENSES="${DEFENSES:-prompt_guard_2_detector camel progent piguard_detector drift}"
+DEFENSES="${DEFENSES:-prompt_guard_2_detector camel progent piguard_detector drift transformers_pi_detector spotlighting_with_delimiting repeat_user_prompt tool_filter}"
 INPUT="${INPUT:-benchmarks/agentdyn/data/agentdyn_v1_2_2.jsonl}"
 # SHARDS splits one cell's 620 selectors across that many processes. A cell's score is a
 # pure function of its row set -- masked rows leave the denominator, then utility and attack
@@ -47,7 +47,10 @@ mkdir -p "$RESULTS_DIR" "$LOG_DIR" "$SHARD_DIR"
 
 # Model index fixes the port neighbourhood; see run_defense_matrix.sh for the block registry.
 MODEL_KEYS=(ultra kimi qwen supervl)
-DEFENSE_KEYS=(prompt_guard_2_detector camel progent piguard_detector drift)
+# Order fixes each cell's ports; append new defenses rather than reordering.
+DEFENSE_KEYS=(prompt_guard_2_detector camel progent piguard_detector drift \
+              transformers_pi_detector spotlighting_with_delimiting repeat_user_prompt tool_filter)
+DEFENSES_PER_MODEL=${#DEFENSE_KEYS[@]}
 MODEL_PORT_BASE=(45001 46001 47001 48001)
 
 index_of() {
@@ -70,8 +73,10 @@ for key in "${WANTED[@]}"; do
             echo "unknown defense: $defense" >&2; exit 1; }
         # Head ports 11820-11853, one per cell, clear of every campaign block on this host.
         head_port=$(( 11820 + model_index * 10 + defense_index ))
-        port_low=$(( MODEL_PORT_BASE[model_index] + defense_index * 150 ))
-        port_high=$(( port_low + 149 ))
+        # 100 ports per cell so nine cells fit inside each model's 900-port block. A stack
+        # binds two or three, so the width is ample.
+        port_low=$(( MODEL_PORT_BASE[model_index] + defense_index * 100 ))
+        port_high=$(( port_low + 99 ))
         log="${LOG_DIR}/${key}.${defense}.cell.log"
 
         if [ -f "${RESULTS_DIR}/.runner.${head_port}.lock" ] \
@@ -90,7 +95,7 @@ for key in "${WANTED[@]}"; do
             continue
         fi
 
-        cell_index=$(( model_index * 5 + defense_index ))
+        cell_index=$(( model_index * DEFENSES_PER_MODEL + defense_index ))
         for shard in $(seq 0 $(( SHARDS - 1 ))); do
             shard_input="${SHARD_DIR}/$(basename "${INPUT%.jsonl}").shard${shard}of${SHARDS}.jsonl"
             # Contiguous split, written once and reused, so a relaunch resumes the same rows.

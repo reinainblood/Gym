@@ -25,6 +25,10 @@ agentdyn_agent:
       piguard_model_name: leolee99/PIGuard
       piguard_model_revision: dd78b24e330193a22d2293ac66922dd4f982f563 # pragma: allowlist secret
       piguard_local_path: null
+      # transformers_pi_detector's classifier, pinned for the same reason.
+      transformers_pi_model_name: protectai/deberta-v3-base-prompt-injection-v2
+      transformers_pi_model_revision: 90c9989b1a342275dd0d1a95aad283c04e075671 # pragma: allowlist secret
+      transformers_pi_local_path: null
       metric_prefix: agentdyn
       default_defense: null
       system_message: null
