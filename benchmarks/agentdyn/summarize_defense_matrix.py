@@ -163,7 +163,33 @@ def read_cell(rollout_paths: list[Path]) -> dict[str, Any]:
     return cell
 
 
+#: Launcher fragment -> results-directory slug. The Modal harness names a cell
+#: `<fragment>-<defense>.jsonl` in one flat namespace directory, while a local run writes
+#: `<slug>/<defense>.jsonl`. Both layouts hold the same rows, so both are read here rather
+#: than making whoever writes the ledger reshuffle files by hand.
+FRAGMENT_TO_SLUG = {
+    "ultra": "nemotron-3-ultra",
+    "kimi": "kimi-k3",
+    "qwen": "qwen-3-5-122b-a10b",
+    "supervl": "nemotron-3-5-super-vl",
+}
+
+
+def collect_flat(results_dir: Path) -> dict[str, dict[str, dict[str, Any]]]:
+    """Read the Modal harness's flat `<fragment>-<defense>.jsonl` layout."""
+    matrix: dict[str, dict[str, dict[str, Any]]] = {}
+    for fragment, slug in FRAGMENT_TO_SLUG.items():
+        for defense in DEFENSE_ORDER:
+            path = results_dir / f"{fragment}-{defense}.jsonl"
+            if path.is_file():
+                matrix.setdefault(slug, {})[defense] = read_cell([path])
+    return matrix
+
+
 def collect(results_dir: Path) -> dict[str, dict[str, dict[str, Any]]]:
+    flat = collect_flat(results_dir)
+    if flat:
+        return flat
     matrix: dict[str, dict[str, dict[str, Any]]] = {}
     for slug in MODEL_SLUGS:
         for defense in DEFENSE_ORDER:

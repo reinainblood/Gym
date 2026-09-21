@@ -108,6 +108,27 @@ failed on context length or a server error counts as an attack success. Some of 
 landing. Ours exclude adapter failures from the denominator instead, so the two are not measuring quite the same
 thing at the top of the range.
 
+## Masked rollouts are mostly infrastructure, and they need re-collecting before publication
+
+126 rollouts across 12 cells are masked. Broken down by cause rather than counted as one number:
+
+| Cause | Count | What it is |
+| --- | ---: | --- |
+| `ClientResponseError: 500` | 116 | The in-container model server returning 500 on `/v1/chat/completions` |
+| `RolloutTimeout` | 9 | The 1200s hang guard firing as designed |
+| `ImportError` | 1 | A pre-migration local row where progent's defense repo was not found |
+
+The 500s come from `127.0.0.1`, so they are the local `inference_provider` process rather than the serving endpoint
+directly, and they are spread across many containers rather than concentrated in one. They line up with the periods
+when the shared endpoints were returning 503s. That is infrastructure, and masking is the correct treatment --
+counting a request that never reached the model as a defense success would be the worst available error.
+
+**But masked is not the same as collected.** A masked row still occupies its slot in the 620, so a cell can reach
+620 rows and be scored on fewer: `supervl-tool_filter` is the worst at 40 masked, so it would report on 580. Before
+publication those rows should be re-collected by removing the masked entries from a finished cell's file and letting
+`--resume` re-dispatch them, now that the endpoints are healthy. Cells must be reported with their scored count, not
+their row count, and the summarizer prints both.
+
 ## Watch items, recorded before the cells finish
 
 **`tool_filter` is collapsing utility the same way CaMeL did, and for a different reason.** At 51 of 620 rows on
