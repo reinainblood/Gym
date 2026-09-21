@@ -216,7 +216,18 @@ run_cell() {
             stop_this_stack
             start_servers "$tag" || return 1
         fi
-        echo "  [$(date +%H:%M:%S)] ${tag} attempt ${attempt} (concurrency ${concurrency}) -> ${out}"
+        # A failed `gym eval run --resume` can leave its output file SHORTER than it found
+        # it. The ASB campaign lost 6,298 already-collected rollouts that way across five
+        # failed attempts. This runner is more exposed than most: it retries three times and
+        # the tender relaunches cells on its own, so a cell that fails repeatedly could eat
+        # its own history unattended. Snapshot first, and refuse to keep a shrunken file.
+        # A complete cell is about 10MB, so the copy costs nothing worth counting.
+        rows_before=$(wc -l < "$out" 2>/dev/null | tr -d ' '); rows_before=${rows_before:-0}
+        if [ "$rows_before" -gt 0 ]; then
+            cp "$out" "${out}.prev" 2>/dev/null
+            cp "${out%.jsonl}_materialized_inputs.jsonl" "${out%.jsonl}_materialized_inputs.jsonl.prev" 2>/dev/null
+        fi
+        echo "  [$(date +%H:%M:%S)] ${tag} attempt ${attempt} (concurrency ${concurrency}, ${rows_before} rows held) -> ${out}"
         .venv/bin/gym eval run --no-serve --resume \
             --config benchmarks/agentdyn/config.yaml --config "$ENV_YAML" \
             --agent agentdyn_benchmark \
@@ -227,7 +238,14 @@ run_cell() {
             ${LIMIT:+--limit "$LIMIT"} \
             > "${LOG_DIR}/${tag}.attempt${attempt}.log" 2>&1
         status=$?
-        rows=$(wc -l < "$out" 2>/dev/null || echo 0)
+        rows=$(wc -l < "$out" 2>/dev/null | tr -d ' '); rows=${rows:-0}
+        if [ "$rows" -lt "$rows_before" ]; then
+            echo "  [$(date +%H:%M:%S)] ${tag} OUTPUT SHRANK ${rows_before} -> ${rows}; restoring the snapshot"
+            mv "${out}.prev" "$out" 2>/dev/null
+            mv "${out%.jsonl}_materialized_inputs.jsonl.prev" "${out%.jsonl}_materialized_inputs.jsonl" 2>/dev/null
+            rows="$rows_before"
+        fi
+        rm -f "${out}.prev" "${out%.jsonl}_materialized_inputs.jsonl.prev"
         echo "  [$(date +%H:%M:%S)] ${tag} attempt ${attempt} exit=${status} rows=${rows}/${expected}"
 
         if [ "$status" -eq 0 ] && [ "$rows" -ge "$expected" ]; then
