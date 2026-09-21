@@ -206,7 +206,7 @@ run_cell() {
     local slug="$1" defense="$2" concurrency="$3"
     local tag="${slug}.${defense}${OUT_SUFFIX:+.${OUT_SUFFIX}}"
     local out="${RESULTS_DIR}/${slug}/${defense}${OUT_SUFFIX:+-${OUT_SUFFIX}}.jsonl"
-    local attempt status rows expected="$EXPECTED"
+    local attempt status rows expected="$EXPECTED" previous_rows=-1
     [ -n "$LIMIT" ] && expected="$LIMIT"
     mkdir -p "$(dirname "$out")"
 
@@ -232,8 +232,41 @@ run_cell() {
 
         if [ "$status" -eq 0 ] && [ "$rows" -ge "$expected" ]; then
             echo "  [$(date +%H:%M:%S)] ${tag} complete"
+            rm -f "${out%.jsonl}.settled"
             return 0
         fi
+
+        # Gym retires a rollout after NEMO_GYM_MAX_ROLLOUT_ATTEMPTS sidecar entries (3 by
+        # default) and never re-dispatches it on resume, so the run exits 0 having collected
+        # nothing new. That is indistinguishable from success by exit code alone. Without this
+        # check the cell burns its whole retry budget on rows that can never land, is declared
+        # INCOMPLETE, and is then relaunched forever by the tender -- a stack slot spinning on
+        # work that is already settled.
+        if [ "$status" -eq 0 ] && [ "$rows" -eq "$previous_rows" ]; then
+            echo "  [$(date +%H:%M:%S)] ${tag} settled short at ${rows}/${expected}; retired rows will not re-dispatch"
+            {
+                echo "rows=${rows}"
+                echo "expected=${expected}"
+                echo "settled_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                echo "failure_classes:"
+                .venv/bin/python - "${out%.jsonl}_failures.jsonl" <<'CLASSES'
+import collections, json, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+counts = collections.Counter()
+if path.is_file():
+    for line in path.open(encoding="utf-8"):
+        if line.strip():
+            counts[json.loads(line).get("_ng_failure_class", "unknown")] += 1
+for name, count in sorted(counts.items()):
+    print(f"  {name}={count}")
+CLASSES
+            } > "${out%.jsonl}.settled"
+            cat "${out%.jsonl}.settled" | sed 's/^/    /'
+            return 0
+        fi
+        previous_rows="$rows"
 
         # A 503 from an overloaded router means back off, not push harder. Halve the
         # ceiling and let the endpoint's circuit breakers reset before trying again.

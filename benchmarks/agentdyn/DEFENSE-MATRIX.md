@@ -26,6 +26,12 @@ A masked rollout is an adapter failure, not a secure outcome. Masked rows leave 
 attack success are averaged over the benign and attacked subsets, and both the masked count and the adapter-failure
 count are reported per cell. A cell with masked rows is not publishable as-is.
 
+A cell can finish without being full. Gym retires a rollout after three failed attempts and never re-dispatches it on
+resume, and the collection then exits 0 having gathered nothing new -- indistinguishable from success by exit code.
+Such a cell is recorded as **settled short**, with its row count and the failure classes behind the shortfall, rather
+than being retried forever or quietly reported as complete. A settled-short cell is scored on the rows it has, and the
+shortfall is part of its result.
+
 Because that score is a pure function of the row set, a cell may be collected by several processes and merged. DRIFT
 is collected this way -- at roughly fifty policy calls per rollout against nine undefended, a single process projects
 past forty hours for one cell.

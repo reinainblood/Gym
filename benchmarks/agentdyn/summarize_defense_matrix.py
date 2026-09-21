@@ -138,7 +138,15 @@ def read_cell(rollout_paths: list[Path]) -> dict[str, Any]:
         "rollouts_sha256": {str(path): _sha256(path) for path in rollout_paths},
     }
     cell.update(score_rows(rows))
+    # A cell can be finished without being full. Gym retires a rollout after three failed
+    # attempts and never re-dispatches it, so the runner records that the cell settled short
+    # rather than letting the tender relaunch it forever against work that cannot land. Such
+    # a cell is done, and its shortfall is reported rather than hidden.
+    settled = [path for path in (Path(f"{p.with_suffix('')}.settled") for p in rollout_paths) if path.is_file()]
+    cell["settled_short"] = bool(settled) and cell["rows"] < EXPECTED_ROWS
+    cell["settled_notes"] = [path.read_text(encoding="utf-8").strip() for path in settled]
     cell["complete"] = cell["rows"] >= EXPECTED_ROWS
+    cell["finished"] = cell["complete"] or (bool(settled) and len(settled) == len(rollout_paths))
     return cell
 
 
@@ -240,7 +248,12 @@ def render(matrix: dict[str, dict[str, dict[str, Any]]]) -> str:
             cell = cells.get(defense)
             if cell is None:
                 continue
-            rows = f"{cell['rows']} / {EXPECTED_ROWS}" + ("" if cell["complete"] else " (incomplete)")
+            if cell["complete"]:
+                rows = f"{cell['rows']} / {EXPECTED_ROWS}"
+            elif cell["settled_short"]:
+                rows = f"{cell['rows']} / {EXPECTED_ROWS} (settled short)"
+            else:
+                rows = f"{cell['rows']} / {EXPECTED_ROWS} (incomplete)"
             if cell["shards"] > 1:
                 rows += f" [{cell['shards']} shards]"
             calls = "--" if cell.get("mean_model_calls") is None else f"{cell['mean_model_calls']:.1f}"
@@ -277,7 +290,7 @@ def main() -> None:
             (DEFENSE_COST.get(defense, 0), MODEL_KEYS[slug], defense)
             for slug in MODEL_SLUGS
             for defense in DEFENSE_ORDER
-            if not (matrix.get(slug, {}).get(defense) or {}).get("complete")
+            if not (matrix.get(slug, {}).get(defense) or {}).get("finished")
             and runner_state(args.results, slug, defense) == "not running"
         ]
         for _, key, defense in sorted(candidates, reverse=True)[: args.next]:
@@ -289,14 +302,17 @@ def main() -> None:
     completed = sum(1 for cells in matrix.values() for cell in cells.values() if cell["complete"])
     total = len(MODEL_SLUGS) * len(DEFENSE_ORDER)
     collected = sum(cell["rows"] for cells in matrix.values() for cell in cells.values())
+    settled_short = sum(1 for cells in matrix.values() for cell in cells.values() if cell["settled_short"])
     print(f"\nCompleted cells: {completed} / {total}")
+    if settled_short:
+        print(f"Settled short (finished, but missing rows Gym retired): {settled_short}")
     print(f"Rollouts collected: {collected} / {total * EXPECTED_ROWS}")
 
     pending = [
         (slug, defense, matrix.get(slug, {}).get(defense))
         for slug in MODEL_SLUGS
         for defense in DEFENSE_ORDER
-        if not (matrix.get(slug, {}).get(defense) or {}).get("complete")
+        if not (matrix.get(slug, {}).get(defense) or {}).get("finished")
     ]
     if pending:
         print("\nOutstanding cells (re-run launch_defense_grid.sh to pick up anything not running):")
