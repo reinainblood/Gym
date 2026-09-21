@@ -244,6 +244,7 @@ def test_gcg_requires_full_corpus_and_rehashes_shard_receipts(tmp_path):
     receipt = _receipt("GCG", cases_path, behavior_path, "nemotron_3_5_super_gcg", "full-run")
     receipt.update(
         {
+            "status": "completed",
             "source_target_model": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
             "source_target_revision": "hf-ea-0e636f7",
             "behaviors": 400,

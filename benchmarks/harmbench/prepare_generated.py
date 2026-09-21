@@ -75,6 +75,7 @@ def _input_content(test_case: Any, image_dir: Path | None) -> tuple[str | list[d
 def _validate_gcg_generation_receipt(generation_receipt: dict[str, Any], generation_receipt_path: Path | None) -> None:
     """Validate and, for CLI materialization, read back GCG's complete shard evidence."""
     required = {
+        "status": "completed",
         "behaviors": GCG_PUBLIC_BEHAVIORS,
         "cases": GCG_PUBLIC_BEHAVIORS,
         "num_steps": GCG_PUBLIC_STEPS,

@@ -76,3 +76,15 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
 - This prefix is **not** a passed canary. Do not duplicate or resume it while the full Super campaign is active.
   After Super reaches 400/400, both Super calls are terminal, its two receipts exist, and finalization succeeds,
   recheck ownership and live containers, then resume this same immutable Qwen canary prefix through `run_qwen`.
+
+## Exact Qwen BF16 completion stage
+
+- The matched Qwen GCG result must not use the separately served FP8 endpoint for target completions. The branch now
+  contains `operations/qwen/modal_qwen_gcg_completion.py`, a separate resumable FDR runtime bound to the same exact
+  BF16 Volume and revision used by GCG optimization. It reproduces upstream HarmBench's default tokenizer chat-template
+  branch and 512-token deterministic completion profile.
+- Do not deploy or call this runtime before the Qwen full GCG artifact is finalized. Then launch two source-order
+  completion shards, require 400 validated individual receipts and both completion-shard receipts, call its `finalize`
+  function, and require `target-completions/qwen-bf16/target-completion-receipt.json` before classifier scoring.
+- The completion runner returns only indexes, counts, statuses, and call IDs. Its private Volume receipts contain model
+  generations needed by the scorer; never print or download their payload fields into commentary or logs.
