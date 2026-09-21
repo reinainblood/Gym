@@ -3,14 +3,24 @@
 
 
 import csv
+import json
 
 import pytest
 
 from benchmarks.harmbench.generate_direct_full import EXPECTED_COUNTS, generate, upstream_cases
+from benchmarks.harmbench.prepare import _example_content
 from resources_servers.harmbench.tests.upstream_checkout import harmbench_upstream
 
 
 UPSTREAM = harmbench_upstream()
+
+
+def test_example_selection_is_deterministic_and_requires_five_rows():
+    rendered = "".join(json.dumps({"row": index}) + "\n" for index in range(6))
+    selected = [json.loads(line) for line in _example_content(rendered).splitlines()]
+    assert selected == [{"row": index} for index in range(5)]
+    with pytest.raises(ValueError, match="cannot select 5 example rows"):
+        _example_content(rendered.splitlines()[0] + "\n")
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="optional pinned HarmBench checkout is absent")

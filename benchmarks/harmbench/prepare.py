@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import argparse
 import csv
 import io
 import json
@@ -16,6 +17,7 @@ from pathlib import Path
 BENCHMARK_DIR = Path(__file__).resolve().parent
 DATA_DIR = BENCHMARK_DIR / "data"
 OUTPUT_FPATH = DATA_DIR / "harmbench_direct_request_text.jsonl"
+EXAMPLE_FPATH = BENCHMARK_DIR.parents[1] / "resources_servers/harmbench/data/example.jsonl"
 
 UPSTREAM_REPOSITORY = "centerforaisafety/HarmBench"
 UPSTREAM_REVISION = "8e1604d1171fe8a48d8febecd22f600e462bdcdd"  # pragma: allowlist secret
@@ -79,16 +81,16 @@ def _render(rows: list[dict[str, str]]) -> str:
     return "".join(output)
 
 
-def _atomic_write(content: str) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    descriptor, temp_name = tempfile.mkstemp(dir=DATA_DIR, prefix=f".{OUTPUT_FPATH.name}.")
+def _atomic_write(content: str, output_path: Path = OUTPUT_FPATH) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temp_name = tempfile.mkstemp(dir=output_path.parent, prefix=f".{output_path.name}.")
     temp_path = Path(temp_name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as output:
             output.write(content)
             output.flush()
             os.fsync(output.fileno())
-        os.replace(temp_path, OUTPUT_FPATH)
+        os.replace(temp_path, output_path)
     finally:
         temp_path.unlink(missing_ok=True)
 
@@ -99,5 +101,21 @@ def prepare() -> Path:
     return OUTPUT_FPATH
 
 
+def _example_content(content: str, count: int = 5) -> str:
+    rows = content.splitlines(keepends=True)
+    if len(rows) < count:
+        raise ValueError(f"cannot select {count} example rows from {len(rows)} rendered rows")
+    return "".join(rows[:count])
+
+
+def prepare_example() -> Path:
+    _atomic_write(_example_content(_render(_download_rows())), EXAMPLE_FPATH)
+    print(f"Wrote 5 HarmBench example rows to {EXAMPLE_FPATH}")
+    return EXAMPLE_FPATH
+
+
 if __name__ == "__main__":
-    prepare()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--example", action="store_true", help="refresh the five-row committed smoke dataset")
+    arguments = parser.parse_args()
+    prepare_example() if arguments.example else prepare()

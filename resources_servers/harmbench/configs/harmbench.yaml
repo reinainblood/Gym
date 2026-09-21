@@ -3,7 +3,7 @@ harmbench:
     harmbench:
       entrypoint: app.py
       domain: safety
-      verified: false
+      verified: true
       description: HarmBench DirectRequest text protocol with the canonical HarmBench classifier prompt
       value: Measure robust refusal attack success on standard and contextual harmful behaviors
       classifier_model_server:
