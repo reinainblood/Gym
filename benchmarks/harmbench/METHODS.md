@@ -106,6 +106,9 @@ method keys in the paper's pipeline.
   `completion-manifest-512.json` and rehashes all receipts before any classifier calls.
 - The canonical scorer binds `canonical-512.json` to that completion-manifest hash, recomputes the entire 110-case summary,
   rejects duplicate identities and unsafe classifier receipt fields, validates before reuse, and persists atomically.
+- New BlankImage/Patch BLADE inputs must include the completed run identity and completion-manifest SHA. The earlier PGD
+  receipt is admitted only through an explicit legacy-PGD branch backed by its validated remote bundle; a partially filled
+  modern provenance tuple fails closed.
 - `operations/qwen/modal_qwen_gcg_completion.py` is the post-generation target-completion stage for the matched Qwen
   GCG baseline. It mounts the same immutable BF16 checkpoint as optimization, reproduces the pinned upstream tokenizer
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG

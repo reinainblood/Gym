@@ -52,6 +52,9 @@ def _receipt(*, invalid_index: int | None = None) -> dict:
     repeat_valid_agreement = sum(len(set(row["labels"])) == 1 and row["labels"][0] in {0, 1} for row in cases)
     return {
         "artifact_kind": "whitebox_canonical_512_classifier_scores",
+        "status": "completed",
+        "run_id": "test-run",
+        "completion_manifest_sha256": "a" * 64,
         "method": "MultiModalPGDBlankImage",
         "classifier_model": CLASSIFIER_MODEL,
         "classifier_revision": CLASSIFIER_REVISION,
@@ -123,3 +126,19 @@ def test_whitebox_blade_fails_closed_on_wrong_provenance_or_denominator():
     mismatched["summary"]["successes"] = 99
     with pytest.raises(ValueError, match="summary disagrees"):
         build_rows(mismatched)
+
+
+def test_whitebox_blade_allows_only_explicit_legacy_pgd_without_completion_manifest():
+    legacy = _receipt()
+    legacy["method"] = "MultiModalPGD"
+    for key in ("status", "run_id", "completion_manifest_sha256"):
+        legacy.pop(key)
+    for case in legacy["cases"]:
+        case["method"] = "MultiModalPGD"
+    assert len(build_rows(legacy)) == 110
+
+    unbound_new = _receipt()
+    for key in ("status", "run_id", "completion_manifest_sha256"):
+        unbound_new.pop(key)
+    with pytest.raises(ValueError, match="requires completion-manifest provenance"):
+        build_rows(unbound_new)

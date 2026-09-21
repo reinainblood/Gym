@@ -84,6 +84,9 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
 - Canonical scoring binds its payload-free receipt to the completion-manifest SHA-256, recomputes all case-level counts and
   summary metrics before reuse, rejects duplicate indexes/behaviors or unexpected classifier fields, and writes the score
   receipt atomically. An existing `canonical-512.json` is not reusable merely because it has a summary.
+- BLADE requires that modern score provenance for BlankImage and Patch. The completed PGD receipt predates the new
+  completion-manifest field and is accepted only as an explicit legacy `MultiModalPGD` format backed by its independently
+  checksummed and remotely read-back bundle; partial modern provenance is rejected for every method.
 - The served Super endpoint `ap-Y6sMOWq4rnrM5EU6efe8Zf` was reverified at three live instances and must not be
   confused with or scaled down for the separate GCG runtime.
 

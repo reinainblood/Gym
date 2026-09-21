@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,22 @@ def build_rows(receipt: dict[str, Any]) -> list[BladeRow]:
         raise ValueError("input is not a canonical Qwen white-box scoring receipt")
     if method not in WHITEBOX_METHODS:
         raise ValueError(f"unsupported Qwen white-box method: {method}")
+    manifest_hash = receipt.get("completion_manifest_sha256")
+    modern_provenance = (
+        receipt.get("status") == "completed"
+        and isinstance(receipt.get("run_id"), str)
+        and bool(receipt.get("run_id"))
+        and isinstance(manifest_hash, str)
+        and re.fullmatch(r"[0-9a-f]{64}", manifest_hash) is not None
+    )
+    if method != "MultiModalPGD" and not modern_provenance:
+        raise ValueError("new Qwen white-box BLADE input requires completion-manifest provenance")
+    if (
+        method == "MultiModalPGD"
+        and any(key in receipt for key in ("status", "run_id", "completion_manifest_sha256"))
+        and not modern_provenance
+    ):
+        raise ValueError("Qwen MultiModalPGD BLADE input has incomplete modern provenance")
     expected = {
         "classifier_model": CLASSIFIER_MODEL,
         "classifier_revision": CLASSIFIER_REVISION,
