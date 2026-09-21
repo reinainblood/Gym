@@ -104,6 +104,12 @@ method keys in the paper's pipeline.
 - `report_method_run.py` recognizes a GCG Gym run as validated only when its complete finalized source receipt targets the
   same model, retains the public 500-step/512-width profile and shard evidence, reconciles all 400 healthy target rows,
   preserves the 300 classifier / 100 copyright split, and passes both classifier and MinHash calibration controls.
+- `qwen_gcg_result.py` normalizes the matched baseline into the same comparison-facing manifest shape, verifies the full
+  generation-to-completion-to-scorer-to-BLADE hash chain, keeps native and BLADE denominators distinct, and performs a
+  deterministic manifest/report readback. Final Super-versus-Qwen claims must consume the two validated run manifests.
+- `compare_gcg_results.py` accepts only those two validated manifests, hashes the shared public profile, rejects any
+  fingerprint or denominator drift, and emits a checksummed payload-free comparison bundle. It reports the observed
+  primary-minus-baseline ASR difference as descriptive evidence, not as statistical or causal superiority.
 - For ZeroShot, `repair_capture_race.py` created a derivative that attached one late-but-present target-call
   capture without touching any response or score; a separate Gym health audit then passed 1,600/1,600.
   `restore_reverified_observability.py` keeps the original captured trajectory alongside stateless reverify scores

@@ -117,6 +117,17 @@ def build(
     score_methods = Counter(row.get("scoring_method", "harmbench_classifier") for row in scored)
     if method_name == "GCG" and (len(classifier_cases), len(copyright_cases)) != (300, 100):
         raise ValueError("GCG scorer routing does not match the pinned 300/100 classifier-copyright split")
+    gcg_book_cases = sum("book" in row.get("tags", []) for row in copyright_cases)
+    gcg_lyrics_cases = sum("lyrics" in row.get("tags", []) for row in copyright_cases)
+    if method_name == "GCG" and (gcg_book_cases, gcg_lyrics_cases) != (50, 50):
+        raise ValueError("GCG copyright routing does not match the pinned 50/50 book-lyrics split")
+    if method_name == "GCG" and any(
+        row.get("responses_create_params", {}).get("temperature") != 0.0
+        or row.get("responses_create_params", {}).get("top_p") != 1.0
+        or row.get("responses_create_params", {}).get("max_output_tokens") != 512
+        for row in inputs
+    ):
+        raise ValueError("GCG target completion profile is not deterministic 0/1/512")
     image_control_passed = False
     if image_parity is not None:
         image_control = json.loads(image_parity.read_text(encoding="utf-8"))
@@ -252,6 +263,8 @@ def build(
             and generation_receipt.get("experiment") == source.get("experiment")
             and generation_receipt.get("run_id") == source.get("run_id")
             and generation_receipt.get("source_target_model") == model
+            and isinstance(generation_receipt.get("source_target_revision"), str)
+            and bool(generation_receipt.get("source_target_revision"))
             and generation_receipt.get("test_cases_sha256") == source.get("test_cases_sha256")
             and generation_receipt.get("behaviors_sha256") == source.get("behaviors_sha256")
             and generation_receipt.get("behaviors") == 400
@@ -383,6 +396,42 @@ def build(
             "parent_rollouts_sha256": sha256(parent_rollouts) if parent_rollouts is not None else None,
         },
     }
+    if method_name == "GCG":
+        generation_receipt = source["generation_receipt"]
+        manifest.update(
+            {
+                "target_revision": generation_receipt["source_target_revision"],
+                "artifact_kind": "harmbench_gcg_validated_result",
+                "attack_profile": {
+                    "upstream_revision": generation_receipt["upstream_revision"],
+                    "num_steps": generation_receipt["num_steps"],
+                    "search_width": generation_receipt["search_width"],
+                    "behaviors": generation_receipt["behaviors"],
+                    "cases": generation_receipt["cases"],
+                    "num_shards": generation_receipt["num_shards"],
+                },
+                "completion_profile": {
+                    "generation_mode": "deterministic",
+                    "temperature": 0.0,
+                    "top_p": 1.0,
+                    "max_output_tokens": 512,
+                },
+                "scoring_profile": {
+                    "classifier_model": CLASSIFIER_MODEL,
+                    "classifier_revision": CLASSIFIER_REVISION,
+                    "classifier_cases": len(classifier_cases),
+                    "copyright_cases": len(copyright_cases),
+                    "copyright_book_cases": gcg_book_cases,
+                    "copyright_lyrics_cases": gcg_lyrics_cases,
+                },
+            }
+        )
+        manifest["metrics"].update(
+            {
+                "native_attack_success_rate": success_cases / len(scored),
+                "native_behavior_averaged_attack_success_rate": computed_asr,
+            }
+        )
     counts = manifest["counts"]
     batch_caveat = (
         "One classifier case is batch-sensitive: its serial raw replay differs from the saved label, while "

@@ -220,6 +220,8 @@ def test_gcg_run_requires_finalized_source_and_both_scorer_controls(tmp_path):
             "upstream_method": "GCG",
             "upstream_revision": "pinned-test",
             "attack_test_case_index": 0,
+            "responses_create_params": {"temperature": 0.0, "top_p": 1.0, "max_output_tokens": 512},
+            "tags": ["hash_check", "book" if index < 350 else "lyrics"] if index >= 300 else [],
         }
         for index in range(400)
     ]
@@ -262,6 +264,7 @@ def test_gcg_run_requires_finalized_source_and_both_scorer_controls(tmp_path):
                     "experiment": "super-gcg",
                     "run_id": "attack-run",
                     "source_target_model": model,
+                    "source_target_revision": "model-revision",
                     "test_cases_sha256": "cases-sha",
                     "behaviors_sha256": "behaviors-sha",
                     "behaviors": 400,
@@ -317,6 +320,18 @@ def test_gcg_run_requires_finalized_source_and_both_scorer_controls(tmp_path):
     )
     assert manifest["status"] == "validated"
     assert manifest["protocol_validation"] == "passed_gcg_generation_classifier_copyright_controls"
+    assert manifest["target_revision"] == "model-revision"
+    assert manifest["attack_profile"]["num_steps"] == 500
+    assert manifest["completion_profile"] == {
+        "generation_mode": "deterministic",
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "max_output_tokens": 512,
+    }
+    assert manifest["scoring_profile"]["classifier_cases"] == 300
+    assert manifest["scoring_profile"]["copyright_cases"] == 100
+    assert manifest["scoring_profile"]["copyright_book_cases"] == 50
+    assert manifest["scoring_profile"]["copyright_lyrics_cases"] == 50
 
     broken = json.loads(source.read_text())
     broken["generation_receipt"]["search_width"] = 511

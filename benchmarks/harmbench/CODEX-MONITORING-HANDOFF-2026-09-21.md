@@ -99,6 +99,12 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   `qwen_gcg_blade.py`; require 400 reconciled source indexes, exact model/classifier revisions, stable denominator
   accounting, and successful readback of its JSONL, metrics JSON, Markdown report, and `evidence-manifest.json` before
   reporting the baseline. The manifest binds the classifier-score input and all three rendered outputs by size and SHA-256.
+- Run `qwen_gcg_result.py` only after all those gates pass. It binds the attack, exact-BF16 completion, mixed scorer, and
+  validated BLADE bundle into the normalized payload-free `run-manifest.json` used for the final matched comparison. Do
+  not compare the primary and baseline from standalone ASR numbers or draft Markdown.
+- Once both normalized manifests have `status: validated`, run `compare_gcg_results.py`. It refuses mismatched upstream,
+  attack, completion, classifier, or copyright fingerprints and any nonzero failure/missing count. Its ASR delta is
+  descriptive only: do not turn it into a significance, causality, or model-superiority claim without separate analysis.
 
 ## Super GCG reporting gate
 
@@ -107,3 +113,5 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   explicit GCG validation branch: it requires the finalized 400-row source receipt, matching source target, public 500/512
   profile, bound shard evidence, complete healthy collection, the pinned 300 classifier / 100 copyright routing split,
   and both scorer controls before it can emit `status: validated`.
+  Its validated run manifest includes the same normalized attack, completion, scoring, count, metric, and target-revision
+  fingerprints required by the Qwen result package.
