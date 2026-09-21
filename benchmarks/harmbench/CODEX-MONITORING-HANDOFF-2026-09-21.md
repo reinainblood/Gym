@@ -147,3 +147,15 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   and both scorer controls before it can emit `status: validated`.
   Its validated run manifest includes the same normalized attack, completion, scoring, count, metric, and target-revision
   fingerprints required by the Qwen result package.
+
+## Live campaign milestone — 2026-09-21 10:11 CDT
+
+- The full Super campaign produced its first individual behavior artifact under
+  `super-gcg-full-20260921a`. A payload-free in-place readback confirmed valid JSON with exactly one behavior mapping,
+  a nonempty attack list, 296 bytes, and SHA-256
+  `c13789eccb40ee8ec8b66e03c54cce824769438dc8bdc97448650be84873b6c5`.
+- Both source-order Super function calls remained live and the app still had exactly two attack workers. The campaign had
+  1/400 individual artifacts and 0/2 shard receipts. This is partial execution evidence only; do not finalize, redeploy,
+  or launch Qwen GCG yet.
+- The served Super endpoint remained at three live instances. The independent Qwen BlankImage campaign had reached 87/110
+  completed cases with three optimization streams still advancing, so Patch remained gated behind worker drain.
