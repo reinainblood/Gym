@@ -343,6 +343,22 @@ def validate_complete_shard_receipts(
     return parsed
 
 
+def build_shard_receipt_manifest(
+    *, output_root: Path, target: str, num_shards: int
+) -> tuple[list[dict[str, str]], str]:
+    """Bind the finalized generation receipt to the exact validated shard receipts."""
+    receipt_dir = output_root / "shard-receipts"
+    manifest = [
+        {
+            "name": f"{target}-{index:02d}-of-{num_shards:02d}.json",
+            "sha256": sha256(receipt_dir / f"{target}-{index:02d}-of-{num_shards:02d}.json"),
+        }
+        for index in range(num_shards)
+    ]
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    return manifest, hashlib.sha256(canonical).hexdigest()
+
+
 def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
     """Merge a complete 400-behavior campaign and write the Gym-compatible generation receipt."""
     if target not in TARGETS:
@@ -359,11 +375,16 @@ def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
     ]
     if missing:
         raise ValueError(f"cannot finalize: {len(missing)} GCG behaviors are missing")
-    validate_complete_shard_receipts(
+    shard_receipts = validate_complete_shard_receipts(
         output_root=output_root,
         behaviors=behaviors,
         target=target,
         artifact_id=artifact_id,
+    )
+    shard_receipt_manifest, shard_receipts_sha256 = build_shard_receipt_manifest(
+        output_root=output_root,
+        target=target,
+        num_shards=len(shard_receipts),
     )
     subprocess.run(
         ["python", "merge_test_cases.py", "--method_name", "GCG", "--save_dir", str(output_dir)],
@@ -392,6 +413,9 @@ def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
         "num_steps": PUBLIC_STEPS,
         "search_width": PUBLIC_SEARCH_WIDTH,
         "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
+        "num_shards": len(shard_receipts),
+        "shard_receipts": shard_receipt_manifest,
+        "shard_receipts_sha256": shard_receipts_sha256,
     }
     receipt_path = output_root / "generation-receipt.json"
     receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")

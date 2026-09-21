@@ -17,6 +17,7 @@ from benchmarks.harmbench.operations.gcg_small_models_worker import (
     TARGETS,
     UPSTREAM_REVISION,
     behavior_artifact_path,
+    build_shard_receipt_manifest,
     completed_behavior_count,
     run_generation_if_needed,
     shard_behavior_ids,
@@ -149,6 +150,16 @@ def test_complete_shard_receipts_bind_every_source_order_partition(tmp_path):
     )
     assert len(receipts) == 2
     assert sum(receipt["completed_behaviors"] for receipt in receipts) == PUBLIC_BEHAVIORS
+
+    manifest, manifest_sha256 = build_shard_receipt_manifest(
+        output_root=output_root,
+        target="super",
+        num_shards=len(receipts),
+    )
+    assert [row["name"] for row in manifest] == ["super-00-of-02.json", "super-01-of-02.json"]
+    assert all(len(row["sha256"]) == 64 for row in manifest)
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    assert manifest_sha256 == hashlib.sha256(canonical).hexdigest()
 
 
 @pytest.mark.parametrize(
