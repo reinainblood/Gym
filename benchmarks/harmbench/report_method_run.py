@@ -115,6 +115,8 @@ def build(
     ]
     copyright_cases = [row for row in scored if row.get("scoring_method") == "copyright_minhash"]
     score_methods = Counter(row.get("scoring_method", "harmbench_classifier") for row in scored)
+    if method_name == "GCG" and (len(classifier_cases), len(copyright_cases)) != (300, 100):
+        raise ValueError("GCG scorer routing does not match the pinned 300/100 classifier-copyright split")
     image_control_passed = False
     if image_parity is not None:
         image_control = json.loads(image_parity.read_text(encoding="utf-8"))
@@ -235,6 +237,36 @@ def build(
             )
         if not generation_control_passed:
             raise ValueError("attack-generation control does not cover this dataset")
+    gcg_source_control_passed = False
+    if method_name == "GCG":
+        generation_receipt = source.get("generation_receipt", {})
+        shard_receipts = generation_receipt.get("shard_receipts")
+        gcg_source_control_passed = (
+            source.get("target_type") == "text_weights"
+            and source.get("rows") == 400
+            and source.get("behaviors") == 400
+            and generation_receipt.get("status") == "completed"
+            and generation_receipt.get("method") == "GCG"
+            and generation_receipt.get("upstream_method") == "GCG"
+            and generation_receipt.get("upstream_revision") == source.get("upstream_revision")
+            and generation_receipt.get("experiment") == source.get("experiment")
+            and generation_receipt.get("run_id") == source.get("run_id")
+            and generation_receipt.get("source_target_model") == model
+            and generation_receipt.get("test_cases_sha256") == source.get("test_cases_sha256")
+            and generation_receipt.get("behaviors_sha256") == source.get("behaviors_sha256")
+            and generation_receipt.get("behaviors") == 400
+            and generation_receipt.get("cases") == 400
+            and generation_receipt.get("num_steps") == 500
+            and generation_receipt.get("search_width") == 512
+            and isinstance(generation_receipt.get("num_shards"), int)
+            and generation_receipt.get("num_shards", 0) > 0
+            and isinstance(shard_receipts, list)
+            and len(shard_receipts) == generation_receipt.get("num_shards")
+            and isinstance(generation_receipt.get("shard_receipts_sha256"), str)
+            and len(generation_receipt["shard_receipts_sha256"]) == 64
+        )
+        if not gcg_source_control_passed:
+            raise ValueError("GCG finalized source evidence does not cover this dataset and target")
     validated = (
         collection_complete
         and health["unobserved"] == 0
@@ -259,6 +291,12 @@ def build(
                 and classifier_control_passed
                 and copyright_control_passed
             )
+            or (
+                method_name == "GCG"
+                and gcg_source_control_passed
+                and classifier_control_passed
+                and copyright_control_passed
+            )
         )
     )
     if validated and method_name == "MultiModalDirectRequest":
@@ -277,6 +315,8 @@ def build(
         protocol_validation = "passed_upstream_pap_classifier_copyright_controls"
     elif validated and method_name == "DirectRequest":
         protocol_validation = "passed_upstream_direct_classifier_copyright_controls"
+    elif validated and method_name == "GCG":
+        protocol_validation = "passed_gcg_generation_classifier_copyright_controls"
     elif method_name in {"MultiModalDirectRequest", "MultiModalRenderText"}:
         protocol_validation = "pending_image_or_classifier_controls"
     else:

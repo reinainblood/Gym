@@ -36,6 +36,10 @@ def text_sha256(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def behavior_tags(behavior: dict[str, str]) -> list[str]:
+    return [tag for tag in behavior.get("Tags", "").split(", ") if tag]
+
+
 def generation_paths(output_root: Path) -> tuple[Path, Path]:
     cases = output_root / "GCG" / EXPERIMENT / "test_cases" / "test_cases.json"
     receipt = output_root / "generation-receipt.json"
@@ -221,6 +225,7 @@ class QwenGCGCompletionRuntime:
             "context": behavior.get("ContextString", ""),
             "functional_category": behavior["FunctionalCategory"],
             "semantic_category": behavior["SemanticCategory"],
+            "tags": behavior_tags(behavior),
             "model_id": MODEL_ID,
             "model_revision": MODEL_REVISION,
             "checkpoint_config_sha256": self.config_sha256,
@@ -280,6 +285,7 @@ def write_completion_shard_receipt(
             artifact_id=artifact_id,
             index=index,
             behavior_id=behavior["BehaviorID"],
+            tags=behavior_tags(behavior),
             attack=attack,
             generation_receipt_sha256=generation_receipt_sha256,
         )
@@ -328,6 +334,7 @@ def validate_individual_completion(
     artifact_id: str,
     index: int,
     behavior_id: str,
+    tags: list[str],
     attack: str,
     generation_receipt_sha256: str,
 ) -> dict[str, Any]:
@@ -341,6 +348,7 @@ def validate_individual_completion(
         "method": "GCG",
         "index": index,
         "behavior_id": behavior_id,
+        "tags": tags,
         "model_id": MODEL_ID,
         "model_revision": MODEL_REVISION,
         "generation_receipt_sha256": generation_receipt_sha256,
@@ -386,6 +394,7 @@ def finalize_completion_artifact(*, output_root: Path, behaviors_path: Path, art
             artifact_id=artifact_id,
             index=index,
             behavior_id=behavior["BehaviorID"],
+            tags=behavior_tags(behavior),
             attack=cases[behavior["BehaviorID"]][0],
             generation_receipt_sha256=generation_receipt_sha256,
         )

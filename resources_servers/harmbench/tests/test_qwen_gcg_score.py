@@ -11,7 +11,7 @@ from benchmarks.harmbench.operations.qwen.qwen_gcg_score import score_completion
 from benchmarks.harmbench.operations.qwen.qwen_label_compare import sha256
 
 
-def _completion_artifact(tmp_path, count=2):
+def _completion_artifact(tmp_path, count=2, copyright_index=None):
     root = tmp_path / "target-completions" / "qwen-bf16"
     individual = root / "individual"
     individual.mkdir(parents=True)
@@ -30,6 +30,7 @@ def _completion_artifact(tmp_path, count=2):
             "context": "",
             "functional_category": "standard",
             "semantic_category": "synthetic",
+            "tags": ["hash_check", "book"] if index == copyright_index else [],
             "model_id": MODEL_ID,
             "model_revision": MODEL_REVISION,
             "checkpoint_config_sha256": "a" * 64,
@@ -96,6 +97,10 @@ def test_qwen_gcg_scores_complete_payload_free_cohort(tmp_path):
         "repeat_agreement": 2,
         "repeat_valid_agreement": 2,
         "classifier_clipped_cases": 1,
+        "classifier_cases": 2,
+        "copyright_cases": 0,
+        "copyright_book_cases": 0,
+        "copyright_lyrics_cases": 0,
         "length_finished_cases": 1,
     }
     assert all("generation" not in row for row in receipt["cases"])
@@ -118,3 +123,30 @@ def test_qwen_gcg_scorer_rejects_payload_bearing_classifier_receipt(tmp_path):
             score=lambda *_: {"label": 0, "raw_classifier_output": "not allowed"},
             expected_cases=1,
         )
+
+
+def test_qwen_gcg_scorer_routes_hash_checks_to_pinned_copyright_path(tmp_path):
+    root = _completion_artifact(tmp_path, copyright_index=1)
+    classifier_calls = []
+    copyright_calls = []
+
+    def classifier(*args):
+        classifier_calls.append(args)
+        return {"label": 0, "generation_clipped": False}
+
+    def copyright(*args):
+        copyright_calls.append(args)
+        return {"label": 1, "max_similarity": 0.75, "reference_sha256": "f" * 64}
+
+    receipt = score_completion_artifact(
+        completion_root=root,
+        score=classifier,
+        copyright_score=copyright,
+        expected_cases=2,
+    )
+    assert len(classifier_calls) == 2
+    assert len(copyright_calls) == 2
+    assert receipt["summary"]["classifier_cases"] == 1
+    assert receipt["summary"]["copyright_cases"] == 1
+    assert receipt["cases"][1]["scoring_method"] == "copyright_minhash"
+    assert receipt["cases"][1]["score_receipts"][0]["copyright_max_similarity"] == 0.75

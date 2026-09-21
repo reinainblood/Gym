@@ -19,6 +19,19 @@ def _receipt(*, invalid_index=None):
     cases = []
     for index in range(PUBLIC_BEHAVIORS):
         labels = [1, -1] if index == invalid_index else [int(index == 0), int(index == 0)]
+        is_copyright = index >= 300
+        scoring_method = "copyright_minhash" if is_copyright else "harmbench_classifier"
+        score_receipts = (
+            [
+                {"copyright_reference_sha256": "f" * 64, "copyright_max_similarity": 0.75},
+                {"copyright_reference_sha256": "f" * 64, "copyright_max_similarity": 0.75},
+            ]
+            if is_copyright
+            else [
+                {"classifier_prompt_sha256": f"prompt-{index}", "generation_clipped": index == 0},
+                {"classifier_prompt_sha256": f"prompt-{index}", "generation_clipped": index == 0},
+            ]
+        )
         cases.append(
             {
                 "index": index,
@@ -28,13 +41,12 @@ def _receipt(*, invalid_index=None):
                 "attack_sha256": f"attack-{index}",
                 "functional_category": "standard",
                 "semantic_category": "synthetic",
+                "tags": ["hash_check", "book" if index < 350 else "lyrics"] if is_copyright else [],
                 "generation_token_count": 512 if index == 0 else 12,
                 "finish_reason": "length" if index == 0 else "stop",
+                "scoring_method": scoring_method,
                 "labels": labels,
-                "classifier_receipts": [
-                    {"classifier_prompt_sha256": f"prompt-{index}", "generation_clipped": index == 0},
-                    {"classifier_prompt_sha256": f"prompt-{index}", "generation_clipped": index == 0},
-                ],
+                "score_receipts": score_receipts,
             }
         )
     successes = sum(row["labels"][0] == 1 for row in cases)
@@ -63,6 +75,10 @@ def _receipt(*, invalid_index=None):
             "invalid_classifier_outputs": invalid_outputs,
             "repeat_agreement": repeat_agreement,
             "repeat_valid_agreement": repeat_valid_agreement,
+            "classifier_cases": 300,
+            "copyright_cases": 100,
+            "copyright_book_cases": 50,
+            "copyright_lyrics_cases": 50,
         },
         "cases": cases,
     }
@@ -100,6 +116,12 @@ def test_qwen_gcg_blade_excludes_invalid_or_unstable_classifier_case():
     assert rows[7]["valid"] is False
     assert rows[7]["asr_denominator"] == 0
     assert rows[7]["reconciliation_disposition"] == "excluded_task_or_verifier_failure"
+
+
+def test_qwen_gcg_blade_preserves_copyright_scorer_identity():
+    rows = build_rows(_receipt())
+    assert rows[307]["classifier_result"]["scoring_method"] == "copyright_minhash"
+    assert rows[307]["classifier_result"]["prompt_sha256"] is None
 
 
 def test_qwen_gcg_blade_fails_closed_on_wrong_provenance_or_denominator():

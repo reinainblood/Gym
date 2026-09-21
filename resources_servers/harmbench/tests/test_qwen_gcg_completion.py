@@ -39,6 +39,7 @@ def _artifact(tmp_path):
                 "ContextString",
                 "FunctionalCategory",
                 "SemanticCategory",
+                "Tags",
             ],
         )
         writer.writeheader()
@@ -49,6 +50,7 @@ def _artifact(tmp_path):
                 "ContextString": "",
                 "FunctionalCategory": "standard",
                 "SemanticCategory": "synthetic",
+                "Tags": "",
             }
             for index in range(PUBLIC_BEHAVIORS)
         )
@@ -139,6 +141,7 @@ def test_qwen_completion_shards_cover_source_order_and_require_receipts(tmp_path
             "behavior_id": f"b{index:03d}",
             "model_id": MODEL_ID,
             "model_revision": MODEL_REVISION,
+            "tags": [],
             "generation_receipt_sha256": generation_receipt_sha256,
             "attack_sha256": hashlib.sha256(f"synthetic case {index}".encode()).hexdigest(),
             "rendered_prompt_sha256": "d" * 64,

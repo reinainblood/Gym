@@ -93,11 +93,16 @@ method keys in the paper's pipeline.
   chat template, uses deterministic 512-token generation, resumes by source-order index, rehashes the finalized GCG
   generation and shard receipts before model load, and requires a complete 400-receipt completion manifest. It is a
   separate app so deploying it cannot interrupt the active white-box image attack workers or the persistent GCG app.
-- `operations/qwen/modal_qwen_gcg_score.py` rehashes that 400-receipt manifest and runs two serial passes through the
-  pinned raw HarmBench classifier without copying generations into its output. `qwen_gcg_blade.py` then checks all model,
-  source, classifier, denominator, and case-level hashes before emitting payload-free BLADE rows, native metrics, and a
+- `operations/qwen/modal_qwen_gcg_score.py` rehashes that 400-receipt manifest, runs two serial passes through the pinned
+  raw HarmBench classifier for ordinary behaviors, and preserves the upstream MinHash path for `hash_check` book/lyrics
+  behaviors without copying generations into its output. Both the scorer and BLADE validator enforce the pinned 300
+  classifier / 100 copyright split, including 50 book and 50 lyrics cases. `qwen_gcg_blade.py` then checks all model, source, scorer,
+  denominator, and case-level hashes before emitting payload-free BLADE rows, native metrics, and a
   deterministic report; invalid or unstable classifier cases remain visible but outside the model-quality denominator.
   Its evidence manifest binds the classifier-score input and every output hash and is validated through a full readback.
+- `report_method_run.py` recognizes a GCG Gym run as validated only when its complete finalized source receipt targets the
+  same model, retains the public 500-step/512-width profile and shard evidence, reconciles all 400 healthy target rows,
+  preserves the 300 classifier / 100 copyright split, and passes both classifier and MinHash calibration controls.
 - For ZeroShot, `repair_capture_race.py` created a derivative that attached one late-but-present target-call
   capture without touching any response or score; a separate Gym health audit then passed 1,600/1,600.
   `restore_reverified_observability.py` keeps the original captured trajectory alongside stateless reverify scores

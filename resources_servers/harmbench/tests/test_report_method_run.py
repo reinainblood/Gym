@@ -201,3 +201,136 @@ def test_human_run_requires_all_three_matching_controls(tmp_path):
     _write_jsonl(parent, parent_rows)
     with pytest.raises(ValueError, match="changed a saved target model response"):
         build(**kwargs)
+
+
+def test_gcg_run_requires_finalized_source_and_both_scorer_controls(tmp_path):
+    dataset = tmp_path / "dataset.jsonl"
+    rollouts = tmp_path / "rollouts.jsonl"
+    failures = tmp_path / "failures.jsonl"
+    aggregates = tmp_path / "aggregate.json"
+    quality = tmp_path / "quality.json"
+    source = tmp_path / "source.json"
+    classifier = tmp_path / "classifier.json"
+    copyright_control = tmp_path / "copyright.json"
+    model = "nvidia/test-super-bf16"
+    rows = [
+        {
+            "harmbench_id": f"b{index:03d}",
+            "method": "GCG",
+            "upstream_method": "GCG",
+            "upstream_revision": "pinned-test",
+            "attack_test_case_index": 0,
+        }
+        for index in range(400)
+    ]
+    _write_jsonl(dataset, rows)
+    _write_jsonl(
+        rollouts,
+        [
+            row
+            | {
+                "response": {"id": f"target-{index}", "model": model, "output": []},
+                "score_label": int(index == 0),
+                "classifier_label": int(index == 0) if index < 300 else None,
+                "scoring_method": "harmbench_classifier" if index < 300 else "copyright_minhash",
+                "functional_category": "standard",
+                "semantic_category": "synthetic",
+            }
+            for index, row in enumerate(rows)
+        ],
+    )
+    failures.write_text("", encoding="utf-8")
+    aggregates.write_text(json.dumps([{"agent_metrics": {"attack_success_rate": 1 / 400}}]))
+    quality.write_text(json.dumps({"run": {"verdicts": {"healthy": 400, "unhealthy": 0, "unobserved": 0}}}))
+    source.write_text(
+        json.dumps(
+            {
+                "method": "GCG",
+                "upstream_revision": "pinned-test",
+                "experiment": "super-gcg",
+                "run_id": "attack-run",
+                "target_type": "text_weights",
+                "test_cases_sha256": "cases-sha",
+                "behaviors_sha256": "behaviors-sha",
+                "rows": 400,
+                "behaviors": 400,
+                "generation_receipt": {
+                    "status": "completed",
+                    "method": "GCG",
+                    "upstream_method": "GCG",
+                    "upstream_revision": "pinned-test",
+                    "experiment": "super-gcg",
+                    "run_id": "attack-run",
+                    "source_target_model": model,
+                    "test_cases_sha256": "cases-sha",
+                    "behaviors_sha256": "behaviors-sha",
+                    "behaviors": 400,
+                    "cases": 400,
+                    "num_steps": 500,
+                    "search_width": 512,
+                    "num_shards": 2,
+                    "shard_receipts": [{"name": "a"}, {"name": "b"}],
+                    "shard_receipts_sha256": "a" * 64,
+                },
+            }
+        )
+    )
+    classifier.write_text(
+        json.dumps(
+            {
+                "classifier_model": CLASSIFIER_MODEL,
+                "classifier_revision": CLASSIFIER_REVISION,
+                "rollouts_sha256": sha256(rollouts),
+                "rollout_cases": 300,
+                "rollout_agreement": 300,
+                "rollout_prompt_tokens_identical": 300,
+                "rollout_prompt_sha256_matches": 300,
+                "clip_checks": {"checked": 300, "text_identical": 300, "count_identical": 300},
+                "fixture_cases": 1,
+                "fixture_agreement": 1,
+                "disagreements": [],
+            }
+        )
+    )
+    copyright_control.write_text(
+        json.dumps(
+            {
+                "upstream_revision": "pinned-test",
+                "rollouts_sha256": sha256(rollouts),
+                "checked": 100,
+                "agreement": 100,
+                "mismatches": [],
+            }
+        )
+    )
+    manifest, _ = build(
+        dataset=dataset,
+        rollouts=rollouts,
+        failures=failures,
+        aggregate_metrics=aggregates,
+        quality_summary=quality,
+        source_manifest=source,
+        model=model,
+        run_id="target-run",
+        classifier_calibration=classifier,
+        copyright_calibration=copyright_control,
+    )
+    assert manifest["status"] == "validated"
+    assert manifest["protocol_validation"] == "passed_gcg_generation_classifier_copyright_controls"
+
+    broken = json.loads(source.read_text())
+    broken["generation_receipt"]["search_width"] = 511
+    source.write_text(json.dumps(broken))
+    with pytest.raises(ValueError, match="GCG finalized source evidence"):
+        build(
+            dataset=dataset,
+            rollouts=rollouts,
+            failures=failures,
+            aggregate_metrics=aggregates,
+            quality_summary=quality,
+            source_manifest=source,
+            model=model,
+            run_id="target-run",
+            classifier_calibration=classifier,
+            copyright_calibration=copyright_control,
+        )

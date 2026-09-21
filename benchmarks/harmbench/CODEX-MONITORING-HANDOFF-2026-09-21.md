@@ -91,8 +91,18 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   `limit` call is a payload-producing canary but intentionally writes no canonical completion-shard receipt; only an
   unbounded full shard may satisfy the finalizer's shard evidence gate.
 - After the completion finalizer passes, deploy `operations/qwen/modal_qwen_gcg_score.py` in FDR and call its `score`
-  function once. It rehashes the 400 private completion receipts and scores every case twice through the pinned serial raw
-  HarmBench classifier, writing only payload-free `classifier-scores.json`. Download that single receipt and run
+  function once. It rehashes the 400 private completion receipts, routes ordinary behaviors through two serial passes of
+  the pinned raw HarmBench classifier, and routes `hash_check` book/lyrics behaviors through the pinned upstream MinHash
+  references. Require the pinned split of 300 classifier cases plus 100 copyright cases (50 book, 50 lyrics). It writes
+  only payload-free `classifier-scores.json`. Download that single receipt and run
   `qwen_gcg_blade.py`; require 400 reconciled source indexes, exact model/classifier revisions, stable denominator
   accounting, and successful readback of its JSONL, metrics JSON, Markdown report, and `evidence-manifest.json` before
   reporting the baseline. The manifest binds the classifier-score input and all three rendered outputs by size and SHA-256.
+
+## Super GCG reporting gate
+
+- After Super finalization, materialize through `prepare_generated.py`, collect all 400 target completions from the exact
+  served Super identity, and run both classifier and copyright calibration controls. `report_method_run.py` now has an
+  explicit GCG validation branch: it requires the finalized 400-row source receipt, matching source target, public 500/512
+  profile, bound shard evidence, complete healthy collection, the pinned 300 classifier / 100 copyright routing split,
+  and both scorer controls before it can emit `status: validated`.
