@@ -24,7 +24,10 @@ from the repository root with `shasum -a 256 -c benchmarks/harmbench/evidence/SH
 - `qwen-multimodal/`: corrected Qwen MultiModalDirectRequest and
   MultiModalRenderText reports, classifier controls, reverify comparisons, and
   combined BLADE metrics.
-- `qwen-whitebox-pgd/`: payload-free receipt-set hash migration record for the
-  110 completed Qwen MultiModalPGD generation artifacts. It retains the legacy
-  path-dependent audit hash and the portable canonical-content hash with their
-  distinct algorithms; it is not a scored HarmBench result.
+- `qwen-whitebox-pgd/`: payload-free receipt-set hash migration and classifier
+  comparison summaries for the 110 completed Qwen MultiModalPGD artifacts. The
+  protocol-correct 512-token completions scored 31/110 (28.18% ASR) on two
+  stable serial classifier passes. Seven labels differ from the superseded
+  256-token parents; two are among the 66 cases where that old cap did not bind.
+  A separate 12-case fresh-container replicate matched 12/12 labels. The full
+  case-level comparison stays in the named Modal Volume and is bound by hash.

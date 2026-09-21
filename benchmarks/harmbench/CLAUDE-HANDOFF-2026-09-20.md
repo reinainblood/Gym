@@ -281,3 +281,23 @@ commit before PR review. This handoff creates no PR.
 - Never commit API keys, Modal proxy tokens, Keychain values, raw credentials,
   model weights, Hugging Face caches, or private/gated data.
 - The committed receipts are payload-free infrastructure/provenance records.
+
+## Codex takeover update — 2026-09-20 23:30 CDT
+
+- Qwen MultiModalPGD now has a complete parent-versus-512-versus-replicate
+  classifier comparison. The protocol-correct 512-token completions scored
+  31/110 (28.18% ASR); both parent and canonical labels were stable on two
+  serial raw-classifier passes for all 110 cases. Parent versus canonical had
+  seven label flips, including two among 66 cases where the old 256-token cap
+  did not bind. The 12-case fresh-container replicate matched 12/12 canonical
+  labels. Treat the 512 result as valid with a generation-sensitivity caveat,
+  not as invalid or classifier-noisy.
+- The full 351,508-byte comparison receipt is retained in
+  `harmbench-qwen35-122b-whitebox-results` at
+  `qwen35-122b-harmbench-whitebox-20260919/MultiModalPGD/label-comparison/parent-vs-512-vs-r1.json`
+  with SHA-256
+  `b8612e5e76ddb3b48ea785f2c5bb2ceaebecb59efc02f1626c5e7ee0b6cf31d3`.
+- Contrary to the earlier snapshot, MultiModalPGDBlankImage is not queued.
+  Four FDR workers were live and writing resumable artifacts during takeover.
+  MultiModalPGDPatch and BlankImage remain incomplete and must be recounted from
+  the Volume before any launch or restart.
