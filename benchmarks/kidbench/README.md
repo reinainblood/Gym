@@ -109,8 +109,9 @@ in [METRICS.md](METRICS.md).
 ## Licensing
 
 Upstream's code is MIT. Its data, rubrics, and rules carry a bespoke research-use and
-child-safety notice with no entry in Gym's license vocabulary, so the dataset entries are
-marked `TBD` and the real terms are these:
+child-safety notice rather than a named licence, so the dataset entries are marked `TBD` --
+Gym's own vocabulary entry for exactly that case, and not a placeholder for terms nobody has
+looked up. The real terms are these, and they travel with the data:
 
 - For research on child-facing AI safety evaluation and model development.
 - **Not** to be deployed directly to children as an assistant, toy, or companion.

@@ -50,8 +50,10 @@ kidbench_resources_server:
         type: validation
         jsonl_fpath: resources_servers/kidbench/data/single_turn.jsonl
         num_repeats: 1
-        # Upstream ships a bespoke research-use and child-safety notice with no entry in
-        # Gym's license vocabulary. See benchmarks/kidbench/README.md for the actual terms.
+        # `TBD` is Gym's own entry for a dataset whose terms do not match a named licence,
+        # which is this one: upstream ships a bespoke research-use and child-safety notice.
+        # It is not a placeholder for an unknown licence. The terms are in
+        # benchmarks/kidbench/README.md and must travel with any redistribution.
         license: TBD
       - name: example
         type: example
@@ -77,8 +79,10 @@ kidbench_simple_agent:
         type: validation
         jsonl_fpath: resources_servers/kidbench/data/single_turn.jsonl
         num_repeats: 1
-        # Upstream ships a bespoke research-use and child-safety notice with no entry in
-        # Gym's license vocabulary. See benchmarks/kidbench/README.md for the actual terms.
+        # `TBD` is Gym's own entry for a dataset whose terms do not match a named licence,
+        # which is this one: upstream ships a bespoke research-use and child-safety notice.
+        # It is not a placeholder for an unknown licence. The terms are in
+        # benchmarks/kidbench/README.md and must travel with any redistribution.
         license: TBD
       - name: example
         type: example
@@ -113,8 +117,10 @@ kidbench_multi_turn_agent:
         type: validation
         jsonl_fpath: resources_servers/kidbench/data/multi_turn.jsonl
         num_repeats: 1
-        # Upstream ships a bespoke research-use and child-safety notice with no entry in
-        # Gym's license vocabulary. See benchmarks/kidbench/README.md for the actual terms.
+        # `TBD` is Gym's own entry for a dataset whose terms do not match a named licence,
+        # which is this one: upstream ships a bespoke research-use and child-safety notice.
+        # It is not a placeholder for an unknown licence. The terms are in
+        # benchmarks/kidbench/README.md and must travel with any redistribution.
         license: TBD
       - name: example
         type: example
