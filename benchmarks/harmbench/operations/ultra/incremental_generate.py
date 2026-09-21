@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import json
 import sys
@@ -29,7 +30,7 @@ def run(args: argparse.Namespace) -> None:
     method_config.update(get_experiment_config(args.experiment, model_configs, method_configs))
     method_class = get_method_class(args.class_name)
     method = init_method(method_class, method_config)
-    if args.class_name == "GCG":
+    if args.class_name == "GCG" and method.use_prefix_cache:
         from benchmarks.harmbench.cache_compat import install_gcg_dynamic_cache_adapter
 
         install_gcg_dynamic_cache_adapter(method)
@@ -89,7 +90,14 @@ def run(args: argparse.Namespace) -> None:
         if path.exists():
             completed += 1
             continue
-        test_cases, logs = method.generate_test_cases(behaviors=[behavior], verbose=False)
+        if args.quiet_upstream:
+            log_dir = args.output_dir / "_operational_logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            with (log_dir / f"{behavior_id}.log").open("w", encoding="utf-8") as log_stream:
+                with contextlib.redirect_stdout(log_stream), contextlib.redirect_stderr(log_stream):
+                    test_cases, logs = method.generate_test_cases(behaviors=[behavior], verbose=False)
+        else:
+            test_cases, logs = method.generate_test_cases(behaviors=[behavior], verbose=False)
         method.save_test_cases(
             str(args.output_dir),
             test_cases,
@@ -125,6 +133,7 @@ def main() -> None:
     parser.add_argument("--experiment", required=True)
     parser.add_argument("--run-id")
     parser.add_argument("--behavior-ids", default="")
+    parser.add_argument("--quiet-upstream", action="store_true")
     run(parser.parse_args())
 
 
