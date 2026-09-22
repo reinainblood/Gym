@@ -97,6 +97,10 @@ _TAG_AS_TOOL_NAME_RE = re.compile(
     r"<([a-zA-Z_]\w*)>(?:\s*\1\s*</\1>)?\s*(?=<arguments>|\{|</arguments>)",
     re.DOTALL | re.IGNORECASE | re.ASCII,
 )
+_TAG_AS_TOOL_NAME_WITH_DESCRIPTION_RE = re.compile(
+    r"<([a-zA-Z_]\w*)>[^<]*</\1>\s*(?=<arguments>)",
+    re.DOTALL | re.IGNORECASE | re.ASCII,
+)
 _TAG_NAME_BROKEN_ARGUMENT_RE = re.compile(
     r"<([a-zA-Z_]\w*)>\s*\1\s*</arguments>",
     re.DOTALL | re.IGNORECASE | re.ASCII,
@@ -328,6 +332,7 @@ def _recover_malformed_xml_calls(response_text: str) -> List[ExtractedToolCall]:
                 _FUNCTION_MISMATCHED_CLOSE_RE,
                 _TOOL_NAME_HARMONY_WRAPPER_RE,
                 _TAG_AS_TOOL_NAME_RE,
+                _TAG_AS_TOOL_NAME_WITH_DESCRIPTION_RE,
                 _TAG_NAME_BROKEN_ARGUMENT_RE,
                 _TAG_AS_TOOL_NAME_PLACEHOLDER_RE,
                 _TAG_AS_TOOL_NAME_MISMATCHED_CLOSE_RE,
@@ -583,6 +588,7 @@ def has_unparsed_tool_call_markup(response_text: str) -> bool:
                     _FUNCTION_MISMATCHED_CLOSE_RE,
                     _TOOL_NAME_HARMONY_WRAPPER_RE,
                     _TAG_AS_TOOL_NAME_RE,
+                    _TAG_AS_TOOL_NAME_WITH_DESCRIPTION_RE,
                     _TAG_NAME_BROKEN_ARGUMENT_RE,
                     _TAG_AS_TOOL_NAME_PLACEHOLDER_RE,
                     _TAG_AS_TOOL_NAME_MISMATCHED_CLOSE_RE,
