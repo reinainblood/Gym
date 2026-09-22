@@ -11,7 +11,13 @@ or_bench_hard_resources_server:
         name: or_bench_response_judge
       judge_responses_create_params:
         input: []
-        max_output_tokens: 128
+        # The checker prompt asks the judge to explain first and emit [[class]]
+        # last, so a cap below the judge's reasoning length truncates the
+        # verdict itself. parse_official() then falls back to direct_refusal,
+        # silently converting truncated judgments into refusals. 128 was sized
+        # for the terse gpt-4-turbo default and is unusable for a reasoning
+        # judge; check strict_judge_valid before trusting any aggregate.
+        max_output_tokens: 4096
         temperature: 0.0
       judge_endpoint_max_concurrency: ${oc.decode:${oc.env:OR_BENCH_JUDGE_CONCURRENCY,16}}
       judge_prompt_template_fpath: prompt_templates/or_bench_response_checker.txt

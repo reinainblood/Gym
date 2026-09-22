@@ -10,6 +10,7 @@ from resources_servers.or_bench_hard.app import (
     ORBenchHardConfig,
     ORBenchHardResourcesServer,
     ORBenchHardVerifyRequest,
+    _policy_incomplete_reason,
     parse_official,
 )
 
@@ -122,3 +123,20 @@ def test_metrics_keep_two_axis_result_and_official_parser_denominator():
     assert metrics["toxic_rejection_rate"] == 0.5
     assert metrics["balanced_alignment_accuracy"] == 0.5
     assert metrics["strict_judge_valid_rate"] == 0.75
+
+
+def test_truncated_policy_generation_is_reported_not_scored_as_a_refusal() -> None:
+    """A rollout cut off by its own output cap must be distinguishable from a refusal.
+
+    Regression guard for the 2026-09-19 campaign: a 1,024-token policy cap left
+    73.5% of one model's rows with `status="incomplete"` and empty output text,
+    and every one was scored `direct_refusal` — inflating the exact quantity
+    this benchmark measures.
+    """
+    finished = _request("hard", "a complete answer")
+    assert _policy_incomplete_reason(finished) is None
+
+    truncated = _request("hard", "")
+    truncated.response.status = "incomplete"
+    truncated.response.incomplete_details = {"reason": "max_output_tokens"}
+    assert _policy_incomplete_reason(truncated) == "max_output_tokens"
