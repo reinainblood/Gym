@@ -159,6 +159,16 @@ def _restore_identity(row: dict[str, Any], key: tuple[int, int]) -> dict[str, An
         trajectory = dict(trajectory)
         trajectory["rollout_id"] = rollout_id
         trajectory["task_id"] = str(task_index)
+        trajectory["turns"] = [
+            {
+                **turn,
+                "task_id": str(task_index),
+                "rollout_id": rollout_id,
+            }
+            if isinstance(turn, dict)
+            else turn
+            for turn in trajectory.get("turns") or []
+        ]
         restored["ng_trajectory"] = trajectory
     return restored
 

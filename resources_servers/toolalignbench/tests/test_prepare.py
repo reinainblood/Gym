@@ -91,7 +91,11 @@ def test_reconcile_replaces_every_affected_identity(tmp_path: Path, monkeypatch:
         rerun_target_task_index=0,
         rerun_target_rollout_index=1,
         ng_model_call_capture={"rollout_id": "9-0", "calls": [], "metrics": {}},
-        ng_trajectory={"rollout_id": "9-0", "task_id": "9", "turns": []},
+        ng_trajectory={
+            "rollout_id": "9-0",
+            "task_id": "9",
+            "turns": [{"task_id": "9", "rollout_id": "9-0", "turn_no": 1}],
+        },
     )
     replacement_path = tmp_path / "replacement.jsonl"
     _write_jsonl(replacement_path, [replacement])
@@ -104,7 +108,11 @@ def test_reconcile_replaces_every_affected_identity(tmp_path: Path, monkeypatch:
     assert [reconcile_baselines._key(row) for row in merged] == [(0, 0), (0, 1), (1, 0), (1, 1)]
     repaired = merged[1]
     assert repaired["ng_model_call_capture"]["rollout_id"] == "0-1"
-    assert repaired["ng_trajectory"] == {"rollout_id": "0-1", "task_id": "0", "turns": []}
+    assert repaired["ng_trajectory"] == {
+        "rollout_id": "0-1",
+        "task_id": "0",
+        "turns": [{"task_id": "0", "rollout_id": "0-1", "turn_no": 1}],
+    }
 
 
 def test_reconcile_rejects_masked_replacement(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
