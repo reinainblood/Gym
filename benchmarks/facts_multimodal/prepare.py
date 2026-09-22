@@ -32,7 +32,7 @@ EXAMPLE_OUTPUT_FPATH = Path(__file__).parents[2] / "resources_servers" / "facts_
 IMAGE_DIR = BENCHMARK_DIR / "data" / "images"
 DOWNLOAD_REPORT_FPATH = BENCHMARK_DIR / "data" / "image_download_report.csv"
 SOURCE_URL = "https://www.kaggle.com/api/v1/datasets/download/deepmind/facts-multimodal-v2-public-data"
-SOURCE_SHA256 = "140b09d46cf8907703b4c96833ea8b966db59e065c19ca18666bfb6025974e17"
+SOURCE_SHA256 = "140b09d46cf8907703b4c96833ea8b966db59e065c19ca18666bfb6025974e17"  # pragma: allowlist secret
 SOURCE_ARCHIVE_MEMBER = "facts_multimodal_public.csv"
 EXAMPLE_ITEM_IDS = (
     "3025679385787018338",
