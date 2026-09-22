@@ -177,6 +177,32 @@ was while a cell ran, not only how much work the defense costs, and it should no
 at different times without that caveat. It is reported as a diagnostic here and is already documented as a lower bound
 for CaMeL, Progent and DRIFT, whose auxiliary clients make calls the adapter never sees.
 
+## DRIFT is not deterministic, and the rate is measured
+
+Two *serial* runs of the same 77 selectors were compared against each other and against a run at
+`concurrency: 8`, selector by selector, skipping any row masked in either run:
+
+| comparison | selectors | utility disagreements | `attack_success` disagreements |
+| --- | ---: | ---: | ---: |
+| serial vs serial (the noise floor) | 77 | 13 (**17%**) | 4 (5%) |
+| concurrent vs serial | 77 | 9 (12%) | 3 |
+| concurrent vs the serial replicate | 77 | 10 (13%) | 1 |
+
+Two identical serial runs disagree on utility for roughly one selector in six, and on attack success for one in
+twenty. The concurrent run sits *below* that floor on both measures, so concurrency is not a source of the
+variance -- which is what let CaMeL be collected concurrently without affecting its scores. DRIFT was kept serial
+only as a precaution while this figure was still 1-of-6.
+
+The likely mechanism is not "DRIFT is broken". It makes **~55 sequential model calls** per rollout against
+CaMeL's ~3, and CaMeL showed **0 of 16** disagreements on the same endpoint. A per-call divergence well under one
+percent -- ordinary for a 120B MoE where batching affects routing, even at temperature 0 -- compounds over 55 calls
+to about this rate. So the honest statement is that **reproducibility degrades with call count on this serving
+stack**: a property of the setup rather than of DRIFT, and one any correct implementation would show.
+
+The consequence for anyone trending these numbers week to week: a single 620-row DRIFT cell carries run-to-run
+variance the point estimate does not show. `7.14%` to two decimals implies a precision the measurement does not
+have, and a week-over-week change smaller than this floor is noise, not a regression.
+
 ## Watch items, recorded before the cells finish
 
 **`tool_filter` is collapsing utility the same way CaMeL did, and for a different reason.** At 51 of 620 rows on

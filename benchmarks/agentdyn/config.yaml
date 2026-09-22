@@ -20,6 +20,14 @@ agentdyn_benchmark:
       # liveness check read the corpse as live and never relaunched it. The bound has to
       # leave room for contention or it converts a slow rollout into a dead cell.
       rollout_timeout_seconds: 3600
+      # How many abandoned rollouts a process tolerates before exiting to shed their stuck
+      # threads. The shipped default of 2 assumes the supervisor restarts the stack; where it
+      # does not, the exit strands the container instead. The rows that reach this limit are
+      # the tail of CaMeL programs that genuinely do not terminate -- one shard spent two
+      # full hours on its single remaining row -- and the right outcome for each is a masked
+      # RolloutTimeout row, which is exactly what abandoning produces. Letting the process
+      # keep going is what lets those rows land rather than being lost to the exit.
+      max_abandoned_rollouts: 64
       datasets:
         - name: agentdyn
           type: benchmark
