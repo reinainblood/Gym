@@ -30,7 +30,9 @@ vera_mh_judge:
     inference_provider:
       entrypoint: app.py
       base_url: ${oc.env:VERA_MH_JUDGE_BASE_URL,''}
-      api_key: ${oc.env:VERA_MH_JUDGE_API_KEY,''}
+      # The public adapter uses OpenAI-compatible credentials. Provider-specific routing
+      # belongs in a private runtime overlay, never in this checked-in configuration.
+      api_key: ${oc.env:OPENAI_API_KEY,''}
       model: ${oc.env:VERA_MH_JUDGE_MODEL,gpt-5.4}
       num_concurrent_requests: ${oc.decode:${oc.env:VERA_MH_JUDGE_CONCURRENCY,8}}
 
