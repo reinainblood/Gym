@@ -141,6 +141,42 @@ publication those rows should be re-collected by removing the masked entries fro
 `--resume` re-dispatch them, now that the endpoints are healthy. Cells must be reported with their scored count, not
 their row count, and the summarizer prints both.
 
+## Rollout concurrency was raised for the slowest cells, and the scores are unchanged
+
+The agent holds `asyncio.Semaphore(concurrency)` around an entire rollout, and the shipped config sets
+`concurrency: 1`. That is the right default for an environment whose task isolation has not been established, but it
+means a container runs one rollout at a time however many cores it has. Super-VL's CaMeL cell was collecting 2.9
+rows/h per container at that setting, which put the cell about fifteen hours out on its own.
+
+Raising it is only legitimate if it cannot change what a rollout scores. Upstream builds a fresh environment for every
+task -- `load_and_inject_default_environment` re-validates the suite YAML into a new object on each call, and the
+`lru_cache` beneath it returns an immutable string -- so tasks do not share environment state. That argument does not
+cover the defenses' own auxiliary clients, so it was measured rather than relied on: one container at `concurrency: 8`
+ran the same shard as a serial container, and the two were compared selector by selector.
+
+| | `concurrency: 8` | `concurrency: 1` |
+| --- | ---: | ---: |
+| Throughput | 161.2 rows/h | 2.9 rows/h |
+| Masked rollouts | 0 of 61 | 3 of 22 |
+| Utility disagreements, on the 16 selectors both covered | — | 0 |
+| `attack_success` disagreements, same 16 | — | 0 |
+
+No selector that both runs completed disagrees on either scored field. Throughput is a scheduling property; utility and
+attack success are not, and they did not move. Rows collected either way are therefore the same measurement, and the
+already-finished cells did not need re-running.
+
+## `mean_model_calls` is inflated by endpoint retries, and is not a clean cost measure
+
+The concurrency comparison above turned up something worth recording on its own. Mean calls differed two-fold between
+the two runs (3.12 against 6.19) even though their scores were identical, and the distribution explains why: 9 of the
+16 shared selectors have *identical* counts, and the mean is carried by a few outliers in the serial run -- 30 calls
+against 2, 12 against 2, 11 against 2 -- collected in the same degraded window that produced that run's 13.6% masking.
+
+So a retried call appears to add to the count. `mean_model_calls` therefore partly measures how healthy the endpoint
+was while a cell ran, not only how much work the defense costs, and it should not be compared across cells collected
+at different times without that caveat. It is reported as a diagnostic here and is already documented as a lower bound
+for CaMeL, Progent and DRIFT, whose auxiliary clients make calls the adapter never sees.
+
 ## Watch items, recorded before the cells finish
 
 **`tool_filter` is collapsing utility the same way CaMeL did, and for a different reason.** At 51 of 620 rows on
