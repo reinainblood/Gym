@@ -131,6 +131,29 @@ async def test_empty_generation_skips_the_judge() -> None:
     server._call_judge.assert_not_awaited()
 
 
+async def test_malformed_judge_outputs_are_retried() -> None:
+    config = FACTSMultimodalConfig(
+        host="0.0.0.0",
+        port=8080,
+        entrypoint="",
+        name="",
+        judge_model_server=ModelServerRef(type="responses_api_models", name="judge"),
+    )
+    server = FACTSMultimodalServer(config=config, server_client=MagicMock(spec=ServerClient))
+    server._call_judge = AsyncMock(side_effect=["not json", '{"Fact 1": "Yes"}'])
+
+    assert await server._judge_coverage("prompt", 1) == ('{"Fact 1": "Yes"}', 1.0, False)
+    assert server._call_judge.await_count == 2
+
+    server._call_judge = AsyncMock(side_effect=["missing verdict", "FINAL VERDICT: HAS CLEAR CONTRADICTION(s)."])
+    assert await server._judge_factuality("prompt", "data:image/jpeg;base64,/9j/") == (
+        "FINAL VERDICT: HAS CLEAR CONTRADICTION(s).",
+        False,
+        False,
+    )
+    assert server._call_judge.await_count == 2
+
+
 async def test_verify_uses_source_url_for_factuality_when_configured() -> None:
     config = FACTSMultimodalConfig(
         host="0.0.0.0",

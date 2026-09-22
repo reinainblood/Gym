@@ -79,14 +79,18 @@ def parse_coverage_score(judge_text: str, essential_fact_count: int) -> float:
     return score if score is not None else 0.0
 
 
-def parse_factuality_verdict(judge_text: str) -> bool:
-    """Return whether a notebook-style factuality verdict finds no contradiction."""
+def _extract_factuality_verdict(judge_text: str) -> bool | None:
     match = re.search(
         r"FINAL VERDICT:\s*(NO|HAS) CLEAR CONTRADICTION(?:\(S\))?\.?\s*$",
         judge_text.strip(),
         flags=re.IGNORECASE,
     )
-    return bool(match and match.group(1).upper() == "NO")
+    return None if match is None else match.group(1).upper() == "NO"
+
+
+def parse_factuality_verdict(judge_text: str) -> bool:
+    """Return whether a notebook-style factuality verdict finds no contradiction."""
+    return bool(_extract_factuality_verdict(judge_text))
 
 
 def format_rubric_items(rubric_items: list[dict[str, Any]], *, essential_only: bool) -> str:
@@ -192,6 +196,24 @@ class FACTSMultimodalServer(SimpleResourcesServer):
             raise JudgeError("empty FACTS Multimodal judge response")
         return text
 
+    async def _judge_coverage(self, prompt: str, fact_count: int) -> tuple[str, float, bool]:
+        """Retry malformed coverage verdicts without changing valid all-No outcomes."""
+        judge_text = ""
+        for _ in range(3):
+            judge_text = await self._call_judge(prompt)
+            if (score := _extract_coverage_score(judge_text, fact_count)) is not None:
+                return judge_text, score, False
+        return judge_text, 0.0, True
+
+    async def _judge_factuality(self, prompt: str, image_url: str) -> tuple[str, bool, bool]:
+        """Retry until the image-aware judge emits one of the two required verdicts."""
+        judge_text = ""
+        for _ in range(3):
+            judge_text = await self._call_judge(prompt, image_url)
+            if (verdict := _extract_factuality_verdict(judge_text)) is not None:
+                return judge_text, verdict, False
+        return judge_text, False, True
+
     @staticmethod
     def _score_fn(result: dict[str, float]) -> dict[str, float]:
         return {
@@ -246,20 +268,16 @@ class FACTSMultimodalServer(SimpleResourcesServer):
             generation=generation,
         )
         factuality_image_url = body.image_data_url if self.config.use_base64_images else body.image_url
-        coverage_judge_output, factuality_judge_output = await asyncio.gather(
-            self._call_judge(coverage_prompt),
-            self._call_judge(factuality_prompt, factuality_image_url),
-        )
         essential_fact_count = sum(
             "essential" in [str(tag) for tag in item.get("tags", [])] for item in body.rubric_items
         )
-        extracted_coverage = _extract_coverage_score(coverage_judge_output, essential_fact_count)
-        coverage = extracted_coverage if extracted_coverage is not None else 0.0
-        factuality = float(parse_factuality_verdict(factuality_judge_output))
-        coverage_parse_failed = extracted_coverage is None
-        factuality_parse_failed = not re.search(
-            r"FINAL VERDICT:\s*(?:HAS|NO) CLEAR CONTRADICTION", factuality_judge_output, flags=re.IGNORECASE
+        coverage_result, factuality_result = await asyncio.gather(
+            self._judge_coverage(coverage_prompt, essential_fact_count),
+            self._judge_factuality(factuality_prompt, factuality_image_url),
         )
+        coverage_judge_output, coverage, coverage_parse_failed = coverage_result
+        factuality_judge_output, factuality_verdict, factuality_parse_failed = factuality_result
+        factuality = float(factuality_verdict)
         accuracy = float(coverage > 0.5 and factuality)
         return FACTSMultimodalVerifyResponse(
             **body.model_dump(),
