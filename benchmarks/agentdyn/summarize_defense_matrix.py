@@ -176,13 +176,29 @@ FRAGMENT_TO_SLUG = {
 
 
 def collect_flat(results_dir: Path) -> dict[str, dict[str, dict[str, Any]]]:
-    """Read the Modal harness's flat `<fragment>-<defense>.jsonl` layout."""
+    """Read the Modal harness's flat `<fragment>-<defense>.jsonl` layout.
+
+    A cell too slow to finish in one container is collected as
+    `<fragment>-<defense>-shardNofM.jsonl` instead, one file per contiguous slice of the
+    selector list. Those merge back here: a cell's score is a mean over its row set, so the
+    number of containers that produced the set cannot change it. The whole-cell file and the
+    shards are never both read -- a sharded cell's selectors are all covered by its shards,
+    so counting a leftover whole-cell file too would double-weight the rows it duplicates.
+    """
     matrix: dict[str, dict[str, dict[str, Any]]] = {}
     for fragment, slug in FRAGMENT_TO_SLUG.items():
         for defense in DEFENSE_ORDER:
-            path = results_dir / f"{fragment}-{defense}.jsonl"
-            if path.is_file():
-                matrix.setdefault(slug, {})[defense] = read_cell([path])
+            whole = results_dir / f"{fragment}-{defense}.jsonl"
+            # Anchored, because `-shard*.jsonl` also matches the sidecars Gym writes beside
+            # each rollouts file -- `-shard0of8_materialized_inputs.jsonl` holds one line per
+            # selector, so counting it reported an empty shard as complete.
+            shard_name = re.compile(rf"^{re.escape(fragment)}-{re.escape(defense)}-shard\d+of\d+\.jsonl$")
+            shards = sorted(
+                path for path in results_dir.glob(f"{fragment}-{defense}-shard*.jsonl") if shard_name.match(path.name)
+            )
+            paths = shards or ([whole] if whole.is_file() else [])
+            if paths:
+                matrix.setdefault(slug, {})[defense] = read_cell(paths)
     return matrix
 
 
