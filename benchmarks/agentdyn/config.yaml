@@ -11,7 +11,15 @@ agentdyn_benchmark:
       # costing one row -- measured locally at 32 minutes on one core with the cell frozen at
       # 6/620. It belongs here rather than only in the local runner's generated config, so
       # that every way of launching this benchmark inherits it, containers included.
-      rollout_timeout_seconds: 1200
+      #
+      # 1200s was calibrated against serialized rollouts. Running several at once makes each
+      # one slower in wall-clock without making any of them hung, so the old bound started
+      # firing on healthy work: four of eight CaMeL shards abandoned two rollouts each,
+      # tripped `max_abandoned_rollouts`, and the agent exited as designed -- but the
+      # container outlives the stack and keeps publishing a heartbeat, so the launcher's
+      # liveness check read the corpse as live and never relaunched it. The bound has to
+      # leave room for contention or it converts a slow rollout into a dead cell.
+      rollout_timeout_seconds: 3600
       datasets:
         - name: agentdyn
           type: benchmark
