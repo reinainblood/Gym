@@ -1,0 +1,18 @@
+{
+  "attacker_model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+  "attacker_prompt_count": 1600,
+  "attacker_prompts_sha256": "4c5b3ee9f72c0963c03095ecf813ba818f1a9842c864974ff57e34fa1507f4a0",
+  "attacker_revision": "eba92302a2861cdc0098cc54bc9f17cb2c47eb61",
+  "behaviors": 320,
+  "behaviors_sha256": "75d257b3e7428c52eb7b0154318f455af3e01b09a3794b5e2f3d36054f3c0e29",
+  "cases": 1600,
+  "chat_template_sha256": "2d15b3d4cab0d3d98b003f5b0530206125de688279e56b09950b6f1612bfa4ba",
+  "generated_cases_sha256": "51ccecee928118feb336ac24195779dfc7bcb85f0f63d39667c6be432e6a917e",
+  "matching_behaviors": 320,
+  "method": "PAP-top5",
+  "mismatches": [],
+  "raw_attacker_generations_sha256": "579f188b503123646edab5aee157d9b980c5a914a728e92f2ecd331b89758a42",
+  "templates_sha256": "4a81b7c635e44eda360f4653edf466be80fc7b682d9fc8271f4b2890a9f5ec1b",
+  "upstream_method_sha256": "2dc2a8c6ec3df4a2a2c7d5295556a19eb796ac75e86d436d8358646531da68a4",
+  "upstream_revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd"
+}

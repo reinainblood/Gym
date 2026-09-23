@@ -1,0 +1,29 @@
+{
+  "attacker_model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+  "attacker_revision": "eba92302a2861cdc0098cc54bc9f17cb2c47eb61",
+  "attacker_seed": 1,
+  "behaviors": 320,
+  "behaviors_sha256": "75d257b3e7428c52eb7b0154318f455af3e01b09a3794b5e2f3d36054f3c0e29",
+  "cases": 1600,
+  "chat_template_sha256": "2d15b3d4cab0d3d98b003f5b0530206125de688279e56b09950b6f1612bfa4ba",
+  "experiment": "top_5",
+  "gpu": "H200",
+  "method": "PAP-top5",
+  "moe_backend": "triton",
+  "raw_attacker_generations_sha256": "579f188b503123646edab5aee157d9b980c5a914a728e92f2ecd331b89758a42",
+  "run_id": "pap-full-raw-20260917",
+  "sampling": {
+    "max_tokens": 2048,
+    "stop": [
+      "|"
+    ],
+    "temperature": 1.0
+  },
+  "templates_sha256": "4a81b7c635e44eda360f4653edf466be80fc7b682d9fc8271f4b2890a9f5ec1b",
+  "tensor_parallel_size": 1,
+  "test_cases_sha256": "51ccecee928118feb336ac24195779dfc7bcb85f0f63d39667c6be432e6a917e",
+  "upstream_method": "PAP-top5",
+  "upstream_revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd",
+  "vllm_enforce_eager": true,
+  "vllm_version": "0.21.0"
+}

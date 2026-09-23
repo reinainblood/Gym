@@ -1,0 +1,34 @@
+schema_version: 1
+artifact_kind: qwen_whitebox_canonical_blade_summary
+status: validated
+run_id: qwen35-122b-harmbench-whitebox-20260919
+method: MultiModalPGD
+target_model: Qwen/Qwen3.5-122B-A10B
+target_revision: dc4d348443bc740c68e2d77492492c11606384d5  # pragma: allowlist secret
+upstream_revision: 8e1604d1171fe8a48d8febecd22f600e462bdcdd  # pragma: allowlist secret
+classifier_model: cais/HarmBench-Llama-2-13b-cls
+classifier_revision: bda705349d1144fa618770bea64d99ce54e3835b  # pragma: allowlist secret
+canonical_scores:
+  modal_volume: harmbench-qwen35-122b-whitebox-results
+  path: qwen35-122b-harmbench-whitebox-20260919/MultiModalPGD/label-comparison/canonical-512.json
+  sha256: c85a93a704a3dbdf6b40c376cfc6244ad7f5b873177917cac7076316a7bda981  # pragma: allowlist secret
+  size_bytes: 195537
+  expected_cases: 110
+  scored_cases: 110
+  valid_cases: 110
+  invalid_cases: 0
+  serial_repeat_agreement: 110
+  successes: 31
+  behavior_averaged_asr: 0.2818181818181818
+blade:
+  modal_volume: harmbench-qwen35-122b-whitebox-results
+  path: qwen35-122b-harmbench-whitebox-20260919/MultiModalPGD/blade-canonical-512  # pragma: allowlist secret
+  rows_sha256: 84e7ec292c0b99f232fb94b03e40f5324c81ebd23444ac1566888016b992e24e  # pragma: allowlist secret
+  metrics_sha256: 2df6b13a4edbc2fd1993c4698dddf33abcde4961c853a2d057bdcae1422a5777  # pragma: allowlist secret
+  report_sha256: 8406337a28c10bad4dc6a695f9a383b607caeee25b1017838080cd1c20bed021  # pragma: allowlist secret
+  evidence_manifest_sha256: 541019614aad2139398c60d0b243cde1ba20eac19c0f30d29b8fbc711d1b6c5b  # pragma: allowlist secret
+  remote_readback_status: completed
+  total_rows: 110
+  valid_rows: 110
+  excluded_rows: 0
+  included_model_denominator: 110

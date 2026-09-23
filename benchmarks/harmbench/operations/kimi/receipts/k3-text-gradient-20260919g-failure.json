@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "status": "blocked",
+  "attempt": {
+    "app_id": "ap-oFHR4MrhEMJoNzswfvtBPD",
+    "function_call_id": "fc-01M2Y7TV5G95CN01QJJSVP2K37",
+    "run_id": "k3-text-gradient-20260919g"
+  },
+  "finished_at": "2026-09-20T02:23:10Z",
+  "model_id": "moonshotai/Kimi-K3",
+  "model_revision": "9f62e4e9fffbd0a83ddd60e1c209d828994b3569",
+  "checkpoint_manifest_sha256": "98c4642076606cf1dd3f83706c901f867288febed93f45719c21982514b2ba2b",
+  "source_volume": "endpoint-ep-WD4gnzaeXMyM7DfrzTDYjW",
+  "checkpoint_files": 118,
+  "checkpoint_bytes": 1560998984390,
+  "stage": "first_target_forward_compressed_tensors_decompression",
+  "loaded_tensor_entries": 497220,
+  "corrected_quantized_module_count": 247296,
+  "error_type": "torch.OutOfMemoryError",
+  "error_summary": "The Hugging Face compressed-tensors runtime installed a first-forward hook that began decompressing the full 2.8T MXFP4 model. GPU 0 had 267.69 GiB total and 267.65 GiB in use; a further 42 MiB allocation failed after 5,645 of 247,296 quantized modules were decompressed.",
+  "gradient_observed": false,
+  "forward_completed": false,
+  "methods_launched": [],
+  "blocker": "The only official public moonshotai Kimi-K3 checkpoint is MXFP4 packed inference weights. The storage-oriented Transformers compressed-tensors path requires full decompression for forward execution, which cannot fit on B300:8; the vLLM packed inference kernels do not expose an autograd input-gradient path. No official full-size BF16 Kimi-K3 checkpoint was present in the moonshotai public Hub catalog, and FDR had no Kimi K3 BF16 Volume.",
+  "disallowed_fallbacks_not_used": [
+    "tiny-random BF16 Kimi K3 fixtures",
+    "calibration proxy",
+    "straight-through estimator not specified by public HarmBench",
+    "different target model",
+    "toy or reduced attack"
+  ]
+}

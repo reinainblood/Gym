@@ -1,0 +1,4 @@
+# Optional CPU-only calibration environment; not a runtime dependency of Gym.
+torch==2.8.0
+torchvision==0.23.0
+pillow==12.3.0

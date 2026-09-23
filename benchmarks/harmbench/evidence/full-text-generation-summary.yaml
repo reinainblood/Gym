@@ -1,0 +1,56 @@
+schema_version: 1
+artifact_kind: harmbench_full_text_generation_summary
+status: generation_complete_scoring_pending
+upstream_revision: 8e1604d1171fe8a48d8febecd22f600e462bdcdd  # pragma: allowlist secret
+behaviors:
+  cohort: harmbench_behaviors_text_all.csv
+  rows: 400
+  sha256: 8d81accedd38eaaf8b760618622bb888417d1fd0c86eba65c427a16f1cbb4afc  # pragma: allowlist secret
+storage:
+  environment: FDR
+  modal_volume: harmbench-full-text-generated-cases
+direct_request:
+  status: validation_extension_ready_target_collection_blocked
+  experiment: default
+  run_id: direct-full-default-20260921
+  volume_path: direct-full-default-20260921  # pragma: allowlist secret
+  behaviors: 400
+  cases: 400
+  standard_behaviors: 200
+  contextual_behaviors: 100
+  copyright_behaviors: 100
+  test_cases_size_bytes: 194088
+  upstream_method_sha256: 277b6edea5b6aa77b962183dba8a4cace150d85448983e3496222f864d70995d  # pragma: allowlist secret
+  test_cases_sha256: b92e9a55aea706c30892219749141c01fd366d62f4c75bcca80e6dc2e7550723  # pragma: allowlist secret
+  validation_extension:
+    volume_path: validation-slices-20260921/direct-validation-80.jsonl  # pragma: allowlist secret
+    behaviors: 80
+    rows: 80
+    gym_inputs_sha256: 762a15eebe8652a797237174d78bb393ba61c12f11a7c929d72cc74e6791e888  # pragma: allowlist secret
+    parent_full_inputs_sha256: f857be5ce617593c00a2b8d4e18b457536435ec7ce7d5146e3208de5f253931d  # pragma: allowlist secret
+    existing_rollouts_sha256: 6c1bd0c3981d31f32967b036d3878002cfa60b5239ee73653a4232c3bfcb0b51  # pragma: allowlist secret
+human_jailbreaks:
+  status: validation_extension_ready_target_collection_blocked
+  experiment: random_subset_5
+  run_id: seed-1
+  volume_path: human-full-400  # pragma: allowlist secret
+  seed: 1
+  templates_per_behavior: 5
+  behaviors: 400
+  cases: 2000
+  test_cases_size_bytes: 4819841
+  template_source_sha256: 62e53558de1da3e67d1aec15c0dff59c848c0b374fd262ffad8f723fda0cd099  # pragma: allowlist secret
+  test_cases_sha256: 7e64aab4e8caaeaa8931fcd5a706c5894bd79d08ba705777ee3dd0706e7c54c9  # pragma: allowlist secret
+  validation_extension:
+    volume_path: validation-slices-20260921/human-validation-80.jsonl  # pragma: allowlist secret
+    behaviors: 80
+    rows: 400
+    gym_inputs_sha256: 86043b2d4e049d6b021aedf47a649499e9ba119e5f04699f6a1be0038f717dca  # pragma: allowlist secret
+    parent_full_inputs_sha256: 0e81e4426eb6364f7380484a8328e007e359c891f3b00f38f4a9fd118f4e6ffb  # pragma: allowlist secret
+    existing_rollouts_sha256: e47277d635ca5174d9456f81cfdae32c0118f9ee4a9c96f749d51d7457bf478a  # pragma: allowlist secret
+target_collection_blocker:
+  category: credential
+  affected_target: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4
+  observed_at: "2026-09-21T07:08:29Z"
+  symptom: original Ultra endpoint URL, API key, and model environment binding are absent from the current shell, login shell, known Keychain service names, and FDR secret inventory
+  required_next_evidence: restore the exact prior Ultra endpoint credential binding, then run only the prepared validation extensions under the existing Ultra policy profile

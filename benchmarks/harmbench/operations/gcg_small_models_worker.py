@@ -1,0 +1,507 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+"""Run pinned HarmBench GCG against the verified Qwen and Super BF16 checkpoints."""
+
+from __future__ import annotations
+
+import csv
+import hashlib
+import json
+import re
+import subprocess
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+
+UPSTREAM_REVISION = "8e1604d1171fe8a48d8febecd22f600e462bdcdd"  # pragma: allowlist secret
+PIPELINE_SHA256 = "14071e847282121ab3cc89a0fb99af82a2bce138a26e4badf997dcc6d4c37710"  # pragma: allowlist secret
+GCG_CONFIG_SHA256 = "f046d305c30938a29ee51af011cee6380c833d6a11246d7a68f78288da8bfc99"  # pragma: allowlist secret
+PUBLIC_DATASET = "harmbench_behaviors_text_all.csv"
+PUBLIC_BEHAVIORS = 400
+PUBLIC_STEPS = 500
+PUBLIC_SEARCH_WIDTH = 512
+EXECUTION_ONLY_DEVIATION = (
+    "candidate loss microbatching and disabled prefix reuse; public inputs, 500 steps, "
+    "512-candidate search, token gradients, losses, and global argmin preserved"
+)
+
+TARGETS: dict[str, dict[str, Any]] = {
+    "super": {
+        "model_id": "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16",
+        "model_revision": "hf-ea-0e636f7",
+        "model_subdir": "nemotron_3_5_super_ea_09112026_vhf-ea-0e636f7",
+        "manifest": "manifest.json",
+        "manifest_identity": {"status": "verified", "version": "hf-ea-0e636f7"},
+        "trust_remote_code": True,
+        "starting_search_batch_size": 8,
+    },
+    "qwen": {
+        "model_id": "Qwen/Qwen3.5-122B-A10B",
+        "model_revision": "dc4d348443bc740c68e2d77492492c11606384d5",  # pragma: allowlist secret
+        "model_subdir": "snapshot",
+        "manifest": "manifest.json",
+        "manifest_identity": {
+            "status": "verified",
+            "model_id": "Qwen/Qwen3.5-122B-A10B",
+            "revision": "dc4d348443bc740c68e2d77492492c11606384d5",  # pragma: allowlist secret
+        },
+        "trust_remote_code": False,
+        "starting_search_batch_size": 8,
+    },
+}
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(8 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def behavior_artifact_path(individual_dir: Path, behavior_id: str) -> Path:
+    """Return upstream SingleBehaviorRedTeamingMethod's per-behavior case path."""
+    return individual_dir / behavior_id / "test_cases.json"
+
+
+def completed_behavior_count(individual_dir: Path, behavior_ids: list[str]) -> int:
+    """Count only complete upstream per-behavior case files."""
+    return sum(behavior_artifact_path(individual_dir, behavior_id).is_file() for behavior_id in behavior_ids)
+
+
+def run_generation_if_needed(
+    *, individual_dir: Path, behavior_ids: list[str], command: list[str], upstream: Path
+) -> None:
+    """Avoid reloading frontier weights when a resumable shard is already complete."""
+    if completed_behavior_count(individual_dir, behavior_ids) != len(behavior_ids):
+        subprocess.run(command, cwd=upstream, check=True)
+
+
+def validate_upstream(upstream: Path) -> dict[str, str]:
+    """Validate the exact public pipeline and GCG method configuration."""
+    revision = subprocess.check_output(
+        ["git", "-C", str(upstream), "rev-parse", "HEAD"],
+        text=True,
+        stderr=subprocess.DEVNULL,
+    ).strip()
+    pipeline = upstream / "configs/pipeline_configs/run_pipeline.yaml"
+    gcg_config = upstream / "configs/method_configs/GCG_config.yaml"
+    if revision != UPSTREAM_REVISION:
+        raise ValueError(f"HarmBench checkout is {revision}, expected {UPSTREAM_REVISION}")
+    if sha256(pipeline) != PIPELINE_SHA256:
+        raise ValueError("public HarmBench pipeline config hash mismatch")
+    if sha256(gcg_config) != GCG_CONFIG_SHA256:
+        raise ValueError("public HarmBench GCG config hash mismatch")
+    mapping = yaml.safe_load(pipeline.read_text(encoding="utf-8"))["GCG"]
+    if mapping.get("class_name") != "GCG" or mapping.get("allowed_target_model_types") != ["open_source"]:
+        raise ValueError("public HarmBench GCG pipeline mapping changed")
+    defaults = yaml.safe_load(gcg_config.read_text(encoding="utf-8"))["default_method_hyperparameters"]
+    if defaults.get("num_steps") != PUBLIC_STEPS or defaults.get("search_width") != PUBLIC_SEARCH_WIDTH:
+        raise ValueError("public HarmBench GCG hyperparameters changed")
+    return {
+        "revision": revision,
+        "pipeline_sha256": PIPELINE_SHA256,
+        "gcg_config_sha256": GCG_CONFIG_SHA256,
+    }
+
+
+def validate_checkpoint(target: str, weights_root: Path) -> tuple[dict[str, Any], Path]:
+    """Bind the run to one already verified immutable checkpoint volume."""
+    spec = TARGETS[target]
+    manifest_path = weights_root / spec["manifest"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for key, expected in spec["manifest_identity"].items():
+        if manifest.get(key) != expected:
+            raise ValueError(f"{target} checkpoint manifest failed {key}")
+    model_dir = weights_root / spec["model_subdir"]
+    if not model_dir.is_dir() or not (model_dir / "config.json").is_file():
+        raise FileNotFoundError(f"{target} checkpoint directory is incomplete")
+    if target == "super":
+        index = json.loads((model_dir / "model.safetensors.index.json").read_text(encoding="utf-8"))
+        keys = set(index.get("weight_map", {}))
+        required_language_weights = {
+            "language_model.backbone.embeddings.weight",
+            "language_model.lm_head.weight",
+        }
+        if not required_language_weights.issubset(keys):
+            raise ValueError("Super checkpoint index is missing the language embedding or LM head")
+        # The EA checkpoint also publishes top-level aliases of these tied weights. Transformers
+        # reports those aliases as unexpected after loading the actual language_model.* tensors.
+        alias_weights = {"backbone.embeddings.weight", "lm_head.weight"}
+        if not alias_weights.issubset(keys):
+            raise ValueError("Super checkpoint no longer contains the documented tied-weight aliases")
+    return manifest, model_dir
+
+
+def shard_behavior_ids(behaviors: Path, shard_index: int, num_shards: int, limit: int = 0) -> list[str]:
+    """Return the stable source-order behavior partition for one resumable shard."""
+    if not 0 <= shard_index < num_shards:
+        raise ValueError("invalid shard selection")
+    with behaviors.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    if len(rows) != PUBLIC_BEHAVIORS:
+        raise ValueError(f"expected {PUBLIC_BEHAVIORS} public behaviors, found {len(rows)}")
+    selected = [row["BehaviorID"] for row in rows[shard_index::num_shards]]
+    return selected[:limit] if limit else selected
+
+
+def write_runtime_configs(upstream: Path, output_root: Path, target: str, model_dir: Path) -> tuple[Path, Path]:
+    """Bind a target while changing only execution microbatching from public GCG."""
+    spec = TARGETS[target]
+    runtime_dir = output_root / "runtime-config"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    model_key = f"nemotron_3_5_{target}_gcg"
+    models_path = runtime_dir / "models.yaml"
+    models_path.write_text(
+        yaml.safe_dump(
+            {
+                model_key: {
+                    "model": {
+                        "model_name_or_path": str(model_dir),
+                        "dtype": "bfloat16",
+                        "device_map": "auto",
+                        "trust_remote_code": bool(spec["trust_remote_code"]),
+                        "use_fast_tokenizer": True,
+                    },
+                    "num_gpus": 1,
+                    "model_type": "open_source",
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    config = yaml.safe_load((upstream / "configs/method_configs/GCG_config.yaml").read_text(encoding="utf-8"))
+    config["default_method_hyperparameters"]["starting_search_batch_size"] = spec["starting_search_batch_size"]
+    # The public Qwen profile disables prefix caching because its cache format is not compatible
+    # with the original tuple expansion. Super's wrapper likewise keeps cache configuration on its
+    # inner language model. Recomputing the fixed prefix preserves the exact loss and argmin math.
+    config["default_method_hyperparameters"]["use_prefix_cache"] = False
+    method_path = runtime_dir / "GCG.yaml"
+    method_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    return models_path, method_path
+
+
+def run_shard(
+    *,
+    target: str,
+    artifact_id: str,
+    shard_index: int,
+    num_shards: int,
+    limit: int = 0,
+) -> dict[str, Any]:
+    """Run one resumable source-order GCG shard and write a payload-free receipt."""
+    if target not in TARGETS:
+        raise ValueError(f"unsupported target: {target}")
+    upstream = Path("/app/HarmBench")
+    outputs = Path("/outputs")
+    output_root = outputs / artifact_id
+    upstream_receipt = validate_upstream(upstream)
+    checkpoint_manifest, model_dir = validate_checkpoint(target, Path("/weights"))
+    behaviors = upstream / "data/behavior_datasets" / PUBLIC_DATASET
+    selected = shard_behavior_ids(behaviors, shard_index, num_shards, limit)
+    models_path, method_path = write_runtime_configs(upstream, output_root, target, model_dir)
+    model_key = f"nemotron_3_5_{target}_gcg"
+    output_dir = output_root / "GCG" / model_key / "test_cases"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    individual_dir = output_dir / "test_cases_individual_behaviors"
+    command = [
+        "python",
+        "/app/incremental_generate.py",
+        "--upstream",
+        str(upstream),
+        "--models-config",
+        str(models_path),
+        "--method-config",
+        str(method_path),
+        "--behaviors",
+        str(behaviors),
+        "--output-dir",
+        str(output_dir),
+        "--public-name",
+        "GCG",
+        "--class-name",
+        "GCG",
+        "--experiment",
+        model_key,
+        "--behavior-ids",
+        ",".join(selected),
+        "--quiet-upstream",
+    ]
+    # Resume and receipt repair must not reload a frontier checkpoint when every selected
+    # upstream behavior artifact is already present.
+    run_generation_if_needed(individual_dir=individual_dir, behavior_ids=selected, command=command, upstream=upstream)
+    completed = completed_behavior_count(individual_dir, selected)
+    if completed != len(selected):
+        raise ValueError(f"GCG shard saved {completed}/{len(selected)} expected behavior artifacts")
+    receipt = {
+        "schema_version": 1,
+        "status": "completed",
+        "artifact_id": artifact_id,
+        "target": target,
+        "model_id": TARGETS[target]["model_id"],
+        "model_revision": TARGETS[target]["model_revision"],
+        "checkpoint_manifest_sha256": sha256(Path("/weights") / TARGETS[target]["manifest"]),
+        "checkpoint_manifest_status": checkpoint_manifest.get("status"),
+        "upstream": upstream_receipt,
+        "method": "GCG",
+        "num_steps": PUBLIC_STEPS,
+        "search_width": PUBLIC_SEARCH_WIDTH,
+        "starting_search_batch_size": TARGETS[target]["starting_search_batch_size"],
+        "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
+        "shard_index": shard_index,
+        "num_shards": num_shards,
+        "selected_behaviors": len(selected),
+        "completed_behaviors": completed,
+        "behavior_ids_sha256": hashlib.sha256("\n".join(selected).encode()).hexdigest(),
+        "model_config_sha256": sha256(models_path),
+        "method_config_sha256": sha256(method_path),
+    }
+    receipt_path = output_root / "shard-receipts" / f"{target}-{shard_index:02d}-of-{num_shards:02d}.json"
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return receipt
+
+
+def validate_complete_shard_receipts(
+    *, output_root: Path, behaviors: Path, target: str, artifact_id: str
+) -> list[dict[str, Any]]:
+    """Require a complete, source-order-consistent receipt set before finalization."""
+    receipt_dir = output_root / "shard-receipts"
+    paths = sorted(receipt_dir.glob(f"{target}-*-of-*.json"))
+    if not paths:
+        raise ValueError("cannot finalize: no completed GCG shard receipts")
+
+    parsed = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    shard_counts = {receipt.get("num_shards") for receipt in parsed}
+    if len(shard_counts) != 1:
+        raise ValueError("cannot finalize: GCG shard receipts disagree on num_shards")
+    num_shards = shard_counts.pop()
+    if not isinstance(num_shards, int) or not 1 <= num_shards <= 16:
+        raise ValueError("cannot finalize: invalid GCG shard receipt count")
+
+    expected_paths = [receipt_dir / f"{target}-{index:02d}-of-{num_shards:02d}.json" for index in range(num_shards)]
+    if paths != expected_paths:
+        raise ValueError("cannot finalize: incomplete or duplicate GCG shard receipt set")
+
+    bound_hashes: dict[str, set[str]] = {
+        "checkpoint_manifest_sha256": set(),
+        "model_config_sha256": set(),
+        "method_config_sha256": set(),
+    }
+    for index, receipt in enumerate(parsed):
+        selected = shard_behavior_ids(behaviors, index, num_shards)
+        expected_behavior_hash = hashlib.sha256("\n".join(selected).encode()).hexdigest()
+        required = {
+            "schema_version": 1,
+            "status": "completed",
+            "artifact_id": artifact_id,
+            "target": target,
+            "model_id": TARGETS[target]["model_id"],
+            "model_revision": TARGETS[target]["model_revision"],
+            "checkpoint_manifest_status": "verified",
+            "method": "GCG",
+            "num_steps": PUBLIC_STEPS,
+            "search_width": PUBLIC_SEARCH_WIDTH,
+            "starting_search_batch_size": TARGETS[target]["starting_search_batch_size"],
+            "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
+            "shard_index": index,
+            "num_shards": num_shards,
+            "selected_behaviors": len(selected),
+            "completed_behaviors": len(selected),
+            "behavior_ids_sha256": expected_behavior_hash,
+        }
+        mismatched = [key for key, expected in required.items() if receipt.get(key) != expected]
+        required_upstream = {
+            "revision": UPSTREAM_REVISION,
+            "pipeline_sha256": PIPELINE_SHA256,
+            "gcg_config_sha256": GCG_CONFIG_SHA256,
+        }
+        upstream = receipt.get("upstream")
+        if not isinstance(upstream, dict):
+            mismatched.extend(f"upstream.{key}" for key in required_upstream)
+        else:
+            mismatched.extend(
+                f"upstream.{key}" for key, expected in required_upstream.items() if upstream.get(key) != expected
+            )
+        for key, values in bound_hashes.items():
+            value = receipt.get(key)
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+                mismatched.append(key)
+            else:
+                values.add(value)
+        if mismatched:
+            raise ValueError(
+                f"cannot finalize: GCG shard receipt {index} failed fields {','.join(sorted(set(mismatched)))}"
+            )
+
+    for key, values in bound_hashes.items():
+        if len(values) != 1:
+            raise ValueError(f"cannot finalize: GCG shard receipts disagree on {key}")
+    return parsed
+
+
+def build_shard_receipt_manifest(
+    *, output_root: Path, target: str, num_shards: int
+) -> tuple[list[dict[str, str]], str]:
+    """Bind the finalized generation receipt to the exact validated shard receipts."""
+    receipt_dir = output_root / "shard-receipts"
+    manifest = [
+        {
+            "name": f"{target}-{index:02d}-of-{num_shards:02d}.json",
+            "sha256": sha256(receipt_dir / f"{target}-{index:02d}-of-{num_shards:02d}.json"),
+        }
+        for index in range(num_shards)
+    ]
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode()
+    return manifest, hashlib.sha256(canonical).hexdigest()
+
+
+def validate_behavior_artifact(path: Path, behavior_id: str) -> None:
+    """Validate one upstream nested GCG artifact without returning its attack payload."""
+    cases = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(cases, dict)
+        or set(cases) != {behavior_id}
+        or not isinstance(cases[behavior_id], list)
+        or len(cases[behavior_id]) != 1
+        or not isinstance(cases[behavior_id][0], str)
+        or not cases[behavior_id][0].strip()
+    ):
+        raise ValueError("invalid nested GCG behavior artifact")
+
+
+def reconcile_campaign_status(
+    *, output_root: Path, behaviors: Path, target: str, artifact_id: str, num_shards: int
+) -> dict[str, Any]:
+    """Return a payload-free exact-index GCG repair plan without loading weights."""
+    if target not in TARGETS:
+        raise ValueError(f"unsupported target: {target}")
+    if not 1 <= num_shards <= 16:
+        raise ValueError("invalid shard count")
+    behavior_ids = shard_behavior_ids(behaviors, 0, 1)
+    model_key = f"nemotron_3_5_{target}_gcg"
+    individual_dir = output_root / "GCG" / model_key / "test_cases" / "test_cases_individual_behaviors"
+    valid_indexes = []
+    missing_indexes = []
+    invalid_indexes = []
+    for index, behavior_id in enumerate(behavior_ids):
+        path = behavior_artifact_path(individual_dir, behavior_id)
+        if not path.is_file():
+            missing_indexes.append(index)
+            continue
+        try:
+            validate_behavior_artifact(path, behavior_id)
+        except (OSError, ValueError, json.JSONDecodeError):
+            invalid_indexes.append(index)
+        else:
+            valid_indexes.append(index)
+    expected_dirs = set(behavior_ids)
+    observed_entries = list(individual_dir.iterdir()) if individual_dir.is_dir() else []
+    extra_behavior_entries = sum(entry.name not in expected_dirs or not entry.is_dir() for entry in observed_entries)
+    repair_indexes = sorted([*missing_indexes, *invalid_indexes])
+    receipt_dir = output_root / "shard-receipts"
+    shard_receipt_paths = sorted(receipt_dir.glob(f"{target}-*-of-{num_shards:02d}.json"))
+    shard_receipts_valid = False
+    if len(shard_receipt_paths) == num_shards and len(valid_indexes) == PUBLIC_BEHAVIORS and not repair_indexes:
+        try:
+            validate_complete_shard_receipts(
+                output_root=output_root,
+                behaviors=behaviors,
+                target=target,
+                artifact_id=artifact_id,
+            )
+        except (OSError, ValueError, json.JSONDecodeError):
+            shard_receipts_valid = False
+        else:
+            shard_receipts_valid = True
+    return {
+        "schema_version": 1,
+        "artifact_kind": "harmbench_gcg_campaign_status",
+        "artifact_id": artifact_id,
+        "target": target,
+        "expected_behaviors": PUBLIC_BEHAVIORS,
+        "valid_behaviors": len(valid_indexes),
+        "missing_behaviors": len(missing_indexes),
+        "invalid_behaviors": len(invalid_indexes),
+        "extra_behavior_entries": extra_behavior_entries,
+        "missing_indexes": missing_indexes,
+        "invalid_indexes": invalid_indexes,
+        "repair_indexes": repair_indexes,
+        "resume_shards": sorted({index % num_shards for index in repair_indexes}),
+        "num_shards": num_shards,
+        "shard_receipts": len(shard_receipt_paths),
+        "shard_receipts_valid": shard_receipts_valid,
+        "ready_to_finalize": (
+            len(valid_indexes) == PUBLIC_BEHAVIORS
+            and not repair_indexes
+            and extra_behavior_entries == 0
+            and shard_receipts_valid
+        ),
+        "generation_receipt_present": (output_root / "generation-receipt.json").is_file(),
+    }
+
+
+def finalize_artifact(*, target: str, artifact_id: str) -> dict[str, Any]:
+    """Merge a complete 400-behavior campaign and write the Gym-compatible generation receipt."""
+    if target not in TARGETS:
+        raise ValueError(f"unsupported target: {target}")
+    upstream = Path("/app/HarmBench")
+    output_root = Path("/outputs") / artifact_id
+    model_key = f"nemotron_3_5_{target}_gcg"
+    output_dir = output_root / "GCG" / model_key / "test_cases"
+    individual_dir = output_dir / "test_cases_individual_behaviors"
+    behaviors = upstream / "data/behavior_datasets" / PUBLIC_DATASET
+    selected = shard_behavior_ids(behaviors, 0, 1)
+    missing = [
+        behavior_id for behavior_id in selected if not behavior_artifact_path(individual_dir, behavior_id).is_file()
+    ]
+    if missing:
+        raise ValueError(f"cannot finalize: {len(missing)} GCG behaviors are missing")
+    shard_receipts = validate_complete_shard_receipts(
+        output_root=output_root,
+        behaviors=behaviors,
+        target=target,
+        artifact_id=artifact_id,
+    )
+    shard_receipt_manifest, shard_receipts_sha256 = build_shard_receipt_manifest(
+        output_root=output_root,
+        target=target,
+        num_shards=len(shard_receipts),
+    )
+    subprocess.run(
+        ["python", "merge_test_cases.py", "--method_name", "GCG", "--save_dir", str(output_dir)],
+        cwd=upstream,
+        check=True,
+    )
+    cases_path = output_dir / "test_cases.json"
+    cases = json.loads(cases_path.read_text(encoding="utf-8"))
+    if set(cases) != set(selected) or any(not isinstance(value, list) or len(value) != 1 for value in cases.values()):
+        raise ValueError("merged GCG cases do not contain exactly one case for every public behavior")
+    receipt = {
+        "schema_version": 1,
+        "status": "completed",
+        "method": "GCG",
+        "upstream_method": "GCG",
+        "upstream_revision": UPSTREAM_REVISION,
+        "experiment": model_key,
+        "run_id": artifact_id,
+        "target_type": "text_weights",
+        "source_target_model": TARGETS[target]["model_id"],
+        "source_target_revision": TARGETS[target]["model_revision"],
+        "test_cases_sha256": sha256(cases_path),
+        "behaviors_sha256": sha256(behaviors),
+        "behaviors": PUBLIC_BEHAVIORS,
+        "cases": PUBLIC_BEHAVIORS,
+        "num_steps": PUBLIC_STEPS,
+        "search_width": PUBLIC_SEARCH_WIDTH,
+        "execution_only_deviation": EXECUTION_ONLY_DEVIATION,
+        "num_shards": len(shard_receipts),
+        "shard_receipts": shard_receipt_manifest,
+        "shard_receipts_sha256": shard_receipts_sha256,
+    }
+    receipt_path = output_root / "generation-receipt.json"
+    receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return receipt

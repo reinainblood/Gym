@@ -1,0 +1,79 @@
+/* Snorkel x NVIDIA report tokens, adapted from the approved report-theme.css. */
+:root {
+  --nv-green: #76B900;
+  --nv-green-soft: #A9D76C;
+  --nv-near-black: #05090F;
+  --nv-midnight: #0C1524;
+  --nv-deep-navy: #16263F;
+  --nv-ink: #111C2D;
+  --nv-paper: #F5F3EF;
+  --nv-white: #FFFFFF;
+  --nv-data-blue: #4696CB;
+  --nv-heading-blue: #5298C4;
+  --nv-violet: #5E5AD1;
+  --nv-muted-ink: rgba(17, 28, 45, 0.60);
+  --nv-muted-white: rgba(245, 243, 239, 0.62);
+  --nv-border: rgba(17, 28, 45, 0.14);
+}
+@page { size: Letter; margin: 0; }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  color: var(--nv-ink);
+  font-family: Geist, Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.nv-dark-header {
+  position: relative;
+  overflow: hidden;
+  color: var(--nv-paper);
+  background: linear-gradient(123deg, var(--nv-near-black), var(--nv-midnight), var(--nv-deep-navy));
+}
+.nv-green-glow {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  top: -120px;
+  right: -180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #76B90055, #76B90000 68%);
+  pointer-events: none;
+}
+.nv-brand, .nv-eyebrow, .nv-fine-print, .nv-label {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.nv-brand, .nv-eyebrow {
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+.nv-brand {
+  color: rgba(245, 243, 239, 0.72);
+  font-size: 10px;
+  font-weight: 650;
+}
+.nv-brand strong { color: var(--nv-green); }
+.nv-accent-rule { width: 1.2in; height: 4px; background: var(--nv-violet); }
+.nv-paper-page { color: var(--nv-ink); background: var(--nv-white); }
+.nv-section-title {
+  color: var(--nv-heading-blue);
+  font-size: 25px;
+  font-weight: 300;
+  letter-spacing: -0.5px;
+  line-height: 1.12;
+}
+.nv-card {
+  border: 1px solid var(--nv-border);
+  border-radius: 8px;
+  background: var(--nv-paper);
+  padding: 13px;
+  break-inside: avoid;
+}
+.nv-key-value {
+  color: var(--nv-green);
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+}
+.nv-comparison-value { color: var(--nv-data-blue); }
+.nv-fine-print { color: var(--nv-muted-ink); font-size: 8px; line-height: 1.4; }

@@ -1,0 +1,30 @@
+{
+  "attacker_model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+  "attacker_revision": "eba92302a2861cdc0098cc54bc9f17cb2c47eb61",
+  "attacker_seed": 1,
+  "behaviors": 320,
+  "behaviors_sha256": "75d257b3e7428c52eb7b0154318f455af3e01b09a3794b5e2f3d36054f3c0e29",
+  "cases": 1600,
+  "chat_template_sha256": "2d15b3d4cab0d3d98b003f5b0530206125de688279e56b09950b6f1612bfa4ba",
+  "experiment": "mixtral_attacker_llm",
+  "gpu": "H200",
+  "method": "ZeroShot",
+  "moe_backend": "triton",
+  "run_id": "zeroshot-full-20260917",
+  "sampling": {
+    "frequency_penalty": 0.1,
+    "max_tokens": 256,
+    "presence_penalty": 0.1,
+    "stop": [
+      "\n"
+    ],
+    "temperature": 0.9,
+    "top_p": 0.95
+  },
+  "tensor_parallel_size": 1,
+  "test_cases_sha256": "b6860fb3f0ecc7bf36a49830055d0d762de4fb19d61c737e69339ab6b9d01147",
+  "upstream_method": "ZeroShot",
+  "upstream_revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd",
+  "vllm_enforce_eager": true,
+  "vllm_version": "0.21.0"
+}

@@ -1,0 +1,15 @@
+config_paths:
+  - resources_servers/harmbench/configs/harmbench.yaml
+
+harmbench_multimodal_render_text:
+  _inherit_from: harmbench_simple_agent
+  responses_api_agents:
+    simple_agent:
+      datasets:
+        - name: harmbench-multimodal-render-text-gpt4v
+          type: benchmark
+          jsonl_fpath: benchmarks/harmbench/data/multimodal_render_text_gpt4v.jsonl
+          prepare_script: benchmarks/harmbench/prepare_multimodal_render_text.py
+          prompt_config: null
+          num_repeats: 1
+          license: MIT

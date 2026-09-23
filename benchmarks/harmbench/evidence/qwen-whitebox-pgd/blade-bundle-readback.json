@@ -1,0 +1,23 @@
+{
+  "artifact_kind": "harmbench_blade_remote_readback",
+  "manifest_sha256": "541019614aad2139398c60d0b243cde1ba20eac19c0f30d29b8fbc711d1b6c5b",
+  "method": "MultiModalPGD",
+  "output_checks": {
+    "harmbench_blade_metrics.json": {
+      "sha256_match": true,
+      "size_match": true
+    },
+    "harmbench_blade_report.md": {
+      "sha256_match": true,
+      "size_match": true
+    },
+    "harmbench_blade_rows.jsonl": {
+      "sha256_match": true,
+      "size_match": true
+    }
+  },
+  "rows": 110,
+  "status": "completed",
+  "volume": "harmbench-qwen35-122b-whitebox-results",
+  "volume_path": "qwen35-122b-harmbench-whitebox-20260919/MultiModalPGD/blade-canonical-512"
+}
