@@ -49,6 +49,33 @@ def _row(
     }
 
 
+#: Shard count for cells too expensive to collect in one process. A cell's score is a pure
+#: function of its row set -- masked rollouts leave the denominator, then utility and attack
+#: success are averaged over the benign and attacked subsets -- so collecting 620 selectors
+#: across N processes scores identically to one process collecting all of them. Written here
+#: rather than generated ad hoc so a container reproduces the same split from `prepare`.
+SHARD_COUNT = 8
+SHARD_DIR = OUTPUT_PATH.parent / "shards"
+
+
+def write_shards(rows: list[dict[str, Any]]) -> list[Path]:
+    """Split the selectors into contiguous shards for cells that need many processes."""
+    SHARD_DIR.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    size, remainder = divmod(len(rows), SHARD_COUNT)
+    start = 0
+    for index in range(SHARD_COUNT):
+        stop = start + size + (1 if index < remainder else 0)
+        path = SHARD_DIR / f"agentdyn_v1_2_2.shard{index}of{SHARD_COUNT}.jsonl"
+        path.write_text(
+            "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows[start:stop]),
+            encoding="utf-8",
+        )
+        written.append(path)
+        start = stop
+    return written
+
+
 def prepare() -> Path:
     rows: list[dict[str, Any]] = []
     clean_count = 0
@@ -76,6 +103,8 @@ def prepare() -> Path:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
     print(f"Wrote {len(rows)} AgentDyn selectors to {OUTPUT_PATH}")
+    shards = write_shards(rows)
+    print(f"Wrote {len(shards)} shards to {SHARD_DIR} ({sum(1 for _ in shards)} files)")
     return OUTPUT_PATH
 
 
