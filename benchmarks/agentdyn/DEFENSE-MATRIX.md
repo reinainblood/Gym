@@ -42,7 +42,7 @@ past forty hours for one cell.
 - **Concurrency is not the baselines' 4.** The baseline manifest records concurrency 4, but that number never bound
   anything: the agent server runs whole rollouts behind `asyncio.Semaphore(concurrency)`, shipped at `1`. Most of the
   grid was collected that way, one rollout at a time per stack. Four cells were not, in part: `supervl-camel` (its shards,
-  4 at a time from their second launch onward), `kimi-drift` (its last 156 rows, 8 at a time), and the re-collected rows of
+  4 at a time from their relaunch at concurrency 4 onward, 406 rows), `kimi-drift` (its last 156 rows, 8 at a time), and the re-collected rows of
   `kimi-camel` and `qwen-camel` (8 at a time). Only CaMeL and DRIFT were ever run concurrently, because only they were
   checked for score invariance -- and concurrency turned out to be unsafe in general, for a reason that check could
   not see: see [Rollout concurrency was raised](#rollout-concurrency-was-raised-for-the-slowest-cells-the-scores-are-unchanged-but-it-is-not-safe-in-general)
@@ -208,8 +208,8 @@ model bridge) and `os.environ` (via `patch.dict`, which restores the whole mappi
 thread-safe. With two rollouts overlapping, B's patch overwrites A's, so A's auxiliary calls are recorded on B's
 bridge; A's exit then restores the real `openai.OpenAI` and strips the routing variables while B is still running.
 
-What that could and could not have done to the concurrently collected rows -- about 850 of them: `supervl-camel` after
-its shards' second launch, `kimi-drift`'s last 164, and the re-collected rows of `kimi-camel` and `qwen-camel` -- was
+What that could and could not have done to the concurrently collected rows -- about 790 of them: `supervl-camel` from
+its shards' relaunch at concurrency 4 (406 rows), `kimi-drift`'s last 164, and the re-collected rows of `kimi-camel` and `qwen-camel` -- was
 checked rather than assumed:
 
 - **No rollout could have been answered by a different model.** A real, unpatched client reads only `OPENAI_API_KEY`
@@ -224,7 +224,7 @@ checked rather than assumed:
   and identical transcripts under different user tasks (0 in every concurrent slice; `supervl-camel` 3, against 9 in
   the fully serial `ultra-camel`, where identical trivial programs are normal). Neither shows any excess. The window is
   narrow -- CaMeL constructs its client once, immediately after its patches are applied -- which fits that. The checks
-  cannot see cross-talk between two similar tasks in the same suite, so the transcripts of those ~850 rows carry that
+  cannot see cross-talk between two similar tasks in the same suite, so the transcripts of those ~790 rows carry that
   residual caveat.
 
 So the concurrent rows stand, but concurrency above 1 is not a safe setting for this adapter, and the shipped config
