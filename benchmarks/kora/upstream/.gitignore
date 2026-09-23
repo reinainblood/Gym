@@ -1,0 +1,5 @@
+# The KORA run package (about 280 MB) and the pack exported from it are fetched by
+# `python -m benchmarks.kora.prepare` and never committed: the package is published under
+# KORA's Permitted Use terms and is redistributed by korabench.ai, not by this repository.
+*
+!.gitignore
