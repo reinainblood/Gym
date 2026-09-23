@@ -223,14 +223,16 @@ checked rather than assumed:
   cells has a single non-timeout adapter error -- or reached a stale routed URL, which is the same local policy model.
 - **Scores are computed from task state, not from the bridge**, so bridge cross-talk cannot move utility or attack
   success. That is consistent with the invariance table above.
-- **Saved transcripts and call counts could be misattributed**, because they are built from the bridge. Two
-  fingerprints were compared between the serial and concurrent rows of the same cells, and against fully serial
-  controls: tool calls belonging to a different suite (kimi-camel 29% serial vs 29% concurrent; kimi-drift 2.4% vs 0%)
-  and identical transcripts under different user tasks (0 in every concurrent slice; `supervl-camel` 3, against 9 in
-  the fully serial `ultra-camel`, where identical trivial programs are normal). Neither shows any excess. The window is
-  narrow -- CaMeL constructs its client once, immediately after its patches are applied -- which fits that. The checks
-  cannot see cross-talk between two similar tasks in the same suite, so the transcripts of those ~790 rows carry that
-  residual caveat.
+- **Saved transcripts and call counts were misattributed, and that is now measured.** An earlier version of this
+  section reported no excess cross-talk from two transcript fingerprints. A third signal, found while packaging the
+  delivery, shows otherwise: 88 scored rows carry an empty response envelope (`response.id = "agentdojo-error"`)
+  despite 2-11 recorded model calls -- their calls were recorded on another rollout's bridge. All 88 are in the four
+  cells collected concurrently (`supervl-camel` 58, `kimi-camel` 14, `kimi-drift` 14, `qwen-camel` 2), and within
+  each mixed cell every one falls in the concurrently collected segment; the fully serial cells, `ultra-camel`
+  included, have none. The same mechanism can equally have added foreign calls to other concurrent rows' transcripts,
+  which no fingerprint can see, so the transcripts and call counts of all ~790 concurrently collected rows should be
+  treated as unreliable. Scores are not affected: a misrouted call still reaches the same policy model with the
+  rollout's own request, and utility and attack success are computed from that rollout's suite state.
 
 So the concurrent rows stand, but concurrency above 1 is not a safe setting for this adapter, and the shipped config
 keeps it at 1. Throughput comes from more processes -- separate stacks, or the selector shards used for the two
@@ -268,7 +270,8 @@ only as a precaution while this figure was still 1-of-6.
 to ~55 sequential model calls compounding small serving nondeterminism "even at temperature 0". The runs were not at
 temperature 0. No runner passed `--temperature`, and the adapter forwards only run-set sampling, so every arm except
 CaMeL -- the undefended baselines included -- was sampled at each endpoint's default temperature. CaMeL requests 0 from
-its own client: every scored CaMeL row records `temperature: 0.0`, and every other row records none. That split lines up
+its own client: CaMeL rows record `temperature: 0.0` except 74 scored rows whose responses were lost to the
+cross-talk described above, and every other row records none. That split lines up
 with the observation exactly -- CaMeL 0 of 16 disagreements, DRIFT 13 of 77 -- and is the likely source of DRIFT's
 variance. It is still a property of how the run was configured rather than of DRIFT, but it is fixable: pass
 `--temperature 0.0`, which is also upstream's harness default.
