@@ -114,6 +114,7 @@ def summarize(cell: dict) -> dict:
     attacked = [row for row in scored if row.get("injection_task_id") is not None]
     temperatures = collections.Counter(json.dumps((row.get("response") or {}).get("temperature")) for row in rows)
     rate = lambda part, key: sum(bool(row.get(key)) for row in part) / len(part) if part else float("nan")
+    selected = [row for row in scored if row.get("tool_filter_kept_tools") is not None]
     return {
         "shards": f"{len(cell['present'])}/{cell['shards']}" + ("+s" if cell["supplement"] else ""),
         "dropped_noncanonical": cell["dropped_noncanonical"],
@@ -127,6 +128,11 @@ def summarize(cell: dict) -> dict:
         "utility_under_attack": rate(attacked, "utility"),
         "attack_success_rate": rate(attacked, "attack_success"),
         "masked": dict(collections.Counter(mask_cause(row) for row in rows if row.get("mask_sample"))),
+        # Share of scored rows whose tool_filter kept no tool; None where the field is absent
+        # (other arms, and rows collected before the field existed).
+        "tool_filter_empty_selection_rate": (
+            sum(1 for row in selected if not row["tool_filter_kept_tools"]) / len(selected) if selected else None
+        ),
         "temperatures": dict(temperatures),
         "complete": len(counts) == TOTAL_ROWS and len(cell["present"]) == cell["shards"],
     }
@@ -146,6 +152,11 @@ def table(directory: Path, as_json: bool) -> None:
             f"{s['benign_utility']:6.3f} {s['utility_under_attack']:6.3f} {s['attack_success_rate']:6.3f}  "
             f"{','.join(s['temperatures'])}  {s['masked'] or ''}{'' if s['complete'] else '  INCOMPLETE'}"
             f"{'  DUPES ' + str(s['duplicates']) if s['duplicates'] else ''}"
+            + (
+                f"  empty_sel {s['tool_filter_empty_selection_rate']:.3f}"
+                if s["tool_filter_empty_selection_rate"] is not None
+                else ""
+            )
         )
 
 
