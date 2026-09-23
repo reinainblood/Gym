@@ -48,6 +48,11 @@ past forty hours for one cell.
   not see: see [Rollout concurrency was raised](#rollout-concurrency-was-raised-for-the-slowest-cells-the-scores-are-unchanged-but-it-is-not-safe-in-general)
   and [DRIFT is not deterministic](#drift-is-not-deterministic-and-the-rate-is-measured). Every other defense ran
   serially throughout.
+- **Sampling was not pinned.** Upstream's harness samples at temperature 0 (`OpenAILLM`'s default). This collection
+  passed no `--temperature`, and the adapter forwards only the sampling a run sets, so every arm except CaMeL -- the
+  undefended baselines included -- ran at each endpoint's default temperature, which is not recorded. CaMeL requests 0
+  from its own client, and its rows record it. Scores are computed correctly either way; what differs is protocol parity
+  with upstream and run-to-run variance. Reproductions should pass `--temperature 0.0`.
 - **Two Super-VL cells were collected as eight shards.** `supervl-camel` and `supervl-drift` were each split into eight
   contiguous slices of the 620 selectors (78/78/78/78/77/77/77/77) and collected in parallel; `prepare.py` emits the
   slices, and they concatenate byte-identically to the full selector file. A cell's score is a mean over its row set,
@@ -259,11 +264,14 @@ twenty. The concurrent run sits *below* that floor on both measures, so concurre
 variance -- which is what let CaMeL be collected concurrently without affecting its scores. DRIFT was kept serial
 only as a precaution while this figure was still 1-of-6.
 
-The likely mechanism is not "DRIFT is broken". It makes **~55 sequential model calls** per rollout against
-CaMeL's ~3, and CaMeL showed **0 of 16** disagreements on the same endpoint. A per-call divergence well under one
-percent -- ordinary for a 120B MoE where batching affects routing, even at temperature 0 -- compounds over 55 calls
-to about this rate. So the honest statement is that **reproducibility degrades with call count on this serving
-stack**: a property of the setup rather than of DRIFT, and one any correct implementation would show.
+**Correction: the mechanism is sampling, not call count.** An earlier version of this section attributed the variance
+to ~55 sequential model calls compounding small serving nondeterminism "even at temperature 0". The runs were not at
+temperature 0. No runner passed `--temperature`, and the adapter forwards only run-set sampling, so every arm except
+CaMeL -- the undefended baselines included -- was sampled at each endpoint's default temperature. CaMeL requests 0 from
+its own client: every scored CaMeL row records `temperature: 0.0`, and every other row records none. That split lines up
+with the observation exactly -- CaMeL 0 of 16 disagreements, DRIFT 13 of 77 -- and is the likely source of DRIFT's
+variance. It is still a property of how the run was configured rather than of DRIFT, but it is fixable: pass
+`--temperature 0.0`, which is also upstream's harness default.
 
 The consequence for anyone trending these numbers week to week: a single 620-row DRIFT cell carries run-to-run
 variance the point estimate does not show. `7.14%` to two decimals implies a precision the measurement does not
