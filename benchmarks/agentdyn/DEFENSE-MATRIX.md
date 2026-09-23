@@ -44,7 +44,8 @@ past forty hours for one cell.
   grid was collected that way, one rollout at a time per stack. Four cells were not, in part: `supervl-camel` (its shards,
   4 at a time from their second launch onward), `kimi-drift` (its last 156 rows, 8 at a time), and the re-collected rows of
   `kimi-camel` and `qwen-camel` (8 at a time). Only CaMeL and DRIFT were ever run concurrently, because only they were
-  checked for it: see [Rollout concurrency was raised](#rollout-concurrency-was-raised-for-the-slowest-cells-and-the-scores-are-unchanged)
+  checked for score invariance -- and concurrency turned out to be unsafe in general, for a reason that check could
+  not see: see [Rollout concurrency was raised](#rollout-concurrency-was-raised-for-the-slowest-cells-the-scores-are-unchanged-but-it-is-not-safe-in-general)
   and [DRIFT is not deterministic](#drift-is-not-deterministic-and-the-rate-is-measured). Every other defense ran
   serially throughout.
 - **Two Super-VL cells were collected as eight shards.** `supervl-camel` and `supervl-drift` were each split into eight
@@ -176,7 +177,7 @@ They stay masked on purpose. A timeout is the treatment failing to finish, which
 than of the infrastructure; deleting them would convert a real failure into a re-roll until it passed. `supervl-camel`
 is scored on 545 rows because of them, and that is the honest denominator.
 
-## Rollout concurrency was raised for the slowest cells, and the scores are unchanged
+## Rollout concurrency was raised for the slowest cells: the scores are unchanged, but it is not safe in general
 
 The agent holds `asyncio.Semaphore(concurrency)` around an entire rollout, and the shipped config sets
 `concurrency: 1`. That is the right default for an environment whose task isolation has not been established, but it
@@ -199,6 +200,36 @@ ran the same shard as a serial container, and the two were compared selector by 
 No selector that both runs completed disagrees on either scored field. Throughput is a scheduling property; utility and
 attack success are not, and they did not move. Rows collected either way are therefore the same measurement, and the
 already-finished cells did not need re-running.
+
+**The isolation argument above was incomplete, and `concurrency: 1` is load-bearing.** Environment state is isolated,
+but defense setup is not. For the routed defenses (CaMeL, Progent, DRIFT) the agent wraps each rollout in
+`unittest.mock.patch` scopes over process globals -- `openai.OpenAI` (replaced by a proxy bound to *that rollout's*
+model bridge) and `os.environ` (via `patch.dict`, which restores the whole mapping on exit). Those scopes are not
+thread-safe. With two rollouts overlapping, B's patch overwrites A's, so A's auxiliary calls are recorded on B's
+bridge; A's exit then restores the real `openai.OpenAI` and strips the routing variables while B is still running.
+
+What that could and could not have done to the concurrently collected rows -- about 850 of them: `supervl-camel` after
+its shards' second launch, `kimi-drift`'s last 164, and the re-collected rows of `kimi-camel` and `qwen-camel` -- was
+checked rather than assumed:
+
+- **No rollout could have been answered by a different model.** A real, unpatched client reads only `OPENAI_API_KEY`
+  and `OPENAI_BASE_URL`, and the containers carried no OpenAI key. So such a client either raised at construction, got
+  a 401 from OpenAI with the placeholder key -- both would land as masked rows with an adapter error, and none of these
+  cells has a single non-timeout adapter error -- or reached a stale routed URL, which is the same local policy model.
+- **Scores are computed from task state, not from the bridge**, so bridge cross-talk cannot move utility or attack
+  success. That is consistent with the invariance table above.
+- **Saved transcripts and call counts could be misattributed**, because they are built from the bridge. Two
+  fingerprints were compared between the serial and concurrent rows of the same cells, and against fully serial
+  controls: tool calls belonging to a different suite (kimi-camel 29% serial vs 29% concurrent; kimi-drift 2.4% vs 0%)
+  and identical transcripts under different user tasks (0 in every concurrent slice; `supervl-camel` 3, against 9 in
+  the fully serial `ultra-camel`, where identical trivial programs are normal). Neither shows any excess. The window is
+  narrow -- CaMeL constructs its client once, immediately after its patches are applied -- which fits that. The checks
+  cannot see cross-talk between two similar tasks in the same suite, so the transcripts of those ~850 rows carry that
+  residual caveat.
+
+So the concurrent rows stand, but concurrency above 1 is not a safe setting for this adapter, and the shipped config
+keeps it at 1. Throughput comes from more processes -- separate stacks, or the selector shards used for the two
+Super-VL cells -- never from raising the semaphore.
 
 ## `mean_model_calls` is inflated by endpoint retries, and is not a clean cost measure
 
