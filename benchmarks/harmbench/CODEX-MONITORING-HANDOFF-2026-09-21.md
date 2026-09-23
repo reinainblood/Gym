@@ -287,3 +287,16 @@ Separately, the existing Qwen MultiModalPGDBlankImage workers and later Patch co
   Raw classifier parity matched 300/300, copyright parity matched 100/100, and deterministic BLADE manifest/output
   readback passed. Fresh PAIR is validated and must not be rerun. The three Fresh TAP shards remain active; do not
   duplicate, redeploy, or finalize them until all calls are terminal and their receipts validate.
+
+## Client-fresh TAP full Super milestone — 2026-09-22 22:33 CDT
+
+- All three `tap-super-full-400-20260921a` source-order shards completed. The exact shard-2 repair call
+  `fc-01M34Y3MDKA2J3XMNA7MBV79DH` resumed from 79 receipts without duplicating completed behaviors. CPU status validated
+  shards `[0, 1, 2]`, and finalizer call `fc-01M35Y5QQ56M8JCG2G3TVNZJQN` produced the canonical 400-behavior receipt and
+  a 400-case upstream control. The final generation receipt binds 18,141 independently receipted Super target calls.
+- Super target/scorer collection reconciled 400/400 healthy cases with zero failures/missing, 9 successes, and 2.25% ASR.
+  Twenty-four reasoning-starved empty responses at the 512-token target cap were repaired using the documented
+  reasoning-model escalation: 22 became healthy at 4,096 tokens, one at 8,192, and one at 16,384. The pinned HarmBench
+  classifier still received no more than 512 classifier tokens. The reconciled run passed 400/400 model-call health,
+  raw classifier parity matched 300/300, copyright parity matched 100/100, and deterministic BLADE readback matched all
+  four evidence files byte-for-byte. The strict method manifest is `validated`. Fresh TAP must not be rerun.
