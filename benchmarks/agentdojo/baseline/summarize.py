@@ -149,10 +149,17 @@ def table(directory: Path, as_json: bool) -> None:
         )
 
 
-def recollect(path: Path, apply: bool) -> None:
+def recollect(path: Path, apply: bool, timeouts: bool = False) -> None:
+    """`timeouts` also drops `RolloutTimeout` rows, for a re-run under a larger budget.
+
+    Only for a timeout the harness imposed on a healthy rollout: upstream sets no time limit,
+    and its task runner reruns a pipeline up to 3x (up to 48 model calls), so a slow endpoint
+    can push a healthy rollout past a budget calibrated on fast ones.
+    """
     rows = [json.loads(line) for line in path.open(encoding="utf-8") if line.strip()]
     counts = collections.Counter(classify(row) for row in rows)
-    keep = [row for row in rows if classify(row) != "masked-infrastructure"]
+    drop = {"masked-infrastructure"} | ({"masked-result"} if timeouts else set())
+    keep = [row for row in rows if classify(row) not in drop]
     print(f"{path.name}: {dict(counts)} -> drop {len(rows) - len(keep)}, keep {len(keep)}")
     if apply and len(keep) != len(rows):
         path.write_text("".join(json.dumps(row) + "\n" for row in keep), encoding="utf-8")
@@ -168,12 +175,13 @@ def main() -> None:
     r = sub.add_parser("recollect")
     r.add_argument("paths", type=Path, nargs="+")
     r.add_argument("--apply", action="store_true")
+    r.add_argument("--timeouts", action="store_true", help="Also drop RolloutTimeout rows.")
     args = parser.parse_args()
     if args.command == "table":
         table(args.directory, args.json)
     else:
         for path in args.paths:
-            recollect(path, args.apply)
+            recollect(path, args.apply, args.timeouts)
 
 
 if __name__ == "__main__":
