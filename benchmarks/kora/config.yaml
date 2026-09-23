@@ -1,0 +1,25 @@
+# KORA (https://korabench.ai), run V2 package 341620448e7e1486: 781 scenarios x 2 tiers =
+# 1,562 conversations per model, 3 to 8 exchanges each against a child model, graded by the
+# published judge. See benchmarks/kora/README.md for the protocol and METRICS.md for every
+# quantity and divergence.
+config_paths:
+  - resources_servers/kora/configs/kora.yaml
+
+# Inherits the resources server, the judge, the policy and the child-model wiring from
+# kora_child_actor_agent. Rows carry the target's system prompt and the scenario; the agent
+# generates the child's turns, so no prompt template applies.
+kora_benchmark_agent:
+  _inherit_from: kora_child_actor_agent
+  responses_api_agents:
+    kora_child_actor:
+      datasets:
+      - name: kora
+        type: benchmark
+        jsonl_fpath: benchmarks/kora/data/kora_benchmark.jsonl
+        prepare_script: benchmarks/kora/prepare.py
+        prompt_config: null
+        # Gym's entry for terms that match no named licence; KORA's Permitted Use terms are
+        # summarized in the README.
+        license: TBD
+        # Upstream runs each (scenario, tier) once per target.
+        num_repeats: 1

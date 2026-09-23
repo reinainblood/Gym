@@ -1,0 +1,153 @@
+{
+    "name": "example",
+    "type": "example",
+    "jsonl_fpath": "resources_servers/kora/data/example.jsonl",
+    "num_repeats": 1,
+    "source": null,
+    "gitlab_identifier": null,
+    "huggingface_identifier": null,
+    "license": null,
+    "Number of examples": 5,
+    "Number of tools": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "Json-dumped number of words (proxy for token count)": {
+        "Total # non-null values": 5,
+        "Average": 233.8,
+        "Min": 62.0,
+        "Max": 365.0,
+        "Standard deviation": 157.16
+    },
+    "Number of turns": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "Temperature": {
+        "Total # non-null values": 0,
+        "Average": 0.0,
+        "Min": 0.0,
+        "Max": 0.0,
+        "Standard deviation": 0.0
+    },
+    "kora_id": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "run_id": {
+        "unique_count": 1,
+        "total_count": 5
+    },
+    "scenario_id": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "tier": {
+        "unique_count": 2,
+        "total_count": 5
+    },
+    "age_range": {
+        "unique_count": 3,
+        "total_count": 5
+    },
+    "risk_category_id": {
+        "unique_count": 3,
+        "total_count": 5
+    },
+    "risk_category_name": {
+        "unique_count": 3,
+        "total_count": 5
+    },
+    "risk_id": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "risk_name": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "risk_description": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "planned_turns": {
+        "Total # non-null values": 5,
+        "Average": 3.2,
+        "Min": 3.0,
+        "Max": 4.0,
+        "Standard deviation": 0.447
+    },
+    "short_title": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "child_age": {
+        "Total # non-null values": 5,
+        "Average": 12.2,
+        "Min": 8.0,
+        "Max": 16.0,
+        "Standard deviation": 3.27
+    },
+    "child_gender": {
+        "unique_count": 2,
+        "total_count": 5
+    },
+    "child_race_ethnicity": {
+        "unique_count": 3,
+        "total_count": 5
+    },
+    "child_ses": {
+        "unique_count": 2,
+        "total_count": 5
+    },
+    "child_cognitive_maturity": {
+        "unique_count": 1,
+        "total_count": 5
+    },
+    "child_emotional_maturity": {
+        "unique_count": 2,
+        "total_count": 5
+    },
+    "risk_signal_type": {
+        "unique_count": 2,
+        "total_count": 5
+    },
+    "social_context": {
+        "unique_count": 2,
+        "total_count": 5
+    },
+    "motivation_name": {
+        "unique_count": 3,
+        "total_count": 5
+    },
+    "child_maturity": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "child_background": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "narrative": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "evaluation_criteria": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "first_user_message": {
+        "unique_count": 5,
+        "total_count": 5
+    },
+    "scenario_flavor_id": {
+        "unique_count": 1,
+        "total_count": 1
+    }
+}
