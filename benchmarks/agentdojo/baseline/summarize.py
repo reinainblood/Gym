@@ -26,6 +26,16 @@ from pathlib import Path
 
 TOTAL_ROWS = 1046
 SHARD_FILE = re.compile(r"^(?P<model>[a-z0-9]+)-(?P<arm>[a-z_]+)-shard(?P<index>\d+)of(?P<shards>\d+)\.jsonl$")
+#: Completion of a cell whose shards predate the slack-numbering fix; see baseline/shards.py.
+SUPPLEMENT_FILE = re.compile(r"^(?P<model>[a-z0-9]+)-(?P<arm>[a-z_]+)-slack5\.jsonl$")
+
+
+def canonical_selectors() -> set[tuple[str, str, str | None]]:
+    """The selector set of the fixed prepare(): what every cell is scored against."""
+    from benchmarks.agentdojo.prepare import prepare
+
+    return {selector(json.loads(line)) for line in prepare().read_text(encoding="utf-8").splitlines()}
+
 
 INFRASTRUCTURE_PREFIXES = (
     "ClientResponseError",
@@ -66,20 +76,33 @@ def load_cells(directory: Path) -> dict[tuple[str, str], dict]:
     groups: dict[tuple[str, str], dict[int, dict[int, Path]]] = collections.defaultdict(
         lambda: collections.defaultdict(dict)
     )
+    supplements: dict[tuple[str, str], Path] = {}
     for path in sorted(directory.iterdir()):
         match = SHARD_FILE.match(path.name)
         if match:
             key = (match["model"], match["arm"])
             groups[key][int(match["shards"])][int(match["index"])] = path
+        match = SUPPLEMENT_FILE.match(path.name)
+        if match:
+            supplements[(match["model"], match["arm"])] = path
+    canonical = canonical_selectors()
     cells = {}
     for key, by_count in groups.items():
         if len(by_count) != 1:
             raise SystemExit(f"{key}: files from more than one shard count {sorted(by_count)}; resolve before scoring")
         ((shards, files),) = by_count.items()
+        paths = [files[index] for index in sorted(files)] + ([supplements[key]] if key in supplements else [])
         rows = []
-        for index in sorted(files):
-            rows.extend(json.loads(line) for line in files[index].open(encoding="utf-8") if line.strip())
-        cells[key] = {"shards": shards, "present": sorted(files), "rows": rows}
+        for path in paths:
+            rows.extend(json.loads(line) for line in path.open(encoding="utf-8") if line.strip())
+        kept = [row for row in rows if selector(row) in canonical]
+        cells[key] = {
+            "shards": shards,
+            "present": sorted(files),
+            "supplement": key in supplements,
+            "rows": kept,
+            "dropped_noncanonical": len(rows) - len(kept),
+        }
     return cells
 
 
@@ -92,7 +115,8 @@ def summarize(cell: dict) -> dict:
     temperatures = collections.Counter(json.dumps((row.get("response") or {}).get("temperature")) for row in rows)
     rate = lambda part, key: sum(bool(row.get(key)) for row in part) / len(part) if part else float("nan")
     return {
-        "shards": f"{len(cell['present'])}/{cell['shards']}",
+        "shards": f"{len(cell['present'])}/{cell['shards']}" + ("+s" if cell["supplement"] else ""),
+        "dropped_noncanonical": cell["dropped_noncanonical"],
         "rows": len(rows),
         "unique": len(counts),
         "duplicates": sum(n - 1 for n in counts.values() if n > 1),
@@ -114,11 +138,11 @@ def table(directory: Path, as_json: bool) -> None:
     if as_json:
         print(json.dumps(out, indent=2))
         return
-    header = f"{'cell':34} {'shards':>6} {'rows':>5} {'scored':>6} {'BU':>6} {'UuA':>6} {'ASR':>6}  temp  masked"
+    header = f"{'cell':34} {'shards':>8} {'drop':>4} {'rows':>5} {'scored':>6} {'BU':>6} {'UuA':>6} {'ASR':>6}  temp  masked"
     print(header)
     for name, s in out.items():
         print(
-            f"{name:34} {s['shards']:>6} {s['unique']:>5} {s['scored']:>6} "
+            f"{name:34} {s['shards']:>8} {s['dropped_noncanonical']:>4} {s['unique']:>5} {s['scored']:>6} "
             f"{s['benign_utility']:6.3f} {s['utility_under_attack']:6.3f} {s['attack_success_rate']:6.3f}  "
             f"{','.join(s['temperatures'])}  {s['masked'] or ''}{'' if s['complete'] else '  INCOMPLETE'}"
             f"{'  DUPES ' + str(s['duplicates']) if s['duplicates'] else ''}"

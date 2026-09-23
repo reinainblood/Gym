@@ -32,6 +32,14 @@ def shard_rows(index: int, shards: int, total: int = 1046) -> int:
     return len(range(index, total, shards))
 
 
+#: The 21 slack x injection_task_5 selectors. Shards launched before the slack-numbering fix
+#: (prepare.py numbered slack's injections 0-4; upstream's are 1-5) collected 1,025 valid
+#: selectors plus 21 unloadable slack x injection_task_0 rows; this file is the remainder, so
+#: those cells are completed with it rather than recollected. The summarizer scores every
+#: cell against the fixed prepare() selector set and drops the unloadable rows.
+SUPPLEMENT_PATH = SHARD_DIR / "agentdojo_benchmark.slack_injection_task_5.jsonl"
+
+
 def materialize() -> None:
     source = prepare()
     lines = source.read_text(encoding="utf-8").splitlines(keepends=True)
@@ -39,7 +47,9 @@ def materialize() -> None:
     for shards in SHARD_COUNTS:
         for index in range(shards):
             shard_path(index, shards).write_text("".join(lines[index::shards]), encoding="utf-8")
-    print(f"Wrote shards {SHARD_COUNTS} of {len(lines)} rows to {SHARD_DIR}")
+    supplement = [line for line in lines if '"suite": "slack"' in line and '"injection_task_5"' in line]
+    SUPPLEMENT_PATH.write_text("".join(supplement), encoding="utf-8")
+    print(f"Wrote shards {SHARD_COUNTS} of {len(lines)} rows and {len(supplement)} supplement rows to {SHARD_DIR}")
 
 
 if __name__ == "__main__":
