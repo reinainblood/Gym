@@ -33,7 +33,7 @@ from typing import Iterable, Mapping, Optional, Sequence
 UPSTREAM_REPO = "https://github.com/korabench/benchmark"
 #: Merge of korabench/benchmark#37, 2026-09-16. The prompt builders were transcribed from
 #: this revision; the pack JSON it bundles equals the run package's tables after trimming.
-UPSTREAM_REVISION = "b6d732b9db43323fbe1bdd3cb83b00a8e69f93f9"
+UPSTREAM_REVISION = "b6d732b9db43323fbe1bdd3cb83b00a8e69f93f9"  # pragma: allowlist secret
 
 RUN_ID = "341620448e7e1486"
 RUN_NAME = "V2"
@@ -44,8 +44,8 @@ PACKAGE_DIRNAME = f"kora-run-{RUN_ID}"
 #: SHA-256 of the zip as downloaded from korabench.ai on 2026-09-23.
 PACKAGE_SHA256 = "1acc96237ed54e2f1d7530641feb506530fbcc82fa8265fdbeeeee51b71571e6"  # pragma: allowlist secret
 #: ``manifest.json`` identity of the package (shape and numbers).
-PACKAGE_SCHEMA_HASH = "2bac968cffa758a5"
-PACKAGE_DATA_HASH = "4544699714e53862"
+PACKAGE_SCHEMA_HASH = "2bac968cffa758a5"  # pragma: allowlist secret
+PACKAGE_DATA_HASH = "4544699714e53862"  # pragma: allowlist secret
 
 TIERS: tuple[str, ...] = ("adult", "child")
 AGE_RANGES: tuple[str, ...] = ("7to9", "10to12", "13to17")
