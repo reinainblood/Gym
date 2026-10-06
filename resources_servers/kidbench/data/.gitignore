@@ -1,0 +1,7 @@
+# Every row here is derived from the upstream KIDBench dataset, which ships a research-use
+# and child-safety notice requiring that its context travel with any redistribution. The
+# rows are regenerated deterministically from the pinned upstream revision by
+# `python -m benchmarks.kidbench.prepare`, so none of them — including the example splits —
+# are committed.
+*.jsonl
+!.gitignore
