@@ -48,6 +48,7 @@ class InferenceProviderConfig(BaseResponsesAPIModelConfig):
     uses_reasoning_parser: bool = False
     num_concurrent_requests: int = 1000
     extra_body: Dict[str, Any] = Field(default_factory=dict)
+    default_headers: Dict[str, str] = Field(default_factory=dict)
 
     correlate_via_user_field: bool = False
     """Forward the current rollout id (see ``nemo_gym.core.episode_context``) as
@@ -66,6 +67,7 @@ class InferenceProvider(SimpleResponsesAPIModel):
             api_key=self.config.api_key,
             # An outside provider, never a NeMo Gym server: its busy answers are waited out on a time budget.
             internal=False,
+            default_headers=self.config.default_headers,
         )
         self._converter = ChatCompletionsConverter(
             return_token_id_information=False,
