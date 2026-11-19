@@ -1,0 +1,25 @@
+config_paths:
+  - resources_servers/over_refusal_detection/configs/over_refusal_detection.yaml
+
+over_refusal_detection_benchmark:
+  _inherit_from: over_refusal_detection_simple_agent
+  responses_api_agents:
+    simple_agent:
+      resources_server:
+        name: over_refusal_detection
+      datasets:
+        - name: over_refusal_detection
+          type: benchmark
+          jsonl_fpath: benchmarks/over_refusal_detection/data/over_refusal_detection.jsonl
+          prepare_script: benchmarks/over_refusal_detection/prepare.py
+          prompt_config: null
+          num_repeats: 4
+          license: CC-BY-4.0
+
+over_refusal_detection_environment_server:
+  environment_servers:
+    legacy_agent:
+      entrypoint: app.py
+      agent_server:
+        type: responses_api_agents
+        name: over_refusal_detection_benchmark
