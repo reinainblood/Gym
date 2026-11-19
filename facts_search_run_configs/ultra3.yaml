@@ -1,0 +1,13 @@
+head_server:
+  host: 127.0.0.1
+  port: 11833
+
+policy_model:
+  responses_api_models:
+    inference_provider:
+      entrypoint: app.py
+      base_url: https://snorkelai-fdr--ep-nvidia-nemotron-3-ultra-550b-a55b-nvfp-63eebc.us-west.modal.direct/v1
+      api_key: ${oc.env:MODAL_PROXY_TOKEN,""}
+      model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4
+      uses_reasoning_parser: true
+      num_concurrent_requests: 32
