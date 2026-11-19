@@ -1,0 +1,42 @@
+or_bench_hard_resources_server:
+  resources_servers:
+    or_bench_hard:
+      entrypoint: app.py
+      domain: safety
+      verified: false
+      description: Full OR-Bench Hard safe cohort plus toxic control with the released three-class checker
+      value: Measure over-refusal and toxic-prompt rejection as a two-axis safety calibration result
+      judge_model_server:
+        type: responses_api_models
+        name: or_bench_response_judge
+      judge_responses_create_params:
+        input: []
+        max_output_tokens: 128
+        temperature: 0.0
+      judge_endpoint_max_concurrency: ${oc.decode:${oc.env:OR_BENCH_JUDGE_CONCURRENCY,16}}
+      judge_prompt_template_fpath: prompt_templates/or_bench_response_checker.txt
+
+or_bench_response_judge:
+  responses_api_models:
+    inference_provider:
+      entrypoint: app.py
+      base_url: ${oc.env:OR_BENCH_JUDGE_BASE_URL,''}
+      api_key: ${oc.env:OR_BENCH_JUDGE_API_KEY,''}
+      model: ${oc.env:OR_BENCH_JUDGE_MODEL,gpt-4-turbo-2024-04-09}
+      num_concurrent_requests: ${oc.decode:${oc.env:OR_BENCH_JUDGE_CONCURRENCY,16}}
+
+or_bench_hard_simple_agent:
+  responses_api_agents:
+    simple_agent:
+      entrypoint: app.py
+      max_steps: 1
+      resources_server:
+        type: resources_servers
+        name: or_bench_hard_resources_server
+      model_server:
+        type: responses_api_models
+        name: policy_model
+      datasets:
+        - name: example
+          type: example
+          jsonl_fpath: resources_servers/or_bench_hard/data/example.jsonl
